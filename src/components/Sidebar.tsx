@@ -46,7 +46,6 @@ const USER_SUBMENUS: { key: MenuKey; label: string }[] = [
 /** 컨텐츠 관리 하위 메뉴 — 상품 관리(+상품 하위), 가격 관리, 브랜드 관리 */
 const CONTENT_SUBMENUS: { key: MenuKey; label: string }[] = [
   { key: 'products', label: '상품 관리' },
-  { key: 'pricing', label: '가격 관리' },
   { key: 'brands', label: '브랜드 관리' },
 ];
 
@@ -55,7 +54,7 @@ const baseKey = (k: MenuKey) => k.split('/')[0];
 /** 부모 메뉴가 포함하는 하위 base 키들(펼침·활성 판정용) */
 const childBases = (key: MenuKey): string[] =>
   key === 'users' ? ['users', 'content-users']
-  : key === 'content' ? ['content', 'products', 'pricing', 'brands']
+  : key === 'content' ? ['content', 'products', 'brands']
   : [key];
 
 type SidebarProps = {

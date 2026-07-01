@@ -886,6 +886,15 @@ td.num { font-family: var(--num); font-weight: 500; }
 .grp-tab-acts span:hover { opacity: 1; }
 .grp-tab-div { width: 1px; align-self: stretch; background: var(--line); margin: 2px 6px; }
 .fp-loc { display: block; color: var(--text-3); font-size: 0.74rem; margin-top: 2px; }
+.fp-part { font-size: 0.72rem; font-weight: 700; color: var(--text-2); padding: 6px 8px 2px; }
+.fu-row { display: flex; align-items: center; gap: 8px; padding: 7px 6px; border-bottom: 1px solid var(--line); cursor: pointer; font-size: 0.82rem; }
+.fu-name { flex: 1; }
+.fu-tag { font-size: 0.68rem; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: var(--surface-2, #eee); color: var(--text-3); }
+.fu-tag.on { background: var(--ink); color: #fff; }
+.grp-guide { display: flex; gap: 10px; align-items: flex-start; background: var(--surface-2, #f4f5f7); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin: 10px 0 14px; font-size: 0.8rem; line-height: 1.6; color: var(--text-2); }
+.grp-guide-ico { font-size: 1rem; line-height: 1.5; }
+.grp-guide b { color: var(--ink); }
+.grp-guide code { background: #fff; border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; font-size: 0.76rem; }
 .grp-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
 @media (max-width: 1100px) { .grp-two-col { grid-template-columns: 1fr; } }
 .grp-col-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }

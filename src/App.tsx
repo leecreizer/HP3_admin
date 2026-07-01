@@ -7,7 +7,6 @@ import { Brands } from './pages/Brands';
 import { Dashboard } from './pages/Dashboard';
 import { Floorplans } from './pages/Floorplans';
 import { Products } from './pages/Products';
-import { Pricing } from './pages/Pricing';
 import { Design } from './pages/Design';
 import { RoleManager } from './pages/RoleManager';
 import { ModelingLibrary } from './pages/ModelingLibrary';
@@ -128,7 +127,6 @@ export default function App() {
     'users/operators': '어드민 운영자 관리',
     'content-users': '홈플래너 계정 관리',
     'products': '상품 관리',
-    'pricing': '가격 관리',
     'brands': '브랜드 관리',
     'users/roles': '권한 관리',
     'products/modeling': '컨텐츠 그룹 관리',
@@ -180,9 +178,6 @@ export default function App() {
       break;
     case 'content':
       content = <PagePlaceholder title="컨텐츠 관리" />;
-      break;
-    case 'pricing':
-      content = <Pricing />;
       break;
     case 'products':
       if (active === 'products/modeling') { content = <ModelingLibrary />; break; }

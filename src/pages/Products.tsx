@@ -4,6 +4,7 @@ import { FolderIcon, PencilIcon, SearchIcon, TrashIcon } from '../components/ico
 import { ThSort, useSort } from '../components/sortable';
 import { Pagination, usePagination } from '../components/Pagination';
 import { AssetViewer } from '../components/AssetViewer';
+import { useConfirm } from '../components/confirm';
 import type { Group } from '../data/org';
 import { loadSwapState, expandMembers } from '../data/groups';
 import { putAsset, getAssets } from '../data/assetStore';
@@ -1107,16 +1108,60 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
     setNewName('');
   };
 
+  const { confirm, confirmDialog } = useConfirm();
+  // 삭제 되돌리기 — products·folders 스냅샷 (undo/redo 각 최대 10)
+  const undoRef = useRef<{ products: Product[]; folders: Folder[] }[]>([]);
+  const redoRef = useRef<{ products: Product[]; folders: Folder[] }[]>([]);
+  const [, setHistTick] = useState(0);
+  const pushHistory = () => {
+    undoRef.current.push({ products, folders });
+    if (undoRef.current.length > 10) undoRef.current.shift();
+    redoRef.current = [];
+    setHistTick((t) => t + 1);
+  };
+  const undo = () => {
+    const prev = undoRef.current.pop();
+    if (!prev) return;
+    redoRef.current.push({ products, folders });
+    if (redoRef.current.length > 10) redoRef.current.shift();
+    setProducts(prev.products); setFolders(prev.folders); persistWith({ products: prev.products, folders: prev.folders });
+    setHistTick((t) => t + 1);
+  };
+  const redo = () => {
+    const next = redoRef.current.pop();
+    if (!next) return;
+    undoRef.current.push({ products, folders });
+    if (undoRef.current.length > 10) undoRef.current.shift();
+    setProducts(next.products); setFolders(next.folders); persistWith({ products: next.products, folders: next.folders });
+    setHistTick((t) => t + 1);
+  };
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const k = e.key.toLowerCase();
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return; // 입력 중엔 무시
+      if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+      else if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); redo(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  });
+
   const deleteFolder = (id: string) => {
     if (ROOT_IDS.includes(id)) return;
     const folder = folders.find((f) => f.id === id);
     if (!folder) return;
     // 하위 폴더가 있으면 먼저 이동/삭제해야 함
     if (folders.some((c) => c.parentId === id)) return;
+    pushHistory();
     // 안에 있던 상품은 상위 폴더로 이동 (없으면 해당 섹션 미분류 루트)
     const parent = folder.parentId ?? (folder.kind === 'internal' ? INT_ROOT_ID : ROOT_FOLDER_ID);
-    setProducts((prev) => prev.map((p) => (p.folderId === id ? { ...p, folderId: parent } : p)));
-    setFolders((prev) => prev.filter((f) => f.id !== id));
+    const nextP = products.map((p) => (p.folderId === id ? { ...p, folderId: parent } : p));
+    const nextF = folders.filter((f) => f.id !== id);
+    setProducts(nextP); setFolders(nextF); persistWith({ products: nextP, folders: nextF });
     if (activeFolder === id) setActiveFolder(parent);
   };
 
@@ -1231,6 +1276,7 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
   };
 
   const deleteChecked = () => {
+    pushHistory();
     const next = products.filter((p) => !checked.has(p.contentCode));
     setProducts(next);
     persistWith({ products: next });
@@ -1732,7 +1778,12 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
                   <div className="folder-menu-div" />
                   <button role="menuitem" className="danger" disabled={hasChildren}
                     title={hasChildren ? '하위 폴더를 먼저 이동/삭제하세요' : undefined}
-                    onClick={() => { if (!hasChildren) { deleteFolder(f.id); setMenuFolder(null); } }}>삭제</button>
+                    onClick={() => {
+                      setMenuFolder(null);
+                      if (hasChildren) return;
+                      const cnt = products.filter((p) => p.folderId === f.id).length;
+                      confirm({ message: <>‘{f.name}’ 폴더를 삭제할까요?<br />폴더 안 상품 {cnt}개는 상위 폴더로 이동합니다.</>, onConfirm: () => deleteFolder(f.id) });
+                    }}>삭제</button>
                 </>}
               </div>,
               document.body,
@@ -2433,6 +2484,8 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
         <span className="date">전체 {products.length.toLocaleString()}개 컨텐츠</span>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
           {dirty && <span className="dirty-badge" title="저장되지 않은 변경사항">● 미저장 변경</span>}
+          <button className="btn-ghost" title="삭제 되돌리기 (Ctrl+Z, 최대 10회)" disabled={undoRef.current.length === 0} onClick={undo}>↶ 되돌리기</button>
+          <button className="btn-ghost" title="다시하기 (Ctrl+Shift+Z, 최대 10회)" disabled={redoRef.current.length === 0} onClick={redo}>↷ 다시하기</button>
           <button className="btn-primary" onClick={() => { setForm({ ...EMPTY_PRODUCT_FORM, folderId: activeFolder }); setPendingAsset(null); setPreviewAssetId(null); setShowRegister(true); }}>
             + 상품 등록
           </button>
@@ -2463,6 +2516,7 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
           </button>
         </div>
       </div>
+      {confirmDialog}
 
       <div className="products-layout" style={{ gridTemplateColumns: `${folderWidth}px 6px 1fr` }}>
         {/* ---- 폴더 패널 (카테고리 설정 + 노출/비노출 2섹션) ---- */}
@@ -2568,7 +2622,8 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
                   <option key={f.id} value={f.id}>{f.name}</option>
                 ))}
               </select>
-              <button className="btn-ghost danger" disabled={checked.size === 0} onClick={deleteChecked}>
+              <button className="btn-ghost danger" disabled={checked.size === 0}
+                onClick={() => confirm({ message: <>선택한 상품 {checked.size}개를 삭제할까요?</>, onConfirm: deleteChecked })}>
                 삭제
               </button>
             </div>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PencilIcon, TrashIcon } from '../components/icons';
 import {
-  loadProducts, loadFolders, loadSwapState, saveSwapState, expandMembers,
+  loadProducts, loadFolders, loadSwapState, saveSwapState,
   type SwapGroup,
 } from '../data/groups';
 
@@ -20,10 +20,9 @@ export function ModelingLibrary() {
   const [groups, setGroups] = useState<SwapGroup[]>(saved.groups);
   const [folders, setFolders] = useState<Record<string, string[]>>(saved.folders);
   const [items, setItems] = useState<Record<string, string[]>>(saved.items ?? {});
-  const [groupRefs, setGroupRefs] = useState<Record<string, string[]>>(saved.groupRefs ?? {});
+  const [groupRefs] = useState<Record<string, string[]>>(saved.groupRefs ?? {});
   const [categories, setCategories] = useState<string[]>(saved.categories);
   const [activeCat, setActiveCat] = useState<string>(saved.categories[0] ?? '');
-  // 이 페이지에서 변경하지 않는 값은 로드값을 그대로 보존해 저장
   const folderModes = saved.folderModes ?? {};
   const styles = saved.styles;
   const styleCategories = saved.styleCategories ?? [];
@@ -35,26 +34,20 @@ export function ModelingLibrary() {
   useEffect(() => { setDirty(sig !== savedSig.current); }, [sig]);
   const save = () => { saveSwapState({ groups, folders, folderModes, items, groupRefs, styles, categories, styleCategories }); savedSig.current = sig; setDirty(false); };
 
-  const memberMap = useMemo(() => expandMembers({ groups, folders, items, styles, categories }, allFolders, products), [groups, folders, items, styles, categories, allFolders, products]);
-
-  // 모델 그룹 생성/편집
-  const [addingGroup, setAddingGroup] = useState<null | 'normal' | 'grouping'>(null);
-  const [newGroupName, setNewGroupName] = useState('');
-  const [renaming, setRenaming] = useState<string | null>(null);
-  const [renameDraft, setRenameDraft] = useState('');
   const [pickerGroup, setPickerGroup] = useState<string | null>(null);
   const [folderQuery, setFolderQuery] = useState('');
   /** 상품 직접 추가 피커가 열린 그룹 + 검색어 */
   const [itemPickerGroup, setItemPickerGroup] = useState<string | null>(null);
   const [itemQuery, setItemQuery] = useState('');
-  /** 그룹핑: 일반 그룹 추가 피커 */
-  const [refPickerGroup, setRefPickerGroup] = useState<string | null>(null);
-  const [refQuery, setRefQuery] = useState('');
-  /** 선택된 그룹 — 선택하면 영역 우측 추가 버튼 활성 */
-  const [selGroup, setSelGroup] = useState<string | null>(null);
-  const selectGroup = (id: string) => { setSelGroup(id); setPickerGroup(null); setItemPickerGroup(null); setRefPickerGroup(null); };
   const productName = (code: string) => products.find((p) => p.contentCode === code)?.name ?? code;
-  const groupName = (id: string) => groups.find((g) => g.id === id)?.name ?? id;
+  /** 폴더 단위 노출 그룹 편집 상태 */
+  const [selFu, setSelFu] = useState<string | null>(null);
+  const [addingFu, setAddingFu] = useState(false);
+  const [fuName, setFuName] = useState('');
+  const [fuRenaming, setFuRenaming] = useState<string | null>(null);
+  const [fuRenameDraft, setFuRenameDraft] = useState('');
+  /** 폴더 단위 노출 그룹에 상품그룹(폴더) 추가 피커 열림 대상 */
+  const [fuPicker, setFuPicker] = useState<string | null>(null);
 
   // 탭(카테고리) 편집
   const [addingTab, setAddingTab] = useState(false);
@@ -63,28 +56,6 @@ export function ModelingLibrary() {
   const [tabRenameDraft, setTabRenameDraft] = useState('');
   const [confirmDeleteTab, setConfirmDeleteTab] = useState<string | null>(null);
 
-  const addGroup = (cat: string, type: 'normal' | 'grouping') => {
-    const name = newGroupName.trim();
-    if (!name) return;
-    setGroups((p) => [...p, { id: `sg-${Date.now()}`, name, kind: cat, type }]);
-    setNewGroupName(''); setAddingGroup(null);
-  };
-  const commitRename = () => {
-    const name = renameDraft.trim();
-    if (renaming && name) setGroups((p) => p.map((g) => (g.id === renaming ? { ...g, name } : g)));
-    setRenaming(null);
-  };
-  const deleteGroup = (id: string) => {
-    setGroups((p) => p.filter((g) => g.id !== id));
-    setFolders((p) => { const n = { ...p }; delete n[id]; return n; });
-    setItems((p) => { const n = { ...p }; delete n[id]; return n; });
-    // 삭제된 일반 그룹을 참조하던 그룹핑 그룹에서도 제거
-    setGroupRefs((p) => {
-      const n = { ...p }; delete n[id];
-      for (const k of Object.keys(n)) n[k] = (n[k] ?? []).filter((x) => x !== id);
-      return n;
-    });
-  };
   const connectFolder = (folderId: string, groupId: string) =>
     setFolders((p) => ({ ...p, [groupId]: (p[groupId] ?? []).includes(folderId) ? (p[groupId] ?? []) : [...(p[groupId] ?? []), folderId] }));
   const disconnectFolder = (folderId: string, groupId: string) =>
@@ -94,11 +65,6 @@ export function ModelingLibrary() {
     setItems((p) => ({ ...p, [groupId]: (p[groupId] ?? []).includes(code) ? (p[groupId] ?? []) : [...(p[groupId] ?? []), code] }));
   const disconnectItem = (code: string, groupId: string) =>
     setItems((p) => ({ ...p, [groupId]: (p[groupId] ?? []).filter((c) => c !== code) }));
-  // 그룹핑: 일반 그룹 묶기
-  const connectRef = (refGroupId: string, groupingId: string) =>
-    setGroupRefs((p) => ({ ...p, [groupingId]: (p[groupingId] ?? []).includes(refGroupId) ? (p[groupingId] ?? []) : [...(p[groupingId] ?? []), refGroupId] }));
-  const disconnectRef = (refGroupId: string, groupingId: string) =>
-    setGroupRefs((p) => ({ ...p, [groupingId]: (p[groupingId] ?? []).filter((x) => x !== refGroupId) }));
 
   // 탭(카테고리) 추가/수정/삭제
   const addTab = () => {
@@ -121,7 +87,6 @@ export function ModelingLibrary() {
     setGroups((p) => p.filter((g) => g.kind !== cat));
     setFolders((p) => { const n = { ...p }; for (const id of ids) delete n[id]; return n; });
     setItems((p) => { const n = { ...p }; for (const id of ids) delete n[id]; return n; });
-    setGroupRefs((p) => { const n = { ...p }; for (const id of ids) delete n[id]; return n; });
     setCategories((p) => {
       const next = p.filter((c) => c !== cat);
       if (activeCat === cat) setActiveCat(next[0] ?? '');
@@ -149,50 +114,6 @@ export function ModelingLibrary() {
     for (const o of folderOptions) m[o.id] = o.path;
     return m;
   }, [folderOptions]);
-
-  /** 공통 — 그룹 헤더 행(이름/개수/선택/이름변경/삭제) */
-  const renderGroupHead = (g: SwapGroup, count: number) => (
-    <div className={`tree-item selectable${selGroup === g.id ? ' selected' : ''}`} style={{ paddingLeft: 14 }}
-      onClick={() => { if (renaming !== g.id) selectGroup(g.id); }}>
-      {renaming === g.id ? (
-        <input className="inline-input tree-rename" autoFocus value={renameDraft}
-          onChange={(e) => setRenameDraft(e.target.value)} onClick={(e) => e.stopPropagation()}
-          onBlur={commitRename} onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenaming(null); }} />
-      ) : (
-        <span className="t">{g.name}</span>
-      )}
-      <span className="count">{count}</span>
-      <span className="tree-actions">
-        <span className="tree-act" role="button" title="이름 변경" onClick={(e) => { e.stopPropagation(); setRenaming(g.id); setRenameDraft(g.name); }}><PencilIcon size={13} /></span>
-        <span className="tree-act" role="button" title="그룹 삭제" onClick={(e) => { e.stopPropagation(); deleteGroup(g.id); }}><TrashIcon size={13} /></span>
-      </span>
-    </div>
-  );
-
-  /** 일반 그룹 행 — 멤버(폴더·상품) 태그만 표시. 추가 버튼은 영역 헤더에서. */
-  const renderNormalRow = (g: SwapGroup) => {
-    const connected = folders[g.id] ?? [];
-    const connectedItems = items[g.id] ?? [];
-    return (
-      <li key={g.id}>
-        {renderGroupHead(g, (memberMap[g.id] ?? []).length)}
-        {(connected.length > 0 || connectedItems.length > 0) && (
-          <div className="grp-conn">
-            {connected.map((fid) => (
-              <span key={fid} className="tag removable">📁 {folderName(fid)}
-                <button className="tag-x" aria-label={`${folderName(fid)} 제거`} onClick={() => disconnectFolder(fid, g.id)}>×</button>
-              </span>
-            ))}
-            {connectedItems.map((code) => (
-              <span key={code} className="tag removable item">📦 {productName(code)}
-                <button className="tag-x" aria-label={`${productName(code)} 제거`} onClick={() => disconnectItem(code, g.id)}>×</button>
-              </span>
-            ))}
-          </div>
-        )}
-      </li>
-    );
-  };
 
   /** 폴더 추가 피커 패널 (선택 그룹 대상) */
   const renderFolderPicker = (gid: string) => {
@@ -256,74 +177,62 @@ export function ModelingLibrary() {
     );
   };
 
-  /** g가 groupRefs로 target에 (간접 포함) 도달하는지 — 순환 방지용 */
-  const reaches = (g: string, target: string, seen = new Set<string>()): boolean => {
-    if (g === target) return true;
-    if (seen.has(g)) return false;
-    seen.add(g);
-    return (groupRefs[g] ?? []).some((r) => reaches(r, target, seen));
-  };
-  /** 그룹의 표시 개수 — 그룹핑 그룹은 묶은 그룹 수, 일반 그룹은 멤버 상품 수 */
-  const groupCount = (id: string) =>
-    groups.find((x) => x.id === id)?.type === 'grouping' ? (groupRefs[id] ?? []).length : (memberMap[id] ?? []).length;
-
-  /** 그룹핑 그룹 행 — 묶은 그룹 태그만 표시. 추가 버튼은 영역 헤더에서. */
-  const renderGroupingRow = (g: SwapGroup) => {
-    const refs = groupRefs[g.id] ?? [];
-    return (
-      <li key={g.id}>
-        {renderGroupHead(g, refs.length)}
-        {refs.length > 0 && (
-          <div className="grp-conn">
-            {refs.map((rid) => {
-              const grouping = groups.find((x) => x.id === rid)?.type === 'grouping';
-              return (
-                <span key={rid} className="tag removable item">{grouping ? '🗂️' : '🧩'} {groupName(rid)} <small style={{ color: 'var(--text-3)' }}>{groupCount(rid)}</small>
-                  <button className="tag-x" aria-label={`${groupName(rid)} 제거`} onClick={() => disconnectRef(rid, g.id)}>×</button>
-                </span>
-              );
-            })}
-          </div>
-        )}
-      </li>
-    );
-  };
-
-  /** 그룹 묶기 피커 패널 (선택된 그룹핑 그룹 대상) */
-  const renderRefPicker = (gid: string) => {
-    const refs = groupRefs[gid] ?? [];
-    const refMatches = groups.filter((n) =>
-      n.kind === activeCat && n.id !== gid && !refs.includes(n.id)
-      && !reaches(n.id, gid) /* 순환 방지: 이미 자기를 포함하는 그룹은 제외 */
-      && (!refQuery.trim() || n.name.toLowerCase().includes(refQuery.trim().toLowerCase())));
+  /** 폴더 단위 노출 그룹에 담을 상품그룹(=왼쪽 교체 묶음의 폴더) 선택 피커 */
+  const renderFuFolderPicker = (fuId: string) => {
+    const inFu = folders[fuId] ?? [];
+    const catFolders = catGroupRef ? (folders[catGroupRef] ?? []) : [];
+    const matches = catFolders.filter((fid) => !inFu.includes(fid)
+      && (!folderQuery.trim() || folderName(fid).toLowerCase().includes(folderQuery.trim().toLowerCase())));
     return (
       <div className="folder-picker">
         <div className="folder-picker-bar">
-          <input className="inline-input full" autoFocus value={refQuery}
-            placeholder="교체 묶음·구성 세트 검색…" aria-label="그룹 검색"
-            onChange={(e) => setRefQuery(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Escape') { setRefPickerGroup(null); setRefQuery(''); } }} />
-          <button className="btn-ghost" onClick={() => { setRefPickerGroup(null); setRefQuery(''); }}>닫기</button>
+          <input className="inline-input full" autoFocus value={folderQuery} placeholder="교체 묶음의 폴더 검색…" aria-label="폴더 검색"
+            onChange={(e) => setFolderQuery(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Escape') { setFuPicker(null); setFolderQuery(''); } }} />
+          <button className="btn-ghost" onClick={() => { setFuPicker(null); setFolderQuery(''); }}>닫기</button>
         </div>
         <ul className="folder-picker-list">
-          {refMatches.map((n) => (
-            <li key={n.id}>
-              <button className="folder-pick-item" onClick={() => connectRef(n.id, gid)}>
-                <span className="fp-path">{n.type === 'grouping' ? '🗂️ ' : ''}{n.name} <small style={{ color: 'var(--text-3)' }}>{n.type === 'grouping' ? '그룹핑' : ''} {groupCount(n.id)}개</small></span>
-                <span className="fp-add">+ 추가</span>
+          {matches.map((fid) => (
+            <li key={fid}>
+              <button className="folder-pick-item" onClick={() => connectFolder(fid, fuId)}>
+                <span className="fp-path">📁 {folderName(fid)}</span><span className="fp-add">+ 추가</span>
               </button>
             </li>
           ))}
-          {refMatches.length === 0 && <li><span className="hint" style={{ display: 'block', padding: '6px 8px' }}>묶을 그룹 없음</span></li>}
+          {matches.length === 0 && <li><span className="hint" style={{ display: 'block', padding: '6px 8px' }}>{catFolders.length === 0 ? '왼쪽 교체 묶음에 폴더를 먼저 추가하세요' : '추가할 폴더 없음'}</span></li>}
         </ul>
       </div>
     );
   };
 
   const normalGroups = groups.filter((g) => g.kind === activeCat && g.type !== 'grouping');
-  const groupingGroups = groups.filter((g) => g.kind === activeCat && g.type === 'grouping');
-  const selectedNormal = normalGroups.find((g) => g.id === selGroup) ?? null;
-  const selectedGrouping = groupingGroups.find((g) => g.id === selGroup) ?? null;
+  // 부위(탭)당 교체 묶음 1개(type normal) — 상품 개별 노출. 없으면 추가 시 자동 생성
+  const catGroup = normalGroups[0] ?? null;
+  const catGroupRef = catGroup?.id ?? null;
+  const ensureCatGroupId = (): string => {
+    if (catGroup) return catGroup.id;
+    const id = `sg-${Date.now()}`;
+    setGroups((p) => [...p, { id, name: activeCat, kind: activeCat, type: 'normal' }]);
+    return id;
+  };
+  // 폴더 단위 노출 그룹(type grouping) — 명명 생성 후 왼쪽 교체 묶음의 상품그룹(폴더)을 담음
+  const fuGroups = groups.filter((g) => g.kind === activeCat && g.type === 'grouping');
+  const addFuGroup = () => {
+    const name = fuName.trim(); if (!name) return;
+    const id = `fu-${Date.now()}`;
+    setGroups((p) => [...p, { id, name, kind: activeCat, type: 'grouping' }]);
+    setSelFu(id); setFuName(''); setAddingFu(false);
+  };
+  const commitFuRename = () => {
+    const n = fuRenameDraft.trim();
+    if (fuRenaming && n) setGroups((p) => p.map((g) => (g.id === fuRenaming ? { ...g, name: n } : g)));
+    setFuRenaming(null);
+  };
+  const deleteFu = (id: string) => {
+    setGroups((p) => p.filter((g) => g.id !== id));
+    setFolders((p) => { const n = { ...p }; delete n[id]; return n; });
+    if (selFu === id) setSelFu(null);
+  };
 
   return (
     <main className="main">
@@ -364,64 +273,103 @@ export function ModelingLibrary() {
         )}
       </div>
 
+      <div className="grp-guide">
+        <span className="grp-guide-ico">💡</span>
+        <div>
+          <b>탭</b>은 부위(몸통·도어·손잡이 등)입니다. 각 부위의
+          <b> 교체 묶음</b>(왼쪽)에 폴더·상품을 담아 <u>이 부위에서 교체 가능한 옵션</u>을 만듭니다.
+          <b> 폴더 단위 노출</b>(오른쪽)에 폴더를 담으면 그 폴더는 리스트에서 <u>낱개 상품 대신 ‘폴더 하나’</u>로 노출됩니다.
+          <br />
+          여러 부위를 한 벌로 묶는 <b>세트</b>는 <b>스타일 그룹 관리</b>에서, 창높이처럼 <b>조건별 다른 묶음</b>은
+          상품 편집의 <b>구성 슬롯 → 조건 규칙</b>(<code>#H&nbsp;≤&nbsp;1200 → 저창용 손잡이</code>)에서 연결합니다.
+        </div>
+      </div>
+
       <div className="grp-two-col">
-        {/* ── 좌: 일반 그룹 ── */}
+        {/* ── 좌: 교체 묶음 (부위당 1개, 폴더/상품 직접 추가) ── */}
         <section className="panel">
           <div className="grp-col-head">
-            <h2 className="grp-section-title">교체 묶음 <small>부위 내 교체 옵션(폴더·상품) — 조건 분기 대상</small></h2>
+            <h2 className="grp-section-title">교체 묶음 <small>이 부위의 폴더·상품 — 조건 분기 대상</small></h2>
             <div className="grp-col-actions">
-              {selectedNormal ? (
-                <>
-                  <span className="grp-sel-name" title="선택된 그룹">{selectedNormal.name}</span>
-                  <button className="conn-add" onClick={() => { setPickerGroup(selectedNormal.id); setItemPickerGroup(null); setFolderQuery(''); }}>+ 폴더 추가</button>
-                  <button className="conn-add" onClick={() => { setItemPickerGroup(selectedNormal.id); setPickerGroup(null); setItemQuery(''); }}>+ 상품 추가</button>
-                </>
-              ) : <span className="hint">그룹 선택 후 추가</span>}
+              <button className="conn-add" disabled={!activeCat}
+                onClick={() => { const id = ensureCatGroupId(); setPickerGroup(id); setItemPickerGroup(null); setFolderQuery(''); }}>+ 폴더 추가</button>
+              <button className="conn-add" disabled={!activeCat}
+                onClick={() => { const id = ensureCatGroupId(); setItemPickerGroup(id); setPickerGroup(null); setItemQuery(''); }}>+ 상품 추가</button>
             </div>
           </div>
-          {selectedNormal && pickerGroup === selectedNormal.id && renderFolderPicker(selectedNormal.id)}
-          {selectedNormal && itemPickerGroup === selectedNormal.id && renderItemPicker(selectedNormal.id)}
-          <ul className="tree">
-            {normalGroups.map(renderNormalRow)}
-            {normalGroups.length === 0 && <li><div className="tree-item" style={{ paddingLeft: 14 }}><span className="hint">그룹 없음</span></div></li>}
-          </ul>
-          {addingGroup === 'normal' ? (
-            <div className="folder-new">
-              <input autoFocus value={newGroupName} placeholder={`${activeCat} 교체 묶음 이름`} onChange={(e) => setNewGroupName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') addGroup(activeCat, 'normal'); if (e.key === 'Escape') setAddingGroup(null); }} />
-              <button className="btn-mini" onClick={() => addGroup(activeCat, 'normal')}>생성</button>
+          {pickerGroup && catGroup && pickerGroup === catGroup.id && renderFolderPicker(pickerGroup)}
+          {itemPickerGroup && renderItemPicker(itemPickerGroup)}
+          {catGroup ? (
+            <div className="grp-conn" style={{ marginTop: 6 }}>
+              {(folders[catGroup.id] ?? []).map((fid) => (
+                <span key={fid} className="tag removable">📁 {folderName(fid)}
+                  <button className="tag-x" aria-label={`${folderName(fid)} 제거`} onClick={() => disconnectFolder(fid, catGroup.id)}>×</button>
+                </span>
+              ))}
+              {(items[catGroup.id] ?? []).map((code) => (
+                <span key={code} className="tag removable item">📦 {productName(code)}
+                  <button className="tag-x" aria-label={`${productName(code)} 제거`} onClick={() => disconnectItem(code, catGroup.id)}>×</button>
+                </span>
+              ))}
+              {(folders[catGroup.id] ?? []).length === 0 && (items[catGroup.id] ?? []).length === 0 &&
+                <span className="hint">위 버튼으로 폴더·상품을 추가하세요.</span>}
             </div>
           ) : (
-            activeCat && <button className="folder-new-cta" onClick={() => { setAddingGroup('normal'); setNewGroupName(''); }}>+ 교체 묶음 추가</button>
+            <p className="hint" style={{ marginTop: 8 }}>이 부위에 폴더·상품을 추가하면 교체 묶음이 만들어집니다.</p>
           )}
         </section>
 
-        {/* ── 우: 그룹핑 그룹 ── */}
+        {/* ── 우: 폴더 단위 노출 (담은 폴더는 리스트에 폴더 하나로 노출) ── */}
         <section className="panel">
           <div className="grp-col-head">
-            <h2 className="grp-section-title">구성 세트 <small>여러 부위 교체 묶음을 한 세트로 조합</small></h2>
+            <h2 className="grp-section-title">폴더 단위 노출 <small>그룹을 만들고 교체 묶음의 상품그룹(폴더)을 담으면 폴더 하나로 노출</small></h2>
             <div className="grp-col-actions">
-              {selectedGrouping ? (
-                <>
-                  <span className="grp-sel-name" title="선택된 그룹">{selectedGrouping.name}</span>
-                  <button className="conn-add" onClick={() => { setRefPickerGroup(selectedGrouping.id); setRefQuery(''); }}>+ 그룹 추가</button>
-                </>
-              ) : <span className="hint">그룹 선택 후 추가</span>}
+              {selFu && fuGroups.some((g) => g.id === selFu) && (
+                <button className="conn-add" onClick={() => { setFuPicker(selFu); setFolderQuery(''); }}>+ 상품그룹 추가</button>
+              )}
             </div>
           </div>
-          {selectedGrouping && refPickerGroup === selectedGrouping.id && renderRefPicker(selectedGrouping.id)}
+          {fuPicker && renderFuFolderPicker(fuPicker)}
           <ul className="tree">
-            {groupingGroups.map(renderGroupingRow)}
-            {groupingGroups.length === 0 && <li><div className="tree-item" style={{ paddingLeft: 14 }}><span className="hint">그룹 없음</span></div></li>}
+            {fuGroups.map((g) => {
+              const fs = folders[g.id] ?? [];
+              return (
+                <li key={g.id}>
+                  <div className={`tree-item selectable${selFu === g.id ? ' selected' : ''}`} style={{ paddingLeft: 14 }}
+                    onClick={() => { if (fuRenaming !== g.id) { setSelFu(g.id); setFuPicker(null); } }}>
+                    {fuRenaming === g.id ? (
+                      <input className="inline-input tree-rename" autoFocus value={fuRenameDraft}
+                        onClick={(e) => e.stopPropagation()} onChange={(e) => setFuRenameDraft(e.target.value)}
+                        onBlur={commitFuRename} onKeyDown={(e) => { if (e.key === 'Enter') commitFuRename(); if (e.key === 'Escape') setFuRenaming(null); }} />
+                    ) : (<span className="t">{g.name}</span>)}
+                    <span className="count">{fs.length}</span>
+                    <span className="tree-actions">
+                      <span className="tree-act" role="button" title="이름 변경" onClick={(e) => { e.stopPropagation(); setFuRenaming(g.id); setFuRenameDraft(g.name); }}><PencilIcon size={13} /></span>
+                      <span className="tree-act" role="button" title="삭제" onClick={(e) => { e.stopPropagation(); deleteFu(g.id); }}><TrashIcon size={13} /></span>
+                    </span>
+                  </div>
+                  {fs.length > 0 && (
+                    <div className="grp-conn">
+                      {fs.map((fid) => (
+                        <span key={fid} className="tag removable">📁 {folderName(fid)}
+                          <button className="tag-x" aria-label={`${folderName(fid)} 제거`} onClick={() => disconnectFolder(fid, g.id)}>×</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+            {fuGroups.length === 0 && <li><div className="tree-item" style={{ paddingLeft: 14 }}><span className="hint">그룹 없음</span></div></li>}
           </ul>
-          {addingGroup === 'grouping' ? (
+          {addingFu ? (
             <div className="folder-new">
-              <input autoFocus value={newGroupName} placeholder={`${activeCat} 구성 세트 이름`} onChange={(e) => setNewGroupName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') addGroup(activeCat, 'grouping'); if (e.key === 'Escape') setAddingGroup(null); }} />
-              <button className="btn-mini" onClick={() => addGroup(activeCat, 'grouping')}>생성</button>
+              <input autoFocus value={fuName} placeholder={`${activeCat} 폴더 단위 노출 이름`} onChange={(e) => setFuName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') addFuGroup(); if (e.key === 'Escape') setAddingFu(false); }} />
+              <button className="btn-mini" onClick={addFuGroup}>생성</button>
             </div>
           ) : (
-            activeCat && <button className="folder-new-cta" onClick={() => { setAddingGroup('grouping'); setNewGroupName(''); }}>+ 구성 세트 추가</button>
+            activeCat && <button className="folder-new-cta" onClick={() => { setAddingFu(true); setFuName(''); }}>+ 폴더 단위 노출 추가</button>
           )}
         </section>
       </div>

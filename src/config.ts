@@ -7,7 +7,6 @@ export type BuiltinMenuKey =
   | 'content'
   | 'brands'
   | 'products'
-  | 'pricing'
   | 'design'
   | 'settings';
 
@@ -58,13 +57,13 @@ export type AdminConfig = {
 
 /** admin 등급이 가질 수 있는 전체 메뉴 키(대시보드+주메뉴+시스템) */
 export const ALL_ADMIN_MENU_KEYS: MenuKey[] = [
-  'dashboard', 'users', 'content-users', 'content', 'brands', 'floorplans', 'products', 'pricing', 'design', 'settings',
+  'dashboard', 'users', 'content-users', 'content', 'brands', 'floorplans', 'products', 'design', 'settings',
 ];
 
 /** 기본 등급 세트 (설정에서 추가·수정·삭제 가능) */
 export const DEFAULT_ROLES: Role[] = [
   { id: 'role-super', name: '최고관리자', scope: 'admin', menus: [...ALL_ADMIN_MENU_KEYS], builtin: true },
-  { id: 'role-operator', name: '운영자', scope: 'admin', menus: ['dashboard', 'floorplans', 'content', 'products', 'pricing', 'design'], builtin: true },
+  { id: 'role-operator', name: '운영자', scope: 'admin', menus: ['dashboard', 'floorplans', 'content', 'products', 'design'], builtin: true },
   { id: 'role-viewer', name: '뷰어', scope: 'admin', menus: ['dashboard', 'floorplans'], builtin: true },
   { id: 'role-user', name: '일반', scope: 'service', menus: [], builtin: true },
   { id: 'role-b2b', name: 'B2B', scope: 'service', menus: [], builtin: true },

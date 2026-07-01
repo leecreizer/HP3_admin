@@ -1,16 +1,25 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { PencilIcon, TrashIcon } from '../components/icons';
-import { loadSwapState, saveSwapState, type StyleSet } from '../data/groups';
+import { loadSwapState, saveSwapState, loadFolders, type StyleSet } from '../data/groups';
 
 /**
- * 스타일 그룹 관리 — 컨텐츠 그룹 관리에서 만든 모델 그룹들의 묶음(스타일).
- * - 스타일 카테고리(탭)별로 스타일을 만들고, 각 스타일에 모델 그룹들을 묶는다.
+ * 스타일 그룹 관리 — 부위별 교체 묶음의 폴더(상품그룹)를 하나씩 골라 묶은 ‘스타일’.
+ * 예: 매트화이트 = 몸통(일반장) + 도어(리노아베이지) + … → 스타일 선택 시 각 부위가 한 번에 교체.
  */
 export function StyleLibrary() {
   const saved = useRef(loadSwapState()).current;
-  // 모델 그룹/폴더/상품 등은 이 페이지에서 변경하지 않으므로 로드값을 보존해 저장
+  const allFolders = useRef(loadFolders()).current;
+  // 이 페이지에서 변경하지 않는 값은 로드값을 보존해 저장
   const groups = saved.groups;
-  const groupName = (id: string) => groups.find((g) => g.id === id)?.name ?? id;
+  const folderName = (id: string) => allFolders.find((f) => f.id === id)?.name ?? id;
+  // 부위(탭)별 교체 묶음의 폴더(상품그룹) 목록
+  const partOptions = useMemo(() => (saved.categories ?? []).map((part) => {
+    const gids = groups.filter((g) => g.kind === part && g.type !== 'grouping').map((g) => g.id);
+    const fids = [...new Set(gids.flatMap((gid) => saved.folders[gid] ?? []))];
+    return { part, folders: fids.map((fid) => ({ id: fid, name: folderName(fid) })) };
+  }).filter((o) => o.folders.length > 0), [groups, saved.categories, saved.folders, allFolders]);
+  /** 폴더 id → 부위(탭)명 */
+  const folderPart = useMemo(() => { const m: Record<string, string> = {}; for (const o of partOptions) for (const f of o.folders) m[f.id] = o.part; return m; }, [partOptions]);
 
   const [styles, setStyles] = useState<StyleSet[]>(saved.styles);
   const [styleCategories, setStyleCategories] = useState<string[]>(saved.styleCategories ?? []);
@@ -35,7 +44,7 @@ export function StyleLibrary() {
   const addStyle = (cat: string) => {
     const name = newStyleName.trim();
     if (!name) return;
-    setStyles((p) => [...p, { id: `st-${Date.now()}`, name, kind: cat, groupIds: [] }]);
+    setStyles((p) => [...p, { id: `st-${Date.now()}`, name, kind: cat, folders: [] }]);
     setNewStyleName(''); setAddingStyle(false);
   };
   const commitStyleRename = () => {
@@ -44,10 +53,16 @@ export function StyleLibrary() {
     setStyleRenaming(null);
   };
   const deleteStyle = (id: string) => setStyles((p) => p.filter((s) => s.id !== id));
-  const connectStyleGroup = (styleId: string, gid: string) =>
-    setStyles((p) => p.map((s) => (s.id === styleId && !(s.groupIds ?? []).includes(gid) ? { ...s, groupIds: [...(s.groupIds ?? []), gid] } : s)));
-  const disconnectStyleGroup = (styleId: string, gid: string) =>
-    setStyles((p) => p.map((s) => (s.id === styleId ? { ...s, groupIds: (s.groupIds ?? []).filter((x) => x !== gid) } : s)));
+  /** 스타일에 폴더(상품그룹) 담기 — 같은 부위는 하나만(교체하며 반영) */
+  const connectStyleFolder = (styleId: string, fid: string) =>
+    setStyles((p) => p.map((s) => {
+      if (s.id !== styleId) return s;
+      const part = folderPart[fid];
+      const kept = (s.folders ?? []).filter((x) => folderPart[x] !== part); // 같은 부위 기존 선택 제거
+      return { ...s, folders: [...kept, fid] };
+    }));
+  const disconnectStyleFolder = (styleId: string, fid: string) =>
+    setStyles((p) => p.map((s) => (s.id === styleId ? { ...s, folders: (s.folders ?? []).filter((x) => x !== fid) } : s)));
 
   // 탭(스타일 카테고리) 편집
   const [addingTab, setAddingTab] = useState(false);
@@ -120,12 +135,11 @@ export function StyleLibrary() {
 
       <section className="panel">
         <p className="hint" style={{ margin: '0 0 10px' }}>
-          <b>{activeCat || '스타일 탭'}</b> 스타일입니다. 각 스타일의 <b>+ 그룹 추가</b>로 <b>컨텐츠 그룹 관리</b>에서 만든 모델 그룹들을 묶으세요.
+          <b>{activeCat || '스타일 탭'}</b> 스타일입니다. <b>+ 상품그룹 담기</b>로 부위별(몸통·도어 …) 교체 묶음의 폴더를 <b>하나씩 골라</b> 한 벌로 묶으세요. (같은 부위는 하나만 — 새로 고르면 교체)
         </p>
         <ul className="tree">
           {styles.filter((s) => s.kind === activeCat).map((s) => {
-            const gids = s.groupIds ?? [];
-            const matches = groups.filter((g) => !gids.includes(g.id) && (!styleQuery.trim() || g.name.toLowerCase().includes(styleQuery.trim().toLowerCase())));
+            const fids = s.folders ?? [];
             return (
               <li key={s.id}>
                 <div className="tree-item" style={{ paddingLeft: 20 }}>
@@ -134,36 +148,48 @@ export function StyleLibrary() {
                       onChange={(e) => setStyleRenameDraft(e.target.value)}
                       onBlur={commitStyleRename} onKeyDown={(e) => { if (e.key === 'Enter') commitStyleRename(); if (e.key === 'Escape') setStyleRenaming(null); }} />
                   ) : (<span className="t">{s.name}</span>)}
-                  <span className="count">{gids.length}</span>
+                  <span className="count">{fids.length}</span>
                   <span className="tree-actions">
                     <span className="tree-act" role="button" title="이름 변경" onClick={() => { setStyleRenaming(s.id); setStyleRenameDraft(s.name); }}><PencilIcon size={13} /></span>
                     <span className="tree-act" role="button" title="스타일 삭제" onClick={() => deleteStyle(s.id)}><TrashIcon size={13} /></span>
                   </span>
                 </div>
                 <div className="grp-conn">
-                  {gids.map((gid) => (
-                    <span key={gid} className="tag removable">{groupName(gid)}
-                      <button className="tag-x" aria-label={`${groupName(gid)} 제거`} onClick={() => disconnectStyleGroup(s.id, gid)}>×</button>
+                  {fids.map((fid) => (
+                    <span key={fid} className="tag removable">📁 {folderName(fid)} <small style={{ color: 'var(--text-3)' }}>[{folderPart[fid] ?? '?'}]</small>
+                      <button className="tag-x" aria-label={`${folderName(fid)} 제거`} onClick={() => disconnectStyleFolder(s.id, fid)}>×</button>
                     </span>
                   ))}
                   {stylePicker === s.id ? (
                     <div className="folder-picker">
                       <div className="folder-picker-bar">
-                        <input className="inline-input full" autoFocus value={styleQuery} placeholder="모델 그룹 검색…" aria-label="그룹 검색"
+                        <input className="inline-input full" autoFocus value={styleQuery} placeholder="부위·폴더 검색…" aria-label="폴더 검색"
                           onChange={(e) => setStyleQuery(e.target.value)}
                           onKeyDown={(e) => { if (e.key === 'Escape') { setStylePicker(null); setStyleQuery(''); } }} />
                         <button className="btn-ghost" onClick={() => { setStylePicker(null); setStyleQuery(''); }}>닫기</button>
                       </div>
                       <ul className="folder-picker-list">
-                        {matches.map((g) => (
-                          <li key={g.id}><button className="folder-pick-item" onClick={() => connectStyleGroup(s.id, g.id)}>
-                            <span className="fp-path">{g.name} <small style={{ color: 'var(--text-3)' }}>{g.kind}</small></span><span className="fp-add">+ 추가</span></button></li>
-                        ))}
-                        {matches.length === 0 && <li><span className="hint" style={{ display: 'block', padding: '6px 8px' }}>일치하는 모델 그룹 없음</span></li>}
+                        {partOptions.map((o) => {
+                          const opts = o.folders.filter((f) => !fids.includes(f.id)
+                            && (!styleQuery.trim() || `${o.part} ${f.name}`.toLowerCase().includes(styleQuery.trim().toLowerCase())));
+                          if (opts.length === 0) return null;
+                          const chosen = (s.folders ?? []).some((x) => folderPart[x] === o.part);
+                          return (
+                            <li key={o.part}>
+                              <div className="fp-part">{o.part}{chosen && <small style={{ color: 'var(--text-3)' }}> · 선택됨(교체)</small>}</div>
+                              {opts.map((f) => (
+                                <button key={f.id} className="folder-pick-item" onClick={() => connectStyleFolder(s.id, f.id)}>
+                                  <span className="fp-path">📁 {f.name}</span><span className="fp-add">+ 담기</span>
+                                </button>
+                              ))}
+                            </li>
+                          );
+                        })}
+                        {partOptions.length === 0 && <li><span className="hint" style={{ display: 'block', padding: '6px 8px' }}>컨텐츠 그룹 관리의 교체 묶음에 폴더를 먼저 추가하세요</span></li>}
                       </ul>
                     </div>
                   ) : (
-                    <button className="conn-add" onClick={() => { setStylePicker(s.id); setStyleQuery(''); }}>+ 그룹 추가</button>
+                    <button className="conn-add" onClick={() => { setStylePicker(s.id); setStyleQuery(''); }}>+ 상품그룹 담기</button>
                   )}
                 </div>
               </li>
