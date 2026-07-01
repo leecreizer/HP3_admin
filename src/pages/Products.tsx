@@ -200,8 +200,9 @@ type Product = {
   filterValues?: string[];
   /** 운영정보 조합별 입력값 */
   opValues?: Record<string, string>;
-  /** 구성/교체 슬롯 — 모델링 교체 그룹 연결 (도어→도어그룹 등) */
-  modelingSlots?: { slot: string; groupId: string; defaultModelingId?: string }[];
+  /** 구성/교체 슬롯 — 모델링 교체 그룹 연결 (도어→도어그룹 등)
+   *  rules: 조건식(evalFormula)→교체 묶음(groupId) 분기. 위에서부터 참인 첫 규칙의 그룹 사용, 없으면 기본 groupId */
+  modelingSlots?: { slot: string; groupId: string; defaultModelingId?: string; rules?: { condition: string; groupId: string }[] }[];
   /** 스펙/몰 URL — 이름+주소 쌍 목록 */
   specUrls?: { name: string; url: string }[];
   mallUrls?: { name: string; url: string }[];
@@ -590,7 +591,7 @@ type ProductForm = {
   /** 운영정보 조합별 입력값 */
   opValues: Record<string, string>;
   /** 구성/교체 슬롯 */
-  modelingSlots: { slot: string; groupId: string; defaultModelingId?: string }[];
+  modelingSlots: { slot: string; groupId: string; defaultModelingId?: string; rules?: { condition: string; groupId: string }[] }[];
   specUrls: { name: string; url: string }[];
   mallUrls: { name: string; url: string }[];
   /** 썸네일·에셋 — 저장 전까지 폼에만 유지 */
@@ -640,6 +641,9 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
   const excelInputRef = useRef<HTMLInputElement>(null);
   /** 컨텐츠정보 엑셀 다운로드·업로드 메뉴 */
   const [ciOpen, setCiOpen] = useState(false);
+  /** 필터 선택 팝업 — 열릴 때 현재 적용 필터로 초안 초기화, 저장 시 반영 */
+  const [filterModalOpen, setFilterModalOpen] = useState(false);
+  const [filterDraft, setFilterDraft] = useState<string[]>([]);
   /** 접힌 폴더 id 집합 (기본 펼침) */
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set(saved.collapsedFolders ?? []));
   const toggleFolderOpen = (id: string) =>
@@ -1858,21 +1862,46 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
         {form.modelingSlots.map((row, i) => {
           const group = swapState.groups.find((g) => g.id === row.groupId);
           const members = row.groupId ? memberProducts(row.groupId) : [];
+          const slotKind = group?.kind ?? row.slot;
+          const candidateGroups = swapState.groups.filter((g) => g.kind === slotKind && g.type !== 'grouping');
+          const setRules = (rules: { condition: string; groupId: string }[]) =>
+            setSlots(form.modelingSlots.map((s, j) => (j === i ? { ...s, rules } : s)));
+          const rules = row.rules ?? [];
           return (
-            <div className="mslot-row" key={i}>
-              <span className="mslot-slot">{group?.kind ?? '슬롯'}</span>
-              <select className="inline-input" value={row.groupId}
-                onChange={(e) => { const g = swapState.groups.find((x) => x.id === e.target.value); setSlots(form.modelingSlots.map((s, j) => (j === i ? { ...s, groupId: e.target.value, slot: g?.kind ?? '', defaultModelingId: '' } : s))); }}>
-                <option value="">교체 그룹 선택</option>
-                {swapState.groups.map((g) => <option key={g.id} value={g.id}>{g.name} ({g.kind})</option>)}
-              </select>
-              <select className="inline-input" value={row.defaultModelingId ?? ''} disabled={!row.groupId}
-                onChange={(e) => setSlots(form.modelingSlots.map((s, j) => (j === i ? { ...s, defaultModelingId: e.target.value } : s)))}>
-                <option value="">기본 부위 상품</option>
-                {members.map((m) => <option key={m.contentCode} value={m.contentCode}>{m.name}</option>)}
-              </select>
-              <span className="mslot-cnt">{members.length}개</span>
-              <button className="order-btn" title="슬롯 제거" onClick={() => setSlots(form.modelingSlots.filter((_, j) => j !== i))}><TrashIcon size={12} /></button>
+            <div className="mslot-block" key={i}>
+              <div className="mslot-row">
+                <span className="mslot-slot">{slotKind || '슬롯'}</span>
+                <select className="inline-input" value={row.groupId}
+                  onChange={(e) => { const g = swapState.groups.find((x) => x.id === e.target.value); setSlots(form.modelingSlots.map((s, j) => (j === i ? { ...s, groupId: e.target.value, slot: g?.kind ?? '', defaultModelingId: '' } : s))); }}>
+                  <option value="">교체 묶음 선택(기본)</option>
+                  {swapState.groups.map((g) => <option key={g.id} value={g.id}>{g.name} ({g.kind})</option>)}
+                </select>
+                <select className="inline-input" value={row.defaultModelingId ?? ''} disabled={!row.groupId}
+                  onChange={(e) => setSlots(form.modelingSlots.map((s, j) => (j === i ? { ...s, defaultModelingId: e.target.value } : s)))}>
+                  <option value="">기본 부위 상품</option>
+                  {members.map((m) => <option key={m.contentCode} value={m.contentCode}>{m.name}</option>)}
+                </select>
+                <span className="mslot-cnt">{members.length}개</span>
+                <button className="order-btn" title="슬롯 제거" onClick={() => setSlots(form.modelingSlots.filter((_, j) => j !== i))}><TrashIcon size={12} /></button>
+              </div>
+              {/* 조건 분기 — 조건식이 참인 첫 규칙의 교체 묶음을 사용(예: 창높이별 손잡이) */}
+              <div className="mslot-rules">
+                {rules.map((r, ri) => (
+                  <div className="mslot-rule" key={ri}>
+                    <span className="mslot-rule-tag">조건</span>
+                    <input className="inline-input" placeholder="예: #H <= 1200 (빈칸=그 외 기본)" value={r.condition}
+                      onChange={(e) => setRules(rules.map((x, k) => (k === ri ? { ...x, condition: e.target.value } : x)))} />
+                    <span className="mslot-rule-arrow">→</span>
+                    <select className="inline-input" value={r.groupId}
+                      onChange={(e) => setRules(rules.map((x, k) => (k === ri ? { ...x, groupId: e.target.value } : x)))}>
+                      <option value="">교체 묶음 선택</option>
+                      {candidateGroups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                    </select>
+                    <button className="order-btn" title="규칙 제거" onClick={() => setRules(rules.filter((_, k) => k !== ri))}><TrashIcon size={11} /></button>
+                  </div>
+                ))}
+                <button className="link-mini" disabled={!slotKind} onClick={() => setRules([...rules, { condition: '', groupId: '' }])}>+ 조건 규칙</button>
+              </div>
             </div>
           );
         })}
@@ -1898,55 +1927,73 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
   /** 필터 선택기에서 쓰는 전체 그룹 = 연동 그룹 + 사용자 정의 그룹 */
   const pickerGroups: FilterGroup[] = [...derivedFilterGroups, ...filterGroups];
 
-  /** 옵션 id → "그룹: 항목" 표시명 */
   const filterLabel = (optionId: string) => {
-    for (const g of pickerGroups) {
-      const o = g.options.find((x) => x.id === optionId);
-      if (o) return `${g.name}: ${o.name}`;
-    }
+    for (const g of pickerGroups) { const o = g.options.find((x) => x.id === optionId); if (o) return `${g.name}: ${o.name}`; }
     return optionId;
   };
+  const openFilterModal = () => { setFilterDraft([...form.filterValues]); setFilterModalOpen(true); };
+  const toggleDraft = (id: string) => setFilterDraft((d) => (d.includes(id) ? d.filter((x) => x !== id) : [...d, id]));
+  const saveFilterModal = () => { setForm((f) => ({ ...f, filterValues: filterDraft })); setFilterModalOpen(false); };
 
-  /** 필터 선택기 — 선택된 필터만 칩으로 보여주고, '필터 추가'로 목록에서 선택 */
+  /** 필터 — 요약 칩 + ‘필터 추가/편집’ 버튼(팝업), 모달에서 다중선택 후 저장 */
   const renderFilterPicker = () => {
     const selected = form.filterValues;
-    const available = pickerGroups
-      .flatMap((g) => g.options.map((o) => ({ groupId: g.id, groupName: g.name, id: o.id, name: o.name })))
-      .filter((o) => !selected.includes(o.id));
+    const draftSet = new Set(filterDraft);
     return (
       <div className="filter-picker">
-        <div className="check-list" style={{ gap: '8px' }}>
+        <div className="check-list" style={{ gap: 8, alignItems: 'center' }}>
           {selected.length === 0 && <span className="hint">선택된 필터가 없습니다.</span>}
           {selected.map((oid) => (
-            <span key={oid} className="tag removable">
-              {filterLabel(oid)}
+            <span key={oid} className="tag removable">{filterLabel(oid)}
               <button className="tag-x" aria-label={`${filterLabel(oid)} 제거`} onClick={() => toggleFilterValue(oid)}>×</button>
             </span>
           ))}
+          <button type="button" className="btn-ghost" style={{ marginLeft: selected.length ? 4 : 0 }} onClick={openFilterModal}>
+            + 필터 {selected.length ? '편집' : '추가'}
+          </button>
         </div>
-        {available.length > 0 ? (
-          <select
-            className="inline-input"
-            style={{ marginTop: 8, maxWidth: 240 }}
-            aria-label="필터 추가"
-            value=""
-            onChange={(e) => { if (e.target.value) toggleFilterValue(e.target.value); }}
-          >
-            <option value="">+ 필터 추가…</option>
-            {pickerGroups.map((g) => {
-              const opts = available.filter((o) => o.groupId === g.id);
-              if (opts.length === 0) return null;
-              return (
-                <optgroup key={g.id} label={g.name}>
-                  {opts.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-                </optgroup>
-              );
-            })}
-          </select>
-        ) : (
-          pickerGroups.length > 0 && <span className="hint" style={{ display: 'block', marginTop: 8 }}>추가할 필터가 더 없습니다.</span>
+
+        {filterModalOpen && (
+          <div className="modal-backdrop" onClick={() => setFilterModalOpen(false)}>
+            <div className="modal" role="dialog" aria-modal="true" aria-label="필터 선택" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640 }}>
+              <h2 className="modal-title">필터 선택</h2>
+              <p className="hint" style={{ margin: '0 0 12px' }}>옵션을 눌러 다중 선택하세요. 선택된 항목은 표시되며, <b>저장</b> 시 반영됩니다.</p>
+              {pickerGroups.length === 0 ? (
+                <p className="hint">등록된 필터 그룹이 없습니다. ‘필터 관리’에서 추가하세요.</p>
+              ) : (
+                <div className="filter-picker" style={{ maxHeight: '56vh', overflow: 'auto' }}>
+                  {pickerGroups.map((g) => {
+                    const onCount = g.options.filter((o) => draftSet.has(o.id)).length;
+                    return (
+                      <div key={g.id} className="filter-grp">
+                        <div className="filter-grp-head">
+                          <span className="filter-grp-name">{g.name}</span>
+                          {onCount > 0 && <span className="filter-grp-cnt">{onCount}</span>}
+                        </div>
+                        <div className="filter-opts">
+                          {g.options.length === 0 && <span className="hint">옵션 없음</span>}
+                          {g.options.map((o) => {
+                            const on = draftSet.has(o.id);
+                            return (
+                              <button key={o.id} type="button" className={`filter-opt${on ? ' on' : ''}`} aria-pressed={on} onClick={() => toggleDraft(o.id)}>
+                                {on && <span className="filter-opt-chk">✓</span>}{o.name}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <div className="modal-actions">
+                <span className="hint" style={{ marginRight: 'auto' }}>{filterDraft.length}개 선택</span>
+                <button className="btn-ghost" onClick={() => setFilterModalOpen(false)}>취소</button>
+                <button className="btn-primary" style={{ marginLeft: 0 }} onClick={saveFilterModal}>저장</button>
+              </div>
+            </div>
+          </div>
         )}
-        {pickerGroups.length === 0 && <p className="hint">등록된 필터 그룹이 없습니다. 좌측 메뉴 ‘필터 관리’에서 추가하세요.</p>}
       </div>
     );
   };

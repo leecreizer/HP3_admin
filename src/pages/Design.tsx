@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { loadFolders, loadProducts, folderSubtree, loadFilterGroups, loadSwapState, expandMembers, folderRepThumb } from '../data/groups';
 import { opSizeOptions, evalFormula, type OpSize } from './Products';
 import { getAssets } from '../data/assetStore';
@@ -34,12 +35,14 @@ type LibProduct = ReturnType<typeof loadProducts>[number] & {
   filterValues?: string[];
   specUrls?: { name: string; url: string }[];
   mallUrls?: { name: string; url: string }[];
-  modelingSlots?: { slot: string; groupId: string; defaultModelingId?: string }[];
+  modelingSlots?: { slot: string; groupId: string; defaultModelingId?: string; rules?: { condition: string; groupId: string }[] }[];
   modelUrl?: string;
   assets?: { id: string; name: string; type: string; url?: string }[];
   opSize?: OpSize;
   permission?: string;
   visible?: boolean;
+  /** 비규격(맞춤) 여부 — true면 opSize Min/Max/Gap 범위 안에서 자유 입력, false면 GAP 단계 선택. */
+  nonStandard?: boolean;
   modelCode?: string;
   itemCode?: string;
   dp?: string;
@@ -115,6 +118,36 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
     return folders.filter((f) => f.kind !== 'internal' && !hiddenUp(f));
   }, [folders]);
   const filterGroups = useMemo(() => loadFilterGroups(), []);
+  /** 상품 라이브러리 검색어 — 이름·코드·필터로 전체 상품 검색 */
+  const [libQuery, setLibQuery] = useState('');
+  /** 라이브러리 필터 — 선택 옵션으로 상품 거르기(그룹 AND · 옵션 OR) */
+  const [libFilterOpen, setLibFilterOpen] = useState(false);
+  const [libFilterPos, setLibFilterPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [libFilters, setLibFilters] = useState<Set<string>>(new Set());
+  /** 옵션 id → 표시명 (필터 칩) */
+  const filterLabel = (oid: string) => { for (const g of filterGroups) { const o = g.options.find((x) => x.id === oid); if (o) return o.name; } return oid; };
+  /** 선택 필터 매칭 — 옵션이 선택된 그룹마다 1개 이상 보유해야 통과 */
+  const matchFilters = (p: LibProduct) => {
+    if (libFilters.size === 0) return true;
+    const pv = new Set(p.filterValues ?? []);
+    for (const g of filterGroups) {
+      const sel = g.options.filter((o) => libFilters.has(o.id)).map((o) => o.id);
+      if (sel.length && !sel.some((id) => pv.has(id))) return false;
+    }
+    return true;
+  };
+  /** 라이브러리 결과 — 검색어 또는 선택 필터가 있으면 매칭 상품만(전체에서) 추출 */
+  const searchResults = useMemo(() => {
+    const q = libQuery.trim().toLowerCase();
+    if (!q && libFilters.size === 0) return [];
+    return products.filter((p) => {
+      if (!matchFilters(p as LibProduct)) return false;
+      if (!q) return true;
+      const fl = (p.filterValues ?? []).map((id) => filterLabel(id)).join(' ');
+      return `${p.name} ${p.productCode} ${p.contentCode} ${fl}`.toLowerCase().includes(q);
+    }).slice(0, 100);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products, libQuery, filterGroups, libFilters]);
   // 구성(조립) 그룹 — 그룹 관리에서 등록한 모델 그룹 + 멤버
   const swapState = useMemo(() => loadSwapState(), []);
   const memberMap = useMemo(() => expandMembers(swapState, folders, products as never), [swapState, folders, products]);
@@ -264,7 +297,7 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
 
   // 진입한 폴더의 하위 폴더 + 직속 상품
   const subFolders = useMemo(() => extFolders.filter((f) => f.parentId === current), [extFolders, current]);
-  const directProducts = useMemo(() => products.filter((p) => p.folderId === current) as LibProduct[], [products, current]);
+  const directProducts = useMemo(() => (products.filter((p) => p.folderId === current) as LibProduct[]).filter(matchFilters), [products, current, libFilters, filterGroups]);
   const pageCount = Math.max(1, Math.ceil(directProducts.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount - 1);
   const slice = directProducts.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
@@ -444,7 +477,8 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
     attachDoorsFromCodes(codes, folderName);
   };
 
-  // 운영 사이즈를 가진 상품 선택 시 — 각 축을 옵션값(범위 밖이면 첫 옵션=MIN, 고정축은 그 값)으로 정규화
+  // 운영 사이즈를 가진 상품 선택 시 정규화.
+  // 규격: 각 축을 단계 옵션값으로 스냅(범위 밖이면 MIN). 비규격: 스냅하지 않고 Min~Max로 clamp만(자유 입력).
   useEffect(() => {
     if (!sel?.opSize) return;
     (['W', 'D', 'H'] as const).forEach((ax) => {
@@ -452,7 +486,13 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
       if (!opts) return;
       const k = ax === 'W' ? 'w' : ax === 'D' ? 'd' : 'h';
       const cur = effDims(sel)[k];
-      if (!opts.includes(cur)) setDim(sel, k, opts[0]);
+      if (sel.nonStandard) {
+        const min = opts[0], max = opts[opts.length - 1];
+        const clamped = Math.min(max, Math.max(min, cur));
+        if (clamped !== cur) setDim(sel, k, clamped);
+      } else if (!opts.includes(cur)) {
+        setDim(sel, k, opts[0]);
+      }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCode]);
@@ -474,7 +514,6 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
       <button className="lib-tile folder" onClick={() => goFolder(id)}>
         <span className={`tile-img${rep ? '' : ' folder-img'}`}>{rep ? <img src={rep} alt="" /> : <img src="/folder.png" alt="" />}</span>
         <span className="tile-name">{name}</span>
-        <span className="tile-tag">{subtreeCount(id)}개</span>
       </button>
     );
   };
@@ -509,9 +548,61 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
         </nav>
 
         <aside className="panel lib-panel">
-          <div className="panel-head"><h2>상품 라이브러리</h2></div>
+          <div className="panel-head">
+            <h2>상품 라이브러리</h2>
+            <button className={`lib-filter-btn${libFilters.size ? ' on' : ''}`} aria-pressed={libFilterOpen}
+              onClick={(e) => { const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); setLibFilterPos({ x: r.right, y: r.bottom }); setLibFilterOpen((v) => !v); }}>필터{libFilters.size > 0 && <span className="lib-filter-cnt">{libFilters.size}</span>}</button>
+          </div>
+          <div className="lib-search">
+            <input type="search" value={libQuery} placeholder="상품 검색 (이름·코드·필터)" aria-label="상품 검색"
+              onChange={(e) => setLibQuery(e.target.value)} />
+            {libQuery && <button className="lib-search-x" aria-label="검색 지우기" onClick={() => setLibQuery('')}>×</button>}
+          </div>
+          {libFilterOpen && createPortal(<>
+            <div className="lib-filter-backdrop" onClick={() => setLibFilterOpen(false)} />
+            <div className="lib-filter-pop" style={{ left: libFilterPos.x + 12, top: libFilterPos.y - 30 }}>
+              <div className="lib-filter-head">
+                <span>필터로 거르기 <small>(그룹 AND · 옵션 OR)</small></span>
+                {libFilters.size > 0 && <button className="link-mini" onClick={() => setLibFilters(new Set())}>초기화</button>}
+                <button className="lib-filter-close" aria-label="닫기" onClick={() => setLibFilterOpen(false)}>×</button>
+              </div>
+              {filterGroups.length === 0 && <p className="hint">등록된 필터가 없습니다.</p>}
+              {filterGroups.map((g) => (
+                <div key={g.id} className="filter-grp">
+                  <div className="filter-grp-head"><span className="filter-grp-name">{g.name}</span></div>
+                  <div className="filter-opts">
+                    {g.options.map((o) => {
+                      const on = libFilters.has(o.id);
+                      return (
+                        <button key={o.id} type="button" className={`filter-opt${on ? ' on' : ''}`} aria-pressed={on}
+                          onClick={() => setLibFilters((prev) => { const n = new Set(prev); n.has(o.id) ? n.delete(o.id) : n.add(o.id); return n; })}>
+                          {on && <span className="filter-opt-chk">✓</span>}{o.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>, document.body)}
 
-          {current === EXT_ROOT ? (
+          {(libQuery.trim() || libFilters.size > 0) ? (
+            /* 검색어/필터 결과 — 매칭 상품만. 각 상품의 설정 필터를 리스트로 표시 */
+            <div className="lib-scroll">
+              <div className="lib-section">
+                <div className="lib-section-label">{libFilters.size > 0 ? '필터' : '검색'} 결과 {searchResults.length}{searchResults.length >= 100 ? '+' : ''}</div>
+                {searchResults.length === 0 && <p className="empty-block">결과가 없습니다.</p>}
+                <div className="lib-tiles">
+                  {searchResults.map((p) => (
+                    <button key={p.contentCode} className={`lib-tile${activeCode === p.contentCode ? ' active' : ''}`} onClick={() => selectProduct(p)}>
+                      <span className="tile-img">{p.thumbUrl ? <img src={p.thumbUrl} alt="" /> : (p.productKind || p.productGroup)}</span>
+                      <span className="tile-name">{p.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : current === EXT_ROOT ? (
             /* 최초: 영역 타이틀 + 상품군 폴더 목록 (상품 미노출) */
             <div className="lib-scroll">
               {areas.length === 0 && <p className="empty-block">노출 폴더가 없습니다.</p>}
@@ -651,13 +742,16 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
                     const max = op?.[`max${ax}` as keyof OpSize];
                     const gap = op?.[`gap${ax}` as keyof OpSize];
                     const hasRange = min != null && max != null && max > min;
-                    const useSelect = hasRange && gap != null && gap > 1;       // 단계 선택
-                    const useRange = hasRange && !useSelect;                     // GAP 1/미설정 → 범위 입력
+                    // 비규격(맞춤): 규격 사이즈의 Min/Max/Gap을 참고해 **범위 안에서 자유 입력**.
+                    // 규격: GAP>1이면 **단계 선택(드롭다운)**.
+                    const useSelect = hasRange && gap != null && gap > 1 && !sel.nonStandard; // 규격 단계 선택
+                    const useRange = hasRange && !useSelect;                     // 비규격/GAP≤1 → 범위 자유 입력
                     const fixed = !hasRange && min != null;                      // 고정값
                     const opts = useSelect ? (opSizeOptions(op, ax!) ?? []) : [];
-                    // 마우스 오버 안내 — 입력 가능한 범위/값
-                    const hint = useSelect ? `선택 가능: ${opts.join(', ')} mm`
-                      : useRange ? `입력 범위: ${min} ~ ${max} mm${gap ? ` (${gap} 단위)` : ''}`
+                    // 마우스 오버 안내 — 입력 가능한 범위/값 (비규격이면 명시)
+                    const npfx = sel.nonStandard ? '비규격 ' : '';
+                    const hint = useSelect ? `${npfx}선택 가능: ${opts.join(', ')} mm`
+                      : useRange ? `${npfx}입력 범위: ${min} ~ ${max} mm${gap ? ` (${gap} 단위)` : ''}`
                       : fixed ? `고정값: ${min} mm`
                       : undefined;
                     return (
@@ -717,19 +811,34 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
                 /* 조립형(수납장·부엌장 등): 구성 그룹을 누르면 우측에 그 그룹 상품 리스트 */
                 <div className="bi-swap">
                   <div className="bi-swap-title">구성 그룹 <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(DP {sel.dp || '미설정'})</small></div>
-                  {sel.modelingSlots.map((s) => {
-                    const g = swapState.groups.find((x) => x.id === s.groupId);
-                    const codes = memberMap[s.groupId] ?? [];
-                    return (
-                      <button key={s.groupId} className="bi-swap-folder"
-                        title="클릭 시 몸통 DP와 같은 도어를 자동 배치"
-                        onClick={() => attachDoorsForGroup(s.groupId, g?.name ?? '그룹')}>
-                        <span className="bi-cgroup-kind">{g?.kind || s.slot}</span>
-                        <span className="bi-swap-fname">{g?.name ?? '미지정 그룹'}</span>
-                        <span className="bi-swap-cnt">{codes.length}</span>
-                      </button>
-                    );
-                  })}
+                  {(() => {
+                    // 호스트(선택 상품) 변수맵 — 조건식(#H 등) 평가용
+                    const vmap: Record<string, number> = { W: Number(sel.w) || 0, D: Number(sel.d) || 0, H: Number(sel.h) || 0 };
+                    (sel.vars ?? []).forEach((v) => { const n = v.value?.trim() ? Number(evalFormula(v.value, vmap)) : NaN; if (!Number.isNaN(n)) vmap[v.name] = n; });
+                    const resolveSlot = (s: NonNullable<LibProduct['modelingSlots']>[number]) => {
+                      for (const r of s.rules ?? []) {
+                        if (!r.groupId) continue;
+                        if (!r.condition?.trim()) return { gid: r.groupId, cond: r.condition };
+                        try { const v = evalFormula(r.condition, vmap); if (v === true || (typeof v === 'number' && v !== 0)) return { gid: r.groupId, cond: r.condition }; } catch { /* ignore */ }
+                      }
+                      return { gid: s.groupId, cond: null as string | null };
+                    };
+                    return sel.modelingSlots!.map((s, si) => {
+                      const { gid, cond } = resolveSlot(s);
+                      const g = swapState.groups.find((x) => x.id === gid);
+                      const codes = memberMap[gid] ?? [];
+                      const branched = (s.rules ?? []).length > 0;
+                      return (
+                        <button key={`${s.slot}-${si}`} className="bi-swap-folder"
+                          title="클릭 시 몸통 DP와 같은 도어를 자동 배치"
+                          onClick={() => attachDoorsForGroup(gid, g?.name ?? '그룹')}>
+                          <span className="bi-cgroup-kind">{g?.kind || s.slot}</span>
+                          <span className="bi-swap-fname">{g?.name ?? '미지정 그룹'}{branched && <small style={{ color: 'var(--text-3)', marginLeft: 6 }}>{cond ? `· 조건: ${cond}` : '· 기본'}</small>}</span>
+                          <span className="bi-swap-cnt">{codes.length}</span>
+                        </button>
+                      );
+                    });
+                  })()}
                   {attachMsg && <p className="hint" style={{ margin: '6px 2px', color: attachMsg.startsWith('✓') ? 'var(--ink)' : '#c0392b' }}>{attachMsg}</p>}
                   <p className="hint" style={{ margin: '4px 2px' }}>그룹을 누르면 그룹 안에서 몸통 DP와 일치하는 도어를 자동으로 배치합니다.</p>
                 </div>
