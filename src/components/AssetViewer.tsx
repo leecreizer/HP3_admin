@@ -93,9 +93,17 @@ function ModelCanvas({ asset }: { asset: Asset }) {
       frameObject(obj);
       setLoading(false);
     };
-    const onError = () => {
+    const onError = (err?: unknown) => {
       if (disposed) return;
-      setError('파일을 불러올 수 없습니다 (형식 오류 또는 손상)');
+      const msg = err instanceof Error ? err.message : String(err ?? '');
+      // 분리형 GLTF(.gltf + 외부 .bin/텍스처)는 단일 파일 업로드(data URL)로는 외부 참조를
+      // 찾을 수 없어 실패한다 — 원인을 구분해 안내.
+      if (e === 'gltf' && /buffer|\.bin|fetch|Failed to load/i.test(msg)) {
+        setError('분리형 GLTF는 외부 .bin/텍스처를 찾을 수 없어 미리보기 불가 — GLB(단일 파일)로 내보내 업로드하세요');
+      } else {
+        setError('파일을 불러올 수 없습니다 (형식 오류 또는 손상)');
+      }
+      console.warn('[AssetViewer] load 실패:', asset.name, msg);
       setLoading(false);
     };
 
