@@ -124,11 +124,13 @@ export default function App() {
   }, [config.currentRoleId, loginUserId]);
 
   const SUB_TITLE: Record<string, string> = {
-    'users/operators': '어드민 운영자 관리',
-    'content-users': '홈플래너 계정 관리',
+    'users/operators': '어드민 사용자 관리',
+    'content-users': '홈플래너 사용자 관리',
     'products': '상품 관리',
     'brands': '브랜드 관리',
-    'users/roles': '권한 관리',
+    'floorplans': '사용자 도면 관리',
+    'drawings/apt': 'APT 도면 관리',
+    'users/roles': '어드민 권한 관리',
     'products/modeling': '컨텐츠 그룹 관리',
     'products/styles': '스타일 그룹 관리',
     'products/catalog': '상품군·구분 관리',
@@ -160,6 +162,11 @@ export default function App() {
       break;
     case 'floorplans':
       content = <Floorplans />;
+      break;
+    case 'drawings':
+      content = active === 'drawings/apt'
+        ? <PagePlaceholder title="APT 도면 관리" />
+        : <PagePlaceholder title="도면 관리" />;
       break;
     case 'users':
       if (active === 'users/roles') {

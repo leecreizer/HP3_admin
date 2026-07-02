@@ -1,6 +1,7 @@
 /** 내장 페이지 키. 커스텀 메뉴는 'custom-*' 형태의 자유 키를 사용한다. */
 export type BuiltinMenuKey =
   | 'dashboard'
+  | 'drawings'
   | 'floorplans'
   | 'users'
   | 'content-users'
@@ -57,14 +58,14 @@ export type AdminConfig = {
 
 /** admin 등급이 가질 수 있는 전체 메뉴 키(대시보드+주메뉴+시스템) */
 export const ALL_ADMIN_MENU_KEYS: MenuKey[] = [
-  'dashboard', 'users', 'content-users', 'content', 'brands', 'floorplans', 'products', 'design', 'settings',
+  'dashboard', 'users', 'content-users', 'content', 'brands', 'drawings', 'floorplans', 'products', 'design', 'settings',
 ];
 
 /** 기본 등급 세트 (설정에서 추가·수정·삭제 가능) */
 export const DEFAULT_ROLES: Role[] = [
   { id: 'role-super', name: '최고관리자', scope: 'admin', menus: [...ALL_ADMIN_MENU_KEYS], builtin: true },
-  { id: 'role-operator', name: '운영자', scope: 'admin', menus: ['dashboard', 'floorplans', 'content', 'products', 'design'], builtin: true },
-  { id: 'role-viewer', name: '뷰어', scope: 'admin', menus: ['dashboard', 'floorplans'], builtin: true },
+  { id: 'role-operator', name: '운영자', scope: 'admin', menus: ['dashboard', 'drawings', 'floorplans', 'content', 'products', 'design'], builtin: true },
+  { id: 'role-viewer', name: '뷰어', scope: 'admin', menus: ['dashboard', 'drawings', 'floorplans'], builtin: true },
   { id: 'role-user', name: '일반', scope: 'service', menus: [], builtin: true },
   { id: 'role-b2b', name: 'B2B', scope: 'service', menus: [], builtin: true },
   { id: 'role-vip', name: 'VIP', scope: 'service', menus: [], builtin: true },
@@ -85,7 +86,7 @@ export const DEFAULT_CONFIG: AdminConfig = {
   mainMenu: [
     { key: 'users', label: '사용자 관리', visible: true },
     { key: 'content', label: '컨텐츠 관리', visible: true },
-    { key: 'floorplans', label: '도면 관리', visible: true },
+    { key: 'drawings', label: '도면 관리', visible: true },
     { key: 'design', label: '설계 미리보기', visible: true },
   ],
   removedMenus: [],
@@ -112,9 +113,13 @@ export function loadConfig(): AdminConfig {
     if (!saved) return DEFAULT_CONFIG;
     // 저장된 메뉴 구성 유지. 새로 생긴 기본 메뉴는 병합하되, 사용자가 삭제한 메뉴는 부활시키지 않음
     const removed = saved.removedMenus ?? [];
-    const validMenu = saved.mainMenu.filter(
-      (m) => DEFAULT_CONFIG.mainMenu.some((d) => d.key === m.key) || m.key.startsWith('custom-'),
-    );
+    const validMenu = saved.mainMenu
+      .filter((m) => DEFAULT_CONFIG.mainMenu.some((d) => d.key === m.key) || m.key.startsWith('custom-'))
+      // 기본 메뉴 라벨은 항상 최신 기본값 사용(이름 개편 반영). 순서·표시 여부는 저장본 유지
+      .map((m) => {
+        const d = DEFAULT_CONFIG.mainMenu.find((x) => x.key === m.key);
+        return d ? { ...m, label: d.label } : m;
+      });
     const missing = DEFAULT_CONFIG.mainMenu.filter(
       (d) => !validMenu.some((m) => m.key === d.key) && !removed.includes(d.key),
     );

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PencilIcon, TrashIcon } from '../components/icons';
 import { loadSwapState, saveSwapState, loadFolders, type StyleSet } from '../data/groups';
+import { useConfirm } from '../components/confirm';
 
 /**
  * 스타일 그룹 관리 — 부위별 교체 묶음의 폴더(상품그룹)를 하나씩 골라 묶은 ‘스타일’.
@@ -21,6 +22,7 @@ export function StyleLibrary() {
   /** 폴더 id → 부위(탭)명 */
   const folderPart = useMemo(() => { const m: Record<string, string> = {}; for (const o of partOptions) for (const f of o.folders) m[f.id] = o.part; return m; }, [partOptions]);
 
+  const { confirm, confirmDialog } = useConfirm();
   const [styles, setStyles] = useState<StyleSet[]>(saved.styles);
   const [styleCategories, setStyleCategories] = useState<string[]>(saved.styleCategories ?? []);
   const [activeCat, setActiveCat] = useState<string>(saved.styleCategories?.[0] ?? '');
@@ -151,7 +153,7 @@ export function StyleLibrary() {
                   <span className="count">{fids.length}</span>
                   <span className="tree-actions">
                     <span className="tree-act" role="button" title="이름 변경" onClick={() => { setStyleRenaming(s.id); setStyleRenameDraft(s.name); }}><PencilIcon size={13} /></span>
-                    <span className="tree-act" role="button" title="스타일 삭제" onClick={() => deleteStyle(s.id)}><TrashIcon size={13} /></span>
+                    <span className="tree-act" role="button" title="스타일 삭제" onClick={() => confirm({ message: <>‘{s.name}’ 스타일을 삭제할까요?</>, onConfirm: () => deleteStyle(s.id) })}><TrashIcon size={13} /></span>
                   </span>
                 </div>
                 <div className="grp-conn">
@@ -208,6 +210,7 @@ export function StyleLibrary() {
         )}
       </section>
 
+      {confirmDialog}
       {confirmDeleteTab && (
         <div className="modal-backdrop" onClick={() => setConfirmDeleteTab(null)}>
           <div className="modal confirm-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>

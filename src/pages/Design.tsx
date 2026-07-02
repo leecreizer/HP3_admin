@@ -24,6 +24,8 @@ function resolveThreeUrl(): string {
     const saved = localStorage.getItem('hp3-webplaner-url');
     if (saved) return withSlash(saved);
   } catch { /* ignore */ }
+  // GitHub Pages 배포본은 함께 배포된 웹플래너 Pages를 기본 사용
+  if (window.location.hostname.endsWith('github.io')) return 'https://leecreizer.github.io/Webplaner/';
   return `${window.location.protocol}//${window.location.hostname}:5190/`;
 }
 const THREE_URL = resolveThreeUrl();

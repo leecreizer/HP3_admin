@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { SearchIcon, TrashIcon } from '../components/icons';
+import { loadUsers } from './Users';
 
 type FloorplanStatus = 'public' | 'review' | 'draft';
 
@@ -12,6 +13,10 @@ type Floorplan = {
   updated: string;
   status: FloorplanStatus;
   tone: 1 | 2 | 3 | 4;
+  /** 도면을 생성한 사용자 id (사용자 관리 등록 계정) */
+  owner: string;
+  /** 사용자가 만든 카테고리 폴더명 */
+  category: string;
 };
 
 type RenderImage = {
@@ -31,14 +36,14 @@ const STATUS_LABEL: Record<FloorplanStatus, { text: string; cls: string }> = {
 };
 
 const PLANS: Floorplan[] = [
-  { id: 'FP-1042', name: '래미안 원베일리 84A', complex: '서울 서초구', pyeong: 34, rooms: '3R/2B', updated: '2026-06-11', status: 'public', tone: 1 },
-  { id: 'FP-1041', name: '힐스테이트 광교 59B', complex: '경기 수원시', pyeong: 25, rooms: '2R/1B', updated: '2026-06-11', status: 'public', tone: 2 },
-  { id: 'FP-1040', name: '푸르지오 송도 101C', complex: '인천 연수구', pyeong: 41, rooms: '4R/2B', updated: '2026-06-10', status: 'review', tone: 3 },
-  { id: 'FP-1039', name: '자이 마포 리버뷰 74T', complex: '서울 마포구', pyeong: 30, rooms: '3R/2B', updated: '2026-06-10', status: 'public', tone: 4 },
-  { id: 'FP-1038', name: '더샵 센텀파크 112D', complex: '부산 해운대구', pyeong: 45, rooms: '4R/2B', updated: '2026-06-09', status: 'draft', tone: 2 },
-  { id: 'FP-1037', name: 'e편한세상 일산 84F', complex: '경기 고양시', pyeong: 34, rooms: '3R/2B', updated: '2026-06-08', status: 'public', tone: 1 },
-  { id: 'FP-1036', name: '롯데캐슬 잠실 134P', complex: '서울 송파구', pyeong: 52, rooms: '5R/3B', updated: '2026-06-08', status: 'review', tone: 3 },
-  { id: 'FP-1035', name: '아이파크 분당 59A', complex: '경기 성남시', pyeong: 25, rooms: '2R/1B', updated: '2026-06-07', status: 'public', tone: 4 },
+  { id: 'FP-1042', name: '래미안 원베일리 84A', complex: '서울 서초구', pyeong: 34, rooms: '3R/2B', updated: '2026-06-11', status: 'public', tone: 1, owner: 'U-90411', category: '우리집' },
+  { id: 'FP-1041', name: '힐스테이트 광교 59B', complex: '경기 수원시', pyeong: 25, rooms: '2R/1B', updated: '2026-06-11', status: 'public', tone: 2, owner: 'U-90410', category: '신혼집 후보' },
+  { id: 'FP-1040', name: '푸르지오 송도 101C', complex: '인천 연수구', pyeong: 41, rooms: '4R/2B', updated: '2026-06-10', status: 'review', tone: 3, owner: 'U-90409', category: '매장 시공' },
+  { id: 'FP-1039', name: '자이 마포 리버뷰 74T', complex: '서울 마포구', pyeong: 30, rooms: '3R/2B', updated: '2026-06-10', status: 'public', tone: 4, owner: 'U-90411', category: '이사 검토' },
+  { id: 'FP-1038', name: '더샵 센텀파크 112D', complex: '부산 해운대구', pyeong: 45, rooms: '4R/2B', updated: '2026-06-09', status: 'draft', tone: 2, owner: 'U-90407', category: '부모님집' },
+  { id: 'FP-1037', name: 'e편한세상 일산 84F', complex: '경기 고양시', pyeong: 34, rooms: '3R/2B', updated: '2026-06-08', status: 'public', tone: 1, owner: 'U-90410', category: '신혼집 후보' },
+  { id: 'FP-1036', name: '롯데캐슬 잠실 134P', complex: '서울 송파구', pyeong: 52, rooms: '5R/3B', updated: '2026-06-08', status: 'review', tone: 3, owner: 'U-90406', category: '우리집' },
+  { id: 'FP-1035', name: '아이파크 분당 59A', complex: '경기 성남시', pyeong: 25, rooms: '2R/1B', updated: '2026-06-07', status: 'public', tone: 4, owner: 'U-90409', category: '매장 시공' },
 ];
 
 export const INITIAL_RENDERS: RenderImage[] = [
@@ -65,6 +70,17 @@ function PlanThumb({ tone }: { tone: number }) {
 }
 
 export function Floorplans() {
+  // 홈플래너 사용자 목록 (사용자 관리 등록 계정 중 콘텐츠 사용자)
+  const users = useRef(loadUsers()).current;
+  const hpUsers = useMemo(() => users.filter((u) => u.kind === 'content' || PLANS.some((p) => p.owner === u.id)), [users]);
+  const userName = (id: string) => users.find((u) => u.id === id)?.name ?? '알 수 없음';
+  const planCount = useMemo(() => { const m = new Map<string, number>(); for (const p of PLANS) m.set(p.owner, (m.get(p.owner) ?? 0) + 1); return m; }, []);
+  /** 선택된 홈플래너 사용자 — 기본 도면 보유 첫 사용자 */
+  const [selUser, setSelUser] = useState<string>(() => hpUsers.find((u) => PLANS.some((p) => p.owner === u.id))?.id ?? hpUsers[0]?.id ?? '');
+  /** 선택 사용자의 카테고리 폴더 */
+  const [selCat, setSelCat] = useState<string>('all');
+  const userPlans = useMemo(() => PLANS.filter((p) => p.owner === selUser), [selUser]);
+  const categories = useMemo(() => [...new Set(userPlans.map((p) => p.category))], [userPlans]);
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<'all' | FloorplanStatus>('all');
   const [openPlanId, setOpenPlanId] = useState<string | null>(null);
@@ -83,8 +99,9 @@ export function Floorplans() {
 
   const visiblePlans = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const filtered = PLANS.filter(
+    const filtered = userPlans.filter(
       (p) =>
+        (selCat === 'all' || p.category === selCat) &&
         (status === 'all' || p.status === status) &&
         (!q || p.name.toLowerCase().includes(q) || p.complex.includes(q) || p.id.toLowerCase().includes(q)),
     );
@@ -93,7 +110,7 @@ export function Floorplans() {
       if (sortBy === 'pyeong') return b.pyeong - a.pyeong;
       return b.updated.localeCompare(a.updated); // 최신 수정순
     });
-  }, [query, status, sortBy]);
+  }, [userPlans, selCat, query, status, sortBy]);
 
   const renderCount = useMemo(() => {
     const map = new Map<string, number>();
@@ -138,6 +155,8 @@ export function Floorplans() {
             <PlanThumb tone={openPlan.tone} />
             <dl className="plan-meta">
               <div><dt>도면 ID</dt><dd className="num-inline">{openPlan.id}</dd></div>
+              <div><dt>사용자</dt><dd>{userName(openPlan.owner)}</dd></div>
+              <div><dt>카테고리</dt><dd>📁 {openPlan.category}</dd></div>
               <div><dt>단지</dt><dd>{openPlan.complex}</dd></div>
               <div><dt>평형</dt><dd>{openPlan.pyeong}평 · {openPlan.rooms}</dd></div>
               <div><dt>최종 수정</dt><dd className="num-inline">{openPlan.updated}</dd></div>
@@ -206,12 +225,59 @@ export function Floorplans() {
   return (
     <main className="main">
       <div className="page-head">
-        <h1>도면 관리</h1>
-        <span className="date">전체 {PLANS.length.toLocaleString()}개 도면 · 렌더 이미지 {renders.length}장</span>
+        <h1>사용자 도면 관리</h1>
+        <span className="date">홈플래너 사용자 {hpUsers.length}명 · 도면 {PLANS.length.toLocaleString()}개 · 렌더 {renders.length}장</span>
         {dirty && <span className="dirty-badge" style={{ marginLeft: 'auto' }} title="저장되지 않은 변경사항">● 미저장 변경</span>}
         <button className="btn-ghost" style={{ marginLeft: dirty ? 0 : 'auto' }} disabled={!dirty} onClick={save}>저장</button>
         <button className="btn-primary">+ 도면 등록</button>
       </div>
+
+      <div className="fp-layout" style={{ display: 'grid', gridTemplateColumns: '200px 210px 1fr', gap: 12, alignItems: 'start' }}>
+        {/* ── 홈플래너 사용자 리스트 ── */}
+        <section className="panel folder-panel">
+          <div className="panel-head"><h2>사용자</h2></div>
+          <ul className="tree">
+            {hpUsers.map((u) => (
+              <li key={u.id}>
+                <div className={`tree-item${selUser === u.id ? ' active' : ''}`} role="button" tabIndex={0}
+                  onClick={() => { setSelUser(u.id); setSelCat('all'); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { setSelUser(u.id); setSelCat('all'); } }}>
+                  <span className="avatar mini" aria-hidden="true">{u.name.charAt(0)}</span>
+                  <span className="t" style={{ marginLeft: 6 }}>{u.name}</span>
+                  <span className="count">{planCount.get(u.id) ?? 0}</span>
+                </div>
+              </li>
+            ))}
+            {hpUsers.length === 0 && <li><div className="tree-item"><span className="hint">홈플래너 사용자 없음</span></div></li>}
+          </ul>
+        </section>
+
+        {/* ── 선택 사용자의 카테고리 폴더 ── */}
+        <section className="panel folder-panel">
+          <div className="panel-head"><h2>카테고리</h2></div>
+          <ul className="tree">
+            <li>
+              <div className={`tree-item${selCat === 'all' ? ' active' : ''}`} role="button" tabIndex={0}
+                onClick={() => setSelCat('all')}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelCat('all'); }}>
+                <span className="t">전체 도면</span>
+                <span className="count">{userPlans.length}</span>
+              </div>
+            </li>
+            {categories.map((c) => (
+              <li key={c}>
+                <div className={`tree-item${selCat === c ? ' active' : ''}`} style={{ paddingLeft: 20 }} role="button" tabIndex={0}
+                  onClick={() => setSelCat(c)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelCat(c); }}>
+                  <span className="t">📁 {c}</span>
+                  <span className="count">{userPlans.filter((p) => p.category === c).length}</span>
+                </div>
+              </li>
+            ))}
+            {categories.length === 0 && <li><div className="tree-item"><span className="hint">카테고리 없음</span></div></li>}
+          </ul>
+          <p className="hint">사용자가 홈플래너에서 만든 도면 폴더입니다.</p>
+        </section>
 
       <section className="panel">
         <div className="product-toolbar">
@@ -270,6 +336,7 @@ export function Floorplans() {
                 </div>
                 <p className="fp-meta">{p.complex} · {p.pyeong}평 · {p.rooms}</p>
                 <p className="fp-sub">
+                  <span className="tag" style={{ marginRight: 4 }}>👤 {userName(p.owner)}</span>
                   <span className="num-inline">{p.id}</span> · 렌더 <b className="num-inline">{renderCount.get(p.id) ?? 0}</b>장
                 </p>
               </div>
@@ -278,6 +345,7 @@ export function Floorplans() {
           {visiblePlans.length === 0 && <p className="empty-block">조건에 맞는 도면이 없습니다.</p>}
         </div>
       </section>
+      </div>
     </main>
   );
 }

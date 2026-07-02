@@ -38,23 +38,30 @@ const SYSTEM_MENU: { key: MenuKey; label: string }[] = [
 
 /** 사용자 관리 하위 메뉴 (고정) — 부모 '사용자 관리'는 빈 그룹, 실제 화면은 하위에서 */
 const USER_SUBMENUS: { key: MenuKey; label: string }[] = [
-  { key: 'users/operators', label: '어드민 운영자 관리' },
-  { key: 'content-users', label: '홈플래너 계정 관리' },
-  { key: 'users/roles', label: '권한 관리' },
+  { key: 'users/operators', label: '어드민 사용자 관리' },
+  { key: 'content-users', label: '홈플래너 사용자 관리' },
+  { key: 'brands', label: '브랜드 관리' },
+  { key: 'users/roles', label: '어드민 권한 관리' },
 ];
 
-/** 컨텐츠 관리 하위 메뉴 — 상품 관리(+상품 하위), 가격 관리, 브랜드 관리 */
+/** 컨텐츠 관리 하위 메뉴 — 상품 관리와 관리 메뉴들(상품 하위)을 같은 레벨로 나열 */
 const CONTENT_SUBMENUS: { key: MenuKey; label: string }[] = [
   { key: 'products', label: '상품 관리' },
-  { key: 'brands', label: '브랜드 관리' },
+];
+
+/** 도면 관리 하위 메뉴 — 사용자 도면 / APT 도면 */
+const DRAWING_SUBMENUS: { key: MenuKey; label: string }[] = [
+  { key: 'floorplans', label: '사용자 도면 관리' },
+  { key: 'drawings/apt', label: 'APT 도면 관리' },
 ];
 
 /** 'products/groups' → 'products' */
 const baseKey = (k: MenuKey) => k.split('/')[0];
 /** 부모 메뉴가 포함하는 하위 base 키들(펼침·활성 판정용) */
 const childBases = (key: MenuKey): string[] =>
-  key === 'users' ? ['users', 'content-users']
-  : key === 'content' ? ['content', 'products', 'brands']
+  key === 'users' ? ['users', 'content-users', 'brands']
+  : key === 'content' ? ['content', 'products']
+  : key === 'drawings' ? ['drawings', 'floorplans']
   : [key];
 
 type SidebarProps = {
@@ -149,7 +156,9 @@ export function Sidebar({ active, collapsed, config, allowedMenus, onSelect, onT
         {visibleMenu.map((item) => {
           const subs =
             item.key === 'users' ? USER_SUBMENUS
-            : item.key === 'content' ? CONTENT_SUBMENUS
+            // 컨텐츠 관리 = 상품 관리 + 관리 메뉴들(상품 하위)을 같은 레벨로 나열
+            : item.key === 'content' ? [...CONTENT_SUBMENUS, ...config.productSubMenus.filter((s) => s.visible)]
+            : item.key === 'drawings' ? DRAWING_SUBMENUS
             : undefined;
           const baseActive = childBases(item.key).includes(baseKey(active));
           return (
@@ -189,18 +198,6 @@ export function Sidebar({ active, collapsed, config, allowedMenus, onSelect, onT
                       >
                         {sub.label}
                       </button>
-                      {/* 상품 관리 하위(컨텐츠 그룹·스타일 그룹·상품군 …) — 한 단계 더 들여쓰기 */}
-                      {item.key === 'content' && sub.key === 'products' && baseKey(active) === 'products' &&
-                        config.productSubMenus.filter((s) => s.visible).map((ps) => (
-                          <button
-                            key={ps.key}
-                            className={`rail-sub rail-sub-2${active === ps.key ? ' active' : ''}`}
-                            aria-current={active === ps.key ? 'page' : undefined}
-                            onClick={() => onSelect(ps.key)}
-                          >
-                            {ps.label}
-                          </button>
-                        ))}
                     </Fragment>
                   ))}
                 </div>

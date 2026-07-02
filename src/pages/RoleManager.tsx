@@ -49,7 +49,7 @@ export function RoleManager({ config, onChange, dirty, onSave }: RoleManagerProp
   return (
     <main className="main">
       <div className="page-head">
-        <h1>권한 관리</h1>
+        <h1>어드민 권한 관리</h1>
         <span className="date">운영자 등급 {adminRoles.length}개</span>
         {dirty && <span className="dirty-badge" style={{ marginLeft: 'auto' }} title="저장되지 않은 변경사항">● 미저장 변경</span>}
         <button className="btn-primary" style={{ marginLeft: dirty ? 0 : 'auto' }} disabled={!dirty} onClick={onSave}>저장</button>

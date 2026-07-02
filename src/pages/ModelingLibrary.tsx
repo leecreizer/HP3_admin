@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PencilIcon, TrashIcon } from '../components/icons';
+import { useConfirm } from '../components/confirm';
 import {
   loadProducts, loadFolders, loadSwapState, saveSwapState,
   type SwapGroup,
@@ -34,6 +35,7 @@ export function ModelingLibrary() {
   useEffect(() => { setDirty(sig !== savedSig.current); }, [sig]);
   const save = () => { saveSwapState({ groups, folders, folderModes, items, groupRefs, styles, categories, styleCategories }); savedSig.current = sig; setDirty(false); };
 
+  const { confirm, confirmDialog } = useConfirm();
   const [pickerGroup, setPickerGroup] = useState<string | null>(null);
   const [folderQuery, setFolderQuery] = useState('');
   /** 상품 직접 추가 피커가 열린 그룹 + 검색어 */
@@ -345,7 +347,7 @@ export function ModelingLibrary() {
                     <span className="count">{fs.length}</span>
                     <span className="tree-actions">
                       <span className="tree-act" role="button" title="이름 변경" onClick={(e) => { e.stopPropagation(); setFuRenaming(g.id); setFuRenameDraft(g.name); }}><PencilIcon size={13} /></span>
-                      <span className="tree-act" role="button" title="삭제" onClick={(e) => { e.stopPropagation(); deleteFu(g.id); }}><TrashIcon size={13} /></span>
+                      <span className="tree-act" role="button" title="삭제" onClick={(e) => { e.stopPropagation(); confirm({ message: <>‘{g.name}’ 폴더 단위 노출 그룹을 삭제할까요?</>, onConfirm: () => deleteFu(g.id) }); }}><TrashIcon size={13} /></span>
                     </span>
                   </div>
                   {fs.length > 0 && (
@@ -374,6 +376,7 @@ export function ModelingLibrary() {
         </section>
       </div>
 
+      {confirmDialog}
       {confirmDeleteTab && (
         <div className="modal-backdrop" onClick={() => setConfirmDeleteTab(null)}>
           <div className="modal confirm-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>

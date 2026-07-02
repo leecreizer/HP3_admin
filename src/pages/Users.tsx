@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { FolderPlusIcon, PencilIcon, SearchIcon, TrashIcon, UsersIcon } from '../components/icons';
 import { ThSort, useSort } from '../components/sortable';
 import { Pagination, usePagination } from '../components/Pagination';
+import { useConfirm } from '../components/confirm';
 
 type UserStatus = 'active' | 'dormant' | 'blocked';
 /** 서비스 사용자 등급 — 설정 › 등급 관리에서 정의 (자유 문자열) */
@@ -88,6 +89,7 @@ export function loadUsers(): AppUser[] {
 
 export function Users({ brands, setBrands, groups, setGroups, serviceRoles, orgDirty, onSaveOrg, variant = 'operator' }: UsersProps) {
   const isContent = variant === 'content';
+  const { confirm, confirmDialog } = useConfirm();
   /** 컨텐츠 사용자 관리의 그룹 트리는 필터·소속 연결 전용 — 브랜드/그룹 구조 편집은 브랜드 관리에서만 */
   const treeEditable = false;
   const [allUsers, setAllUsers] = useState<AppUser[]>(loadUsers);
@@ -399,11 +401,11 @@ export function Users({ brands, setBrands, groups, setGroups, serviceRoles, orgD
   return (
     <main className="main">
       <div className="page-head">
-        <h1>{isContent ? '홈플래너 계정 관리' : '어드민 운영자 관리'}</h1>
+        <h1>{isContent ? '홈플래너 사용자 관리' : '어드민 사용자 관리'}</h1>
         <span className="date">전체 {summary.total.toLocaleString()}명{isContent ? ` · 사용자 그룹 ${groups.length}개` : ''}</span>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
           {dirty && <span className="dirty-badge" title="저장되지 않은 변경사항">● 미저장 변경</span>}
-          <button className="btn-primary" onClick={openAdd}>+ {isContent ? '홈플래너 계정' : '운영자'} 추가</button>
+          <button className="btn-primary" onClick={openAdd}>+ {isContent ? '홈플래너 사용자' : '어드민 사용자'} 추가</button>
           <button className="btn-primary" disabled={!dirty} onClick={save}>저장</button>
         </div>
       </div>
@@ -674,7 +676,7 @@ export function Users({ brands, setBrands, groups, setGroups, serviceRoles, orgD
                 </div>
               )}
             </div>}
-            <button className="btn-ghost danger" disabled={checked.size === 0} onClick={deleteChecked}>
+            <button className="btn-ghost danger" disabled={checked.size === 0} onClick={() => confirm({ message: <>선택한 사용자 {checked.size}명을 삭제할까요?</>, onConfirm: deleteChecked })}>
               삭제
             </button>
           </div>
@@ -739,7 +741,7 @@ export function Users({ brands, setBrands, groups, setGroups, serviceRoles, orgD
                       <button className="order-btn" aria-label={`${u.name} 수정`} title="수정" onClick={() => openEdit(u)}>
                         <PencilIcon size={12} />
                       </button>
-                      <button className="order-btn" aria-label={`${u.name} 삭제`} title="삭제" onClick={() => deleteUser(u.id)}>
+                      <button className="order-btn" aria-label={`${u.name} 삭제`} title="삭제" onClick={() => confirm({ message: <>‘{u.name}’ 사용자를 삭제할까요?</>, onConfirm: () => deleteUser(u.id) })}>
                         <TrashIcon size={12} />
                       </button>
                     </span>
@@ -765,6 +767,7 @@ export function Users({ brands, setBrands, groups, setGroups, serviceRoles, orgD
       </div>
 
       {/* ---- 사용자 추가/수정 모달 ---- */}
+      {confirmDialog}
       {editTarget !== null && (
         <div className="modal-backdrop" onClick={() => setEditTarget(null)}>
           <div

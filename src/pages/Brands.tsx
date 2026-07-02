@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { TrashIcon } from '../components/icons';
+import { useConfirm } from '../components/confirm';
 import type { Brand, Group } from '../data/org';
 
 let brandSeq = 100;
@@ -14,6 +15,7 @@ type BrandsProps = {
 };
 
 export function Brands({ brands, setBrands, groups, setGroups, dirty, onSave }: BrandsProps) {
+  const { confirm, confirmDialog } = useConfirm();
   const [newName, setNewName] = useState('');
   const [newGroupUnder, setNewGroupUnder] = useState<string | null>(null);
   const [newGroupName, setNewGroupName] = useState('');
@@ -38,11 +40,16 @@ export function Brands({ brands, setBrands, groups, setGroups, dirty, onSave }: 
   };
 
   const deleteBrand = (id: string) => {
-    const childGroups = groupsByBrand.get(id) ?? [];
-    // 하위 그룹이 있으면 확인 후 함께 삭제 (사용자 소속 정보는 자동 해제됨)
-    if (childGroups.length > 0 && !window.confirm(`'${brands.find((b) => b.id === id)?.name}' 브랜드와 하위 그룹 ${childGroups.length}개를 모두 삭제할까요?`)) return;
     setGroups((prev) => prev.filter((g) => g.brandId !== id));
     setBrands((prev) => prev.filter((b) => b.id !== id));
+  };
+  const askDeleteBrand = (id: string) => {
+    const b = brands.find((x) => x.id === id);
+    const cnt = (groupsByBrand.get(id) ?? []).length;
+    confirm({
+      message: <>‘{b?.name}’ 브랜드를 삭제할까요?{cnt > 0 && <><br />하위 그룹 {cnt}개도 함께 삭제됩니다(사용자 소속만 해제, 계정은 유지).</>}</>,
+      onConfirm: () => deleteBrand(id),
+    });
   };
 
   const addGroup = (brandId: string) => {
@@ -110,7 +117,7 @@ export function Brands({ brands, setBrands, groups, setGroups, dirty, onSave }: 
                           onBlur={(e) => renameGroup(g.id, e.target.value.trim() || g.name)}
                           onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
                         />
-                        <button className="tag-x" aria-label={`${g.name} 그룹 삭제`} onClick={() => deleteGroup(g.id)}>
+                        <button className="tag-x" aria-label={`${g.name} 그룹 삭제`} onClick={() => confirm({ message: <>‘{g.name}’ 그룹을 삭제할까요?<br />사용자는 유지되고 소속만 해제됩니다.</>, onConfirm: () => deleteGroup(g.id) })}>
                           ×
                         </button>
                       </span>
@@ -147,7 +154,7 @@ export function Brands({ brands, setBrands, groups, setGroups, dirty, onSave }: 
                       className="order-btn"
                       aria-label={`${b.name} 브랜드 삭제`}
                       title={brandGroups.length > 0 ? '브랜드와 하위 그룹 모두 삭제' : '브랜드 삭제'}
-                      onClick={() => deleteBrand(b.id)}
+                      onClick={() => askDeleteBrand(b.id)}
                     >
                       <TrashIcon size={12} />
                     </button>
@@ -173,6 +180,7 @@ export function Brands({ brands, setBrands, groups, setGroups, dirty, onSave }: 
         </div>
         <p className="hint">그룹 삭제 시 사용자는 유지되고 소속 정보만 해제됩니다.</p>
       </section>
+      {confirmDialog}
     </main>
   );
 }
