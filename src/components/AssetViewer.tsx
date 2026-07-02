@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
+
+// Draco 압축 GLB(KHR_draco_mesh_compression) 디코더 — fbxConvert 가 Draco 로 내보내므로 필수.
+// 미연결 시 "파일을 불러올 수 없습니다" 로 보임(형식 오류가 아니라 디코더 부재).
+const dracoLoader = new DRACOLoader().setDecoderPath(`${import.meta.env.BASE_URL}draco/`);
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -96,7 +101,7 @@ function ModelCanvas({ asset }: { asset: Asset }) {
 
     try {
       if (e === 'glb' || e === 'gltf') {
-        new GLTFLoader().load(asset.url, (g) => onLoad(g.scene), undefined, onError);
+        new GLTFLoader().setDRACOLoader(dracoLoader).load(asset.url, (g) => onLoad(g.scene), undefined, onError);
       } else if (e === 'obj') {
         new OBJLoader().load(asset.url, onLoad, undefined, onError);
       } else if (e === 'fbx') {

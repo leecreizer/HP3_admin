@@ -1992,6 +1992,43 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
     );
   };
 
+  /** 스타일 그룹 — 스타일 그룹 관리의 스타일을 이 상품에 연결(선택 시 부위 일괄 교체 대상) */
+  const renderStyleLinks = () => {
+    const styles = swapState.styles ?? [];
+    const folderNameOf = (fid: string) => folders.find((f) => f.id === fid)?.name ?? fid;
+    if (styles.length === 0) return <p className="hint">등록된 스타일이 없습니다. <b>스타일 그룹 관리</b>에서 스타일을 만들면 여기서 연결할 수 있습니다.</p>;
+    const toggle = (id: string) => setForm((f) => ({
+      ...f,
+      styleIds: f.styleIds.includes(id) ? f.styleIds.filter((x) => x !== id) : [...f.styleIds, id],
+    }));
+    return (
+      <div className="filter-picker">
+        {(swapState.styleCategories ?? [...new Set(styles.map((s) => s.kind ?? ''))]).map((cat) => {
+          const catStyles = styles.filter((s) => (s.kind ?? '') === cat);
+          if (catStyles.length === 0) return null;
+          return (
+            <div key={cat} className="filter-grp">
+              <div className="filter-grp-head"><span className="filter-grp-name">🎨 {cat || '기본'}</span></div>
+              <div className="filter-opts">
+                {catStyles.map((s) => {
+                  const on = form.styleIds.includes(s.id);
+                  const comp = (s.folders ?? []).map(folderNameOf).join(' + ');
+                  return (
+                    <button key={s.id} type="button" className={`filter-opt${on ? ' on' : ''}`} aria-pressed={on}
+                      title={comp || '구성 없음'} onClick={() => toggle(s.id)}>
+                      {on && <span className="filter-opt-chk">✓</span>}{s.name}
+                      {comp && <small style={{ opacity: 0.75, marginLeft: 4 }}>({comp})</small>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   /** 상품구분·모델 관리에서 연동되는 읽기전용 필터 그룹 */
   const derivedFilterGroups: FilterGroup[] = (() => {
     const kinds = [...new Set(Object.values(kindsByGroup).flat())];
@@ -2413,6 +2450,13 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
               <span className="sel-info" style={{ marginLeft: 12 }}>부위별 교체 그룹 연결</span>
             </div>
             {renderModelingSlots()}
+
+            {/* 스타일 그룹 — 스타일 그룹 관리 연동 */}
+            <div className="panel-head" style={{ marginTop: 18 }}>
+              <h2 style={{ fontSize: '0.92rem' }}>스타일 그룹</h2>
+              <span className="sel-info" style={{ marginLeft: 12 }}>스타일 그룹 관리의 스타일 연결 — 선택 시 부위 일괄 교체</span>
+            </div>
+            {renderStyleLinks()}
             <p className="hint" style={{ marginTop: 12 }}>최종 수정: {editing.updatedAt} · {editing.updatedBy}</p>
           </section>
           )}
@@ -3069,6 +3113,12 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
                   <span className="sel-info" style={{ marginLeft: 12 }}>부위별 교체 그룹 연결</span>
                 </div>
                 {renderModelingSlots()}
+
+                <div className="panel-head" style={{ marginTop: 18 }}>
+                  <h2 style={{ fontSize: '0.92rem' }}>스타일 그룹</h2>
+                  <span className="sel-info" style={{ marginLeft: 12 }}>스타일 그룹 관리의 스타일 연결 — 선택 시 부위 일괄 교체</span>
+                </div>
+                {renderStyleLinks()}
               </div>
             )}
             </div>
