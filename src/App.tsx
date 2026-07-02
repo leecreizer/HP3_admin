@@ -3,6 +3,7 @@ import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
 import { loadConfig, saveConfig, type AdminConfig, type MenuKey } from './config';
 import { INITIAL_BRANDS, INITIAL_GROUPS, type Brand, type Group } from './data/org';
+import { AptPlans } from './pages/AptPlans';
 import { Brands } from './pages/Brands';
 import { Dashboard } from './pages/Dashboard';
 import { Floorplans } from './pages/Floorplans';
@@ -165,7 +166,7 @@ export default function App() {
       break;
     case 'drawings':
       content = active === 'drawings/apt'
-        ? <PagePlaceholder title="APT 도면 관리" />
+        ? <AptPlans />
         : <PagePlaceholder title="도면 관리" />;
       break;
     case 'users':

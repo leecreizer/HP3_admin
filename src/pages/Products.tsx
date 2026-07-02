@@ -1025,7 +1025,8 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
     const q = query.trim().toLowerCase();
     return products.filter(
       (p) =>
-        activeSubtree.has(p.folderId) &&
+        // 검색어가 있으면 폴더 범위를 무시하고 전체에서 검색 (다른 폴더 상품도 찾히도록)
+        (q ? true : activeSubtree.has(p.folderId)) &&
         (typeFilter === 'all' ||
           (typeFilter === '배치형' || typeFilter === '설계형'
             ? p.attrType === '모델링' && p.modelingType === typeFilter
@@ -2941,6 +2942,53 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
 
               {/* 속성 구분 */}
               {renderAttrSelector()}
+
+              {/* 컨텐츠 운영정보 — 설계형 모델링이면 등록 단계에서도 노출 */}
+              {form.attrType === '모델링' && form.modelingType === '설계형' && (
+                <div className="form-field span-2">
+                  <div className="panel-head" style={{ margin: '4px 0 8px' }}>
+                    <h2 style={{ fontSize: '0.92rem' }}>컨텐츠 운영정보</h2>
+                    <span className="sel-info" style={{ marginLeft: 12 }}>{form.nonStandard ? '비규격 사이즈' : '운영 사이즈'} (MIN·MAX·GAP)</span>
+                  </div>
+                  {renderOpSize()}
+                  <div className="panel-head" style={{ margin: '12px 0 6px' }}>
+                    <h2 style={{ fontSize: '0.88rem' }}>변수 정의</h2>
+                    <button className="btn-mini" style={{ marginLeft: 'auto' }}
+                      onClick={() => setForm((f) => ({ ...f, vars: [...f.vars, { name: '', value: '' }] }))}>+ 변수</button>
+                  </div>
+                  {form.vars.length === 0 && <p className="hint" style={{ margin: '0 0 4px' }}>필요하면 변수를 추가하세요. 수식에서 #이름 으로 참조.</p>}
+                  {form.vars.map((v, i) => (
+                    <div key={i} className="opsize-row" style={{ gridTemplateColumns: '1fr 1.6fr 28px' }}>
+                      <input type="text" placeholder="이름 (예: LDH)" value={v.name}
+                        onChange={(e) => setForm((f) => ({ ...f, vars: f.vars.map((x, j) => j === i ? { ...x, name: e.target.value } : x) }))} />
+                      <input type="text" placeholder="값 또는 식 (예: 20, #H/2)" value={v.value}
+                        onChange={(e) => setForm((f) => ({ ...f, vars: f.vars.map((x, j) => j === i ? { ...x, value: e.target.value } : x) }))} />
+                      <button className="order-btn" title="변수 삭제" onClick={() => setForm((f) => ({ ...f, vars: f.vars.filter((_, j) => j !== i) }))}><TrashIcon size={12} /></button>
+                    </div>
+                  ))}
+                  <div className="panel-head" style={{ margin: '12px 0 6px' }}>
+                    <h2 style={{ fontSize: '0.88rem' }}>내보내기 수식 · 조건식</h2>
+                  </div>
+                  <div className="size-row">
+                    {([['W 수식', 'w'], ['D 수식', 'd'], ['H 수식', 'h']] as const).map(([lab, k]) => (
+                      <label className="size-cell" key={k}>
+                        <span>{lab}</span>
+                        <input type="text" placeholder="예: #bodyW/2 - 9" value={form.formula[k]}
+                          onChange={(e) => setForm((f) => ({ ...f, formula: { ...f.formula, [k]: e.target.value } }))} />
+                      </label>
+                    ))}
+                  </div>
+                  <label className="form-field" style={{ marginTop: 6 }}>
+                    <span>조건식 <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(TRUE일 때만 적용)</small></span>
+                    <input className="inline-input full" type="text" placeholder="예: #bodyW >= 200 AND #bodyH > 1200" value={form.condition}
+                      onChange={(e) => setForm((f) => ({ ...f, condition: e.target.value }))} />
+                  </label>
+                  <div className="panel-head" style={{ margin: '12px 0 6px' }}>
+                    <h2 style={{ fontSize: '0.88rem' }}>구성/교체 (모델링 그룹)</h2>
+                  </div>
+                  {renderModelingSlots()}
+                </div>
+              )}
 
               <div className="form-field span-2">
                 <span>컨텐츠 크기 (mm) <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(기본은 모델링 사이즈, 직접 입력 가능)</small></span>
