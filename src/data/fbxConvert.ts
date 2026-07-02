@@ -19,6 +19,7 @@ import {
   Texture,
 } from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 
 /** 마커 박스 한 변 크기(모델 로컬 단위). 위치 식별용이라 작게. */
@@ -155,6 +156,29 @@ async function prepareTextures(root: Object3D): Promise<number> {
   return textureCount;
 }
 
+/**
+ * FBXLoader 산출 지오메트리는 **non-indexed**(삼각형마다 정점 3개 중복)라 GLB로 그대로
+ * 내보내면 지오메트리가 수십 MB 로 폭증한다(21MB FBX → 87MB GLB 실측). 정점 용접
+ * (mergeVertices)으로 indexed 지오메트리로 바꿔 중복을 제거 — 보통 3~6× 축소.
+ * 위치/노멀/UV 가 모두 같은 정점만 합치므로 하드엣지·UV 심은 그대로 보존된다.
+ */
+function weldGeometries(root: Object3D): { before: number; after: number } {
+  let before = 0, after = 0;
+  root.traverse((o) => {
+    const mesh = o as Mesh;
+    if (!mesh.isMesh || !mesh.geometry) return;
+    const geo = mesh.geometry;
+    before += geo.getAttribute('position')?.count ?? 0;
+    if (!geo.index) {
+      const welded = mergeVertices(geo);
+      mesh.geometry = welded;
+      geo.dispose();
+    }
+    after += mesh.geometry.getAttribute('position')?.count ?? 0;
+  });
+  return { before, after };
+}
+
 /** GLTFExporter를 Promise로 감싸 GLB(ArrayBuffer)를 반환. */
 function exportGlb(root: Object3D): Promise<ArrayBuffer> {
   return new Promise((resolve, reject) => {
@@ -175,6 +199,9 @@ export interface FbxConvertResult {
   glb: ArrayBuffer;
   markerCount: number;
   meshCount: number;
+  /** 정점 용접 전/후 정점 수 — 지오메트리 압축 효과 확인용. */
+  vertsBefore: number;
+  vertsAfter: number;
   /** WebP 로 임베드된 유효 텍스처 수. */
   textureCount: number;
   /** 변환 소요 시간(ms). */
@@ -196,13 +223,15 @@ export async function convertFbxToGlb(fbx: ArrayBuffer): Promise<FbxConvertResul
   root.scale.multiplyScalar(MM_TO_M);
   root.updateMatrixWorld(true);
 
+  const { before: vertsBefore, after: vertsAfter } = weldGeometries(root); // 정점 용접 — 지오메트리 축소
+
   const textureCount = await prepareTextures(root); // 임베드 텍스처 디코드 대기 + 무효 텍스처 정리 + WebP 마킹
 
   let meshCount = 0;
   root.traverse((o) => { if (isMeshNode(o)) meshCount++; });
 
   const glb = await exportGlb(root);
-  return { glb, markerCount, meshCount, textureCount, elapsedMs: performance.now() - t0 };
+  return { glb, markerCount, meshCount, vertsBefore, vertsAfter, textureCount, elapsedMs: performance.now() - t0 };
 }
 
 /** ArrayBuffer(GLB) → data URL (model/gltf-binary). IDB 저장/iframe 로드용. */
