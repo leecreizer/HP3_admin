@@ -22,8 +22,6 @@ export type MenuConfig = {
 export type TopbarConfig = {
   brandTitle: string;
   brandSub: string;
-  showSearch: boolean;
-  searchPlaceholder: string;
   showNotifications: boolean;
   userName: string;
   userRole: string;
@@ -94,8 +92,6 @@ export const DEFAULT_CONFIG: AdminConfig = {
   topbar: {
     brandTitle: 'HomePlanner3',
     brandSub: 'HANSSEM ADMIN',
-    showSearch: true,
-    searchPlaceholder: '사용자, 상품, 렌더 ID 검색…',
     showNotifications: true,
     userName: '이대우',
     userRole: '시스템 관리자',

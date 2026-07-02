@@ -267,26 +267,6 @@ export function Settings({ config, onChange, dirty, onSave }: SettingsProps) {
               />
             </label>
 
-            <div className="form-field row">
-              <span>검색창 표시</span>
-              <button
-                className={`switch${config.topbar.showSearch ? ' on' : ''}`}
-                role="switch"
-                aria-checked={config.topbar.showSearch}
-                aria-label="검색창 표시 여부"
-                onClick={() => setTopbar({ showSearch: !config.topbar.showSearch })}
-              />
-            </div>
-            <label className="form-field">
-              <span>검색창 안내 문구</span>
-              <input
-                className="inline-input full"
-                value={config.topbar.searchPlaceholder}
-                disabled={!config.topbar.showSearch}
-                onChange={(e) => setTopbar({ searchPlaceholder: e.target.value })}
-              />
-            </label>
-
             <label className="form-field">
               <span>관리자 이름</span>
               <input
