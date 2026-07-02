@@ -45,13 +45,12 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 .shell {
   display: grid;
   grid-template-columns: 266px 1fr;
-  grid-template-rows: 72px 1fr;
+  grid-template-rows: 1fr;
   height: 100vh;
-  grid-template-areas: "side top" "side main";
+  grid-template-areas: "side main";
   transition: grid-template-columns 0.22s ease;
 }
 .shell.collapsed { grid-template-columns: 104px 1fr; }
-.topbar { grid-area: top; }
 .sidebar { grid-area: side; }
 .main { grid-area: main; overflow-y: auto; }
 
@@ -339,13 +338,13 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
   border: 1.5px solid rgba(255, 255, 255, 0.9);
 }
 
-/* ---------- Topbar ---------- */
+/* ---------- Topbar — 우상단 로그인 정보(페이지 타이틀과 같은 라인에 오버레이) ---------- */
 .topbar {
-  display: flex; align-items: center; gap: 14px;
-  padding: 22px 28px 0 24px;
+  position: fixed; top: 18px; right: 28px; z-index: 30;
+  display: flex; align-items: center;
 }
-.crumb { font-size: 0.95rem; color: var(--text-2); }
-.crumb b { color: var(--ink); font-weight: 700; }
+/* 로그인 정보와 겹치지 않게 각 페이지 첫 헤더의 우측 여백 확보 */
+.main > .page-head:first-child { margin-right: 235px; }
 .search {
   margin-left: auto; display: flex; align-items: center; gap: 8px;
   background: rgba(255, 255, 255, 0.55);
@@ -1119,6 +1118,9 @@ td.num { font-family: var(--num); font-weight: 500; }
 .modal.field-manager { width: min(860px, calc(100vw - 40px)); }
 /* 등록 모달: 왼쪽 미디어 + 오른쪽 입력 정보 */
 .reg-layout { display: flex; gap: 20px; align-items: flex-start; }
+/* 등록 모달 — 설계형일 때 기본정보 우측에 붙는 컨텐츠 운영정보 컬럼 (편집 화면과 동일 구성) */
+.reg-opinfo { flex: 0 0 400px; min-width: 0; border-left: 1px solid var(--line); padding-left: 20px; max-height: 72vh; overflow-y: auto; }
+.modal.field-manager.with-opinfo { width: min(1300px, calc(100vw - 40px)); }
 .reg-media { width: 300px; flex-shrink: 0; display: flex; flex-direction: column; gap: 16px; }
 .reg-right { flex: 1; min-width: 0; }
 /* 등록 모달에서는 썸네일·에셋 박스를 칼럼 폭(300)에 맞춰 정사각형으로 */

@@ -728,6 +728,7 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
+    setAssetMsg(''); // 새 업로드 시작 시 이전 변환 로그 리셋 (완료 후 로그는 다음 업로드까지 유지)
     const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
 
     // FBX는 GLB로 자동 변환 — 더미(DP/hotspot 등)를 이름 마커 메시로 보존해 GLB에 살린다.
@@ -2746,7 +2747,7 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
       {/* ---- 상품 등록 모달 ---- */}
       {showRegister && (
         <div className="modal-backdrop" onClick={() => setShowRegister(false)}>
-          <div className="modal field-manager" role="dialog" aria-modal="true" aria-label="상품 등록" onClick={(e) => e.stopPropagation()}>
+          <div className={`modal field-manager${form.attrType === '모델링' && form.modelingType === '설계형' ? ' with-opinfo' : ''}`} role="dialog" aria-modal="true" aria-label="상품 등록" onClick={(e) => e.stopPropagation()}>
             <h2 className="modal-title">상품 등록</h2>
 
             <div className="reg-layout">
@@ -2950,53 +2951,6 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
               {/* 속성 구분 */}
               {renderAttrSelector()}
 
-              {/* 컨텐츠 운영정보 — 설계형 모델링이면 등록 단계에서도 노출 */}
-              {form.attrType === '모델링' && form.modelingType === '설계형' && (
-                <div className="form-field span-2">
-                  <div className="panel-head" style={{ margin: '4px 0 8px' }}>
-                    <h2 style={{ fontSize: '0.92rem' }}>컨텐츠 운영정보</h2>
-                    <span className="sel-info" style={{ marginLeft: 12 }}>{form.nonStandard ? '비규격 사이즈' : '운영 사이즈'} (MIN·MAX·GAP)</span>
-                  </div>
-                  {renderOpSize()}
-                  <div className="panel-head" style={{ margin: '12px 0 6px' }}>
-                    <h2 style={{ fontSize: '0.88rem' }}>변수 정의</h2>
-                    <button className="btn-mini" style={{ marginLeft: 'auto' }}
-                      onClick={() => setForm((f) => ({ ...f, vars: [...f.vars, { name: '', value: '' }] }))}>+ 변수</button>
-                  </div>
-                  {form.vars.length === 0 && <p className="hint" style={{ margin: '0 0 4px' }}>필요하면 변수를 추가하세요. 수식에서 #이름 으로 참조.</p>}
-                  {form.vars.map((v, i) => (
-                    <div key={i} className="opsize-row" style={{ gridTemplateColumns: '1fr 1.6fr 28px' }}>
-                      <input type="text" placeholder="이름 (예: LDH)" value={v.name}
-                        onChange={(e) => setForm((f) => ({ ...f, vars: f.vars.map((x, j) => j === i ? { ...x, name: e.target.value } : x) }))} />
-                      <input type="text" placeholder="값 또는 식 (예: 20, #H/2)" value={v.value}
-                        onChange={(e) => setForm((f) => ({ ...f, vars: f.vars.map((x, j) => j === i ? { ...x, value: e.target.value } : x) }))} />
-                      <button className="order-btn" title="변수 삭제" onClick={() => setForm((f) => ({ ...f, vars: f.vars.filter((_, j) => j !== i) }))}><TrashIcon size={12} /></button>
-                    </div>
-                  ))}
-                  <div className="panel-head" style={{ margin: '12px 0 6px' }}>
-                    <h2 style={{ fontSize: '0.88rem' }}>내보내기 수식 · 조건식</h2>
-                  </div>
-                  <div className="size-row">
-                    {([['W 수식', 'w'], ['D 수식', 'd'], ['H 수식', 'h']] as const).map(([lab, k]) => (
-                      <label className="size-cell" key={k}>
-                        <span>{lab}</span>
-                        <input type="text" placeholder="예: #bodyW/2 - 9" value={form.formula[k]}
-                          onChange={(e) => setForm((f) => ({ ...f, formula: { ...f.formula, [k]: e.target.value } }))} />
-                      </label>
-                    ))}
-                  </div>
-                  <label className="form-field" style={{ marginTop: 6 }}>
-                    <span>조건식 <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(TRUE일 때만 적용)</small></span>
-                    <input className="inline-input full" type="text" placeholder="예: #bodyW >= 200 AND #bodyH > 1200" value={form.condition}
-                      onChange={(e) => setForm((f) => ({ ...f, condition: e.target.value }))} />
-                  </label>
-                  <div className="panel-head" style={{ margin: '12px 0 6px' }}>
-                    <h2 style={{ fontSize: '0.88rem' }}>구성/교체 (모델링 그룹)</h2>
-                  </div>
-                  {renderModelingSlots()}
-                </div>
-              )}
-
               <div className="form-field span-2">
                 <span>컨텐츠 크기 (mm) <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(기본은 모델링 사이즈, 직접 입력 가능)</small></span>
                 <div className="size-row">
@@ -3033,6 +2987,75 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
             </div>
             {renderFilterPicker()}
             </div>
+
+            {/* 컨텐츠 운영정보 — 설계형이면 기본정보 우측에 편집 화면과 동일 구성으로 노출 */}
+            {form.attrType === '모델링' && form.modelingType === '설계형' && (
+              <div className="reg-opinfo">
+                <div className="panel-head">
+                  <h2>컨텐츠 운영정보</h2>
+                  <span className="sel-info" style={{ marginLeft: 12 }}>
+                    {form.productGroup || '상품군'} · {form.productKind || '상품 구분'} 기준
+                  </span>
+                </div>
+
+                <div className="panel-head" style={{ marginTop: 4 }}>
+                  <h2 style={{ fontSize: '0.92rem' }}>{form.nonStandard ? '비규격 사이즈' : '운영 사이즈'}</h2>
+                  <span className="sel-info" style={{ marginLeft: 12 }}>MIN·MAX·GAP — 기본정보 사이즈 선택 범위</span>
+                </div>
+                {renderOpSize()}
+
+                <div className="panel-head" style={{ marginTop: 14 }}>
+                  <h2 style={{ fontSize: '0.92rem' }}>변수 정의</h2>
+                  <span className="sel-info" style={{ marginLeft: 12 }}>수식에서 #이름 으로 참조</span>
+                  <button className="btn-mini" style={{ marginLeft: 'auto' }}
+                    onClick={() => setForm((f) => ({ ...f, vars: [...f.vars, { name: '', value: '' }] }))}>+ 변수</button>
+                </div>
+                <div className="form-grid">
+                  {form.vars.length === 0 && <p className="hint">필요하면 변수를 추가하세요. 예) 이름 <b>LDH</b>, 값 <b>20</b> → 수식에서 <b>#LDH</b> 사용.</p>}
+                  {form.vars.map((v, i) => (
+                    <div key={i} className="opsize-row" style={{ gridTemplateColumns: '1fr 1.6fr 28px' }}>
+                      <input type="text" placeholder="이름 (예: LDH)" value={v.name}
+                        onChange={(e) => setForm((f) => ({ ...f, vars: f.vars.map((x, j) => j === i ? { ...x, name: e.target.value } : x) }))} />
+                      <input type="text" placeholder="값 또는 식 (예: 20, #H/2)" value={v.value}
+                        onChange={(e) => setForm((f) => ({ ...f, vars: f.vars.map((x, j) => j === i ? { ...x, value: e.target.value } : x) }))} />
+                      <button className="order-btn" title="변수 삭제" onClick={() => setForm((f) => ({ ...f, vars: f.vars.filter((_, j) => j !== i) }))}><TrashIcon size={12} /></button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="panel-head" style={{ marginTop: 14 }}>
+                  <h2 style={{ fontSize: '0.92rem' }}>내보내기 수식 · 조건식</h2>
+                  <span className="sel-info" style={{ marginLeft: 12 }}>예: #H+24-#LDH / 조건: #W &gt;= 200 AND #H &gt; 1200</span>
+                </div>
+                <div className="form-grid">
+                  <div className="size-row">
+                    {([['W 수식', 'w'], ['D 수식', 'd'], ['H 수식', 'h']] as const).map(([lab, k]) => (
+                      <label className="size-cell" key={k}>
+                        <span>{lab}</span>
+                        <input type="text" placeholder="예: #bodyW/2 - 9" value={form.formula[k]}
+                          onChange={(e) => setForm((f) => ({ ...f, formula: { ...f.formula, [k]: e.target.value } }))} />
+                      </label>
+                    ))}
+                  </div>
+                  <label className="form-field">
+                    <span>조건식 <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(TRUE일 때만 자동배치 적용)</small></span>
+                    <input className="inline-input full" type="text" placeholder="예: #bodyW >= 200 AND #bodyH > 1200" value={form.condition}
+                      onChange={(e) => setForm((f) => ({ ...f, condition: e.target.value }))} />
+                  </label>
+                </div>
+
+                <div className="panel-head" style={{ marginTop: 18 }}>
+                  <h2 style={{ fontSize: '0.92rem' }}>운영 항목</h2>
+                </div>
+                {renderOperationInfo()}
+
+                <div className="panel-head" style={{ marginTop: 18 }}>
+                  <h2 style={{ fontSize: '0.92rem' }}>구성/교체 (모델링 그룹)</h2>
+                  <span className="sel-info" style={{ marginLeft: 12 }}>부위별 교체 그룹 연결</span>
+                </div>
+                {renderModelingSlots()}
+              </div>
+            )}
             </div>
 
             <div className="modal-actions">

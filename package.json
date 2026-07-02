@@ -1,7 +1,7 @@
 {
   "name": "hp3-admin",
   "private": true,
-  "version": "0.0.9",
+  "version": "0.0.10",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,7 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@gltf-transform/core": "^4.4.1",
+    "@gltf-transform/extensions": "^4.4.1",
+    "@gltf-transform/functions": "^4.4.1",
     "@types/three": "^0.184.1",
+    "draco3d": "^1.5.7",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "three": "^0.184.0"

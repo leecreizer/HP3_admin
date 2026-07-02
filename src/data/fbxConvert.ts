@@ -20,6 +20,12 @@ import {
 } from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { WebIO } from '@gltf-transform/core';
+import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
+import { draco } from '@gltf-transform/functions';
+import draco3d from 'draco3d';
+import dracoEncoderWasmUrl from 'draco3d/draco_encoder.wasm?url';
+import dracoDecoderWasmUrl from 'draco3d/draco_decoder.wasm?url';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 
 /** 마커 박스 한 변 크기(모델 로컬 단위). 위치 식별용이라 작게. */
@@ -179,6 +185,38 @@ function weldGeometries(root: Object3D): { before: number; after: number } {
   return { before, after };
 }
 
+/**
+ * Draco 지오메트리 압축 (KHR_draco_mesh_compression).
+ *
+ * 정점 용접 후에도 GLB 대부분이 raw float 지오메트리(43만 정점 ≈ 20MB 실측)라,
+ * Draco 양자화+엔트로피 압축으로 지오메트리를 통상 5~10× 더 줄인다.
+ * 웹 설계화면 GLTFLoader 는 DRACOLoader(디코더 /draco/) 연결로 디코드한다.
+ * 인코더/디코더 wasm 은 draco3d 패키지에서 번들(외부 CDN 불필요).
+ */
+let dracoIO: Promise<WebIO> | null = null;
+function getDracoIO(): Promise<WebIO> {
+  dracoIO ??= (async () => {
+    const [encoder, decoder] = await Promise.all([
+      draco3d.createEncoderModule({ locateFile: () => dracoEncoderWasmUrl }),
+      draco3d.createDecoderModule({ locateFile: () => dracoDecoderWasmUrl }),
+    ]);
+    return new WebIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({
+      'draco3d.encoder': encoder,
+      'draco3d.decoder': decoder,
+    });
+  })();
+  return dracoIO;
+}
+
+async function compressGlbDraco(glb: ArrayBuffer): Promise<ArrayBuffer> {
+  const io = await getDracoIO();
+  const doc = await io.readBinary(new Uint8Array(glb));
+  await doc.transform(draco());
+  const out = await io.writeBinary(doc);
+  // Uint8Array → 정확한 구간만 ArrayBuffer 로 복사
+  return out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength) as ArrayBuffer;
+}
+
 /** GLTFExporter를 Promise로 감싸 GLB(ArrayBuffer)를 반환. */
 function exportGlb(root: Object3D): Promise<ArrayBuffer> {
   return new Promise((resolve, reject) => {
@@ -230,7 +268,14 @@ export async function convertFbxToGlb(fbx: ArrayBuffer): Promise<FbxConvertResul
   let meshCount = 0;
   root.traverse((o) => { if (isMeshNode(o)) meshCount++; });
 
-  const glb = await exportGlb(root);
+  const rawGlb = await exportGlb(root);
+  // Draco 압축 — 실패(브라우저 미지원 등) 시 비압축 GLB 로 폴백해 등록은 항상 성공.
+  let glb = rawGlb;
+  try {
+    glb = await compressGlbDraco(rawGlb);
+  } catch (e) {
+    console.warn('[FBX→GLB] Draco 압축 실패 — 비압축 GLB 사용', e);
+  }
   return { glb, markerCount, meshCount, vertsBefore, vertsAfter, textureCount, elapsedMs: performance.now() - t0 };
 }
 

@@ -15,11 +15,6 @@ import { StyleLibrary } from './pages/StyleLibrary';
 import { Settings } from './pages/Settings';
 import { Users, loadUsers, userKind } from './pages/Users';
 
-const SECTION: Record<string, string> = {
-  dashboard: '홈',
-  settings: '시스템',
-};
-
 const FIXED_TITLE: Partial<Record<MenuKey, string>> = {
   dashboard: '대시보드',
   settings: '설정',
@@ -221,8 +216,6 @@ export default function App() {
         onReorder={reorderMenu}
       />
       <Topbar
-        section={SECTION[active] ?? '운영'}
-        page={page}
         config={{ ...config.topbar, userName: currentUserName, userRole: currentUser?.role ?? config.topbar.userRole, userAccount: currentUser?.email ?? config.topbar.userAccount }}
         roles={config.roles.filter((r) => r.scope === 'admin')}
         currentRoleId={config.currentRoleId}
