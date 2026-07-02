@@ -12,32 +12,46 @@ import App from './App.tsx'
 const SEED_KEYS = ['hp3-products-state', 'hp3-swap-groups', 'hp3-users', 'hp3-org-brands', 'hp3-org-groups', 'hp3-login-user', 'hp3-admin-config'] as const;
 
 /**
- * 깃허브(public/models)에 올린 GLB 모델링을 테스트 상품으로 자동 등록.
- * modelUrl은 현재 접속 주소 기준(로컬 dev·GitHub Pages 모두 동작)이며, 이미 등록돼 있으면 건너뜀.
+ * 깃허브(public/models)의 GLB 모델링을 테스트 상품으로 자동 등록.
+ * - 목록·연결 정보는 public/models/manifest.json 에서 관리 (파일 추가 = GLB + manifest 한 줄)
+ * - 컨텐츠 코드는 자동 생성(GHMDL + 순번, manifest 순서 기준 결정적) — 수정 불가 정책
+ * - modelUrl은 현재 접속 주소 기준(로컬 dev·GitHub Pages 모두 동작), 파일명 기준으로 중복 등록 방지
  */
-const SAMPLE_MODELS = [
-  { code: 'GHMDL0001', name: '샘플 붙박이장 BBIL10132', file: 'BBIL10132.glb', group: '수납', quote: '붙박이장', kind: '스윙장', folder: 'f-storage', w: 1200, d: 620, h: 2350, modeling: '설계형' },
-  { code: 'GHMDL0002', name: '샘플 가구 130', file: '130.glb', group: '가구', quote: '가구', kind: '', folder: 'f-furniture', w: 800, d: 800, h: 750, modeling: '배치형' },
-  { code: 'GHMDL0003', name: '샘플 소품 게임보이', file: 'game_boy_classic.glb', group: '소품', quote: '소품', kind: '', folder: 'f-props', w: 90, d: 30, h: 150, modeling: '배치형' },
-  { code: 'GHMDL0004', name: '샘플 소품 샐러드', file: 'salad_plate.glb', group: '소품', quote: '소품', kind: '', folder: 'f-props', w: 250, d: 250, h: 60, modeling: '배치형' },
-];
+type ModelManifestItem = {
+  file: string; name: string; group: string; quote: string; kind: string;
+  folder: string; w: number; d: number; h: number; modeling: string;
+};
 
-function seedSampleModels() {
+async function seedSampleModels() {
   try {
     const raw = JSON.parse(localStorage.getItem('hp3-products-state') ?? 'null');
     if (!raw || !Array.isArray(raw.products)) return;
-    if (raw.products.some((p: { contentCode?: string }) => p.contentCode === SAMPLE_MODELS[0].code)) return; // 이미 등록됨
+    const res = await fetch(`${import.meta.env.BASE_URL}models/manifest.json`);
+    if (!res.ok) return;
+    const manifest = await res.json() as ModelManifestItem[];
     const modelBase = new URL(`${import.meta.env.BASE_URL}models/`, window.location.origin).href;
+    const registered = new Set(
+      (raw.products as { modelUrl?: string }[])
+        .map((p) => p.modelUrl?.split('/').pop())
+        .filter(Boolean),
+    );
     const today = new Date().toISOString().slice(0, 10);
-    const added = SAMPLE_MODELS.map((m) => ({
-      contentCode: m.code, name: m.name, brand: '한샘', productGroup: m.group, quoteGroup: m.quote,
-      productCode: m.code, modelCode: '', itemCode: '', visible: true, permission: '전체',
-      w: m.w, d: m.d, h: m.h, placement: '바닥', placeHeight: 0,
-      attrType: '모델링', modelingType: m.modeling, productKind: m.kind, modelKind: '',
-      thumb: '', folderId: m.folder, filterValues: [], opValues: {},
-      modelUrl: `${modelBase}${m.file}`,
-      updatedAt: today, updatedBy: '이대우',
-    }));
+    const added = manifest
+      .filter((m) => !registered.has(m.file))
+      .map((m, i) => {
+        const code = `GHMDL${String(manifest.indexOf(m) + 1).padStart(4, '0')}`; // 자동 생성 — manifest 순서 기준
+        void i;
+        return {
+          contentCode: code, name: m.name, brand: '한샘', productGroup: m.group, quoteGroup: m.quote,
+          productCode: code, modelCode: '', itemCode: '', visible: true, permission: '전체',
+          w: m.w, d: m.d, h: m.h, placement: '바닥', placeHeight: 0,
+          attrType: '모델링', modelingType: m.modeling, productKind: m.kind, modelKind: '',
+          thumb: '', folderId: m.folder, filterValues: [], opValues: {},
+          modelUrl: `${modelBase}${m.file}`,
+          updatedAt: today, updatedBy: '이대우',
+        };
+      });
+    if (added.length === 0) return;
     raw.products = [...added, ...raw.products];
     localStorage.setItem('hp3-products-state', JSON.stringify(raw));
   } catch { /* ignore */ }
@@ -56,7 +70,7 @@ async function bootstrap() {
       }
     } catch { /* 시드 실패해도 앱은 기존 시드 상수로 동작 */ }
   }
-  seedSampleModels();
+  await seedSampleModels();
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <App />

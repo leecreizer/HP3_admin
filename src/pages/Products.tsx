@@ -324,7 +324,7 @@ const INITIAL_FIELDS: FieldDef[] = [
   { key: 'productGroup', label: '상품군', manualInput: true, required: true, editable: true, example: '부엌, 바스, 수납, 도어, 창호 등 용도나 공간에 맞게 정리', builtin: true },
   { key: 'name', label: '상품명', manualInput: true, required: true, editable: true, example: '기준정보와 다르게 표기되는 상품명', builtin: true },
   { key: 'quoteGroup', label: '견적그룹', manualInput: true, required: true, editable: true, example: '상품마다 구분된 견적 로직 적용', builtin: true },
-  { key: 'contentCode', label: '컨텐츠 코드', manualInput: true, required: true, editable: true, example: '배치된 상품의 상품코드를 찾기위한 필수 키코드', builtin: true },
+  { key: 'contentCode', label: '컨텐츠 코드', manualInput: false, required: true, editable: false, example: '자동 생성되는 키코드 — 수정 불가', builtin: true },
   { key: 'productCode', label: '상품코드', manualInput: true, required: true, editable: false, example: '견적 가격을 갖고있는 코드', builtin: true },
   { key: 'visible', label: '노출여부', manualInput: true, required: true, editable: true, example: '설계페이지 상품 리스트 노출여부', builtin: true },
   { key: 'permission', label: '사용자 그룹', manualInput: true, required: true, editable: true, example: '이 사용자 그룹에 속한 사용자에게 컨텐츠 노출', builtin: true },
@@ -1399,7 +1399,9 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
 
   /* ---------- 상품 편집 ---------- */
   /** 노출 필드 관리에서 정한 수정 가능 여부 (정의 없으면 기본 허용) */
-  const fieldEditable = (key: string) => fields.find((f) => f.key === key)?.editable ?? true;
+  // 컨텐츠 코드는 자동 생성 — 기본 정책상 수정 불가(노출필드 설정과 무관하게 강제)
+  const fieldEditable = (key: string) =>
+    key === 'contentCode' ? false : (fields.find((f) => f.key === key)?.editable ?? true);
 
   const productToForm = (p: Product): ProductForm => ({
     attrType: p.attrType,
@@ -2888,13 +2890,8 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
 
               <div className="span-2 code-pair-grid">
                 <label className="form-field">
-                  <span>컨텐츠 코드 <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(비우면 자동 생성)</small></span>
-                  <input
-                    className="inline-input full"
-                    value={form.contentCode}
-                    placeholder="배치된 상품을 찾는 키코드"
-                    onChange={(e) => setForm((f) => ({ ...f, contentCode: e.target.value }))}
-                  />
+                  <span>컨텐츠 코드 <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(자동 생성 · 수정 불가)</small></span>
+                  <input className="inline-input full" value="등록 시 자동 생성됩니다" disabled readOnly />
                 </label>
                 <label className="form-field">
                   <span>상품코드 * <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(등록 후 수정 불가)</small></span>
