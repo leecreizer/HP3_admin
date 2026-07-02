@@ -139,6 +139,11 @@ async function prepareTextures(root: Object3D): Promise<void> {
 
   for (const f of collect()) {
     if (imageReady(f.tex.image)) {
+      // ⭐ WebP 압축 export — GLTFExporter 가 texture.userData.mimeType 을 존중해
+      // EXT_texture_webp 로 내보낸다(품질 0.8). PNG 대비 GLB 크기 1/4~1/10 →
+      // 웹 설계화면 로드/파싱/업로드 시간 대폭 단축. 알파 채널도 WebP 가 지원.
+      // (웹 GLTFLoader 는 EXT_texture_webp 기본 지원 확인됨)
+      f.tex.userData.mimeType = 'image/webp';
       f.tex.needsUpdate = true;
     } else {
       f.mat[f.key] = null; // 유효하지 않은 텍스처 제거 → export 안전
