@@ -1,5 +1,4 @@
 import type { Role, TopbarConfig } from '../config';
-import { SearchIcon } from './icons';
 
 type TopbarProps = {
   section: string;
@@ -18,14 +17,7 @@ export function Topbar({ section, page, config, roles, currentRoleId }: TopbarPr
         {section} / <b>{page}</b>
       </span>
 
-      {config.showSearch && (
-        <label className="search">
-          <SearchIcon />
-          <input type="search" placeholder={config.searchPlaceholder} aria-label="검색" />
-        </label>
-      )}
-
-      <div className="user" style={config.showSearch ? undefined : { marginLeft: 'auto' }}>
+      <div className="user" style={{ marginLeft: 'auto' }}>
         <span className="avatar">{config.userName.charAt(0)}</span>
         <span className="user-meta">
           <span className="name">

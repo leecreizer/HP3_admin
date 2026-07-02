@@ -106,7 +106,7 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
  * 모든 텍스처의 image가 디코드될 때까지 **폴링**한다. 끝내 무효한 텍스처만 머티리얼에서 제거해
  * export 실패("No valid image data")를 막는다.
  */
-async function prepareTextures(root: Object3D): Promise<void> {
+async function prepareTextures(root: Object3D): Promise<number> {
   const collect = (): { mat: Material & Record<string, unknown>; key: string; tex: Texture }[] => {
     const found: { mat: Material & Record<string, unknown>; key: string; tex: Texture }[] = [];
     root.traverse((o) => {
@@ -137,8 +137,10 @@ async function prepareTextures(root: Object3D): Promise<void> {
     await sleep(TEX_POLL_MS);
   }
 
+  let textureCount = 0;
   for (const f of collect()) {
     if (imageReady(f.tex.image)) {
+      textureCount++;
       // ⭐ WebP 압축 export — GLTFExporter 가 texture.userData.mimeType 을 존중해
       // EXT_texture_webp 로 내보낸다(품질 0.8). PNG 대비 GLB 크기 1/4~1/10 →
       // 웹 설계화면 로드/파싱/업로드 시간 대폭 단축. 알파 채널도 WebP 가 지원.
@@ -150,6 +152,7 @@ async function prepareTextures(root: Object3D): Promise<void> {
       (f.mat as Material).needsUpdate = true;
     }
   }
+  return textureCount;
 }
 
 /** GLTFExporter를 Promise로 감싸 GLB(ArrayBuffer)를 반환. */
@@ -172,6 +175,10 @@ export interface FbxConvertResult {
   glb: ArrayBuffer;
   markerCount: number;
   meshCount: number;
+  /** WebP 로 임베드된 유효 텍스처 수. */
+  textureCount: number;
+  /** 변환 소요 시간(ms). */
+  elapsedMs: number;
 }
 
 /**
@@ -179,6 +186,7 @@ export interface FbxConvertResult {
  * @throws 파싱/내보내기 실패 시
  */
 export async function convertFbxToGlb(fbx: ArrayBuffer): Promise<FbxConvertResult> {
+  const t0 = performance.now();
   const loader = new FBXLoader();
   const root = loader.parse(fbx, '');
 
@@ -188,13 +196,13 @@ export async function convertFbxToGlb(fbx: ArrayBuffer): Promise<FbxConvertResul
   root.scale.multiplyScalar(MM_TO_M);
   root.updateMatrixWorld(true);
 
-  await prepareTextures(root); // 임베드 텍스처 디코드 대기 + 무효 텍스처 정리
+  const textureCount = await prepareTextures(root); // 임베드 텍스처 디코드 대기 + 무효 텍스처 정리 + WebP 마킹
 
   let meshCount = 0;
   root.traverse((o) => { if (isMeshNode(o)) meshCount++; });
 
   const glb = await exportGlb(root);
-  return { glb, markerCount, meshCount };
+  return { glb, markerCount, meshCount, textureCount, elapsedMs: performance.now() - t0 };
 }
 
 /** ArrayBuffer(GLB) → data URL (model/gltf-binary). IDB 저장/iframe 로드용. */

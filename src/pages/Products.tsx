@@ -735,10 +735,17 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
       setAssetBusy(true);
       try {
         const buf = await file.arrayBuffer();
-        const { glb, markerCount, meshCount } = await convertFbxToGlb(buf);
+        const { glb, markerCount, meshCount, textureCount, elapsedMs } = await convertFbxToGlb(buf);
         const glbName = file.name.replace(/\.fbx$/i, '.glb');
         setPendingAsset({ id: `a-${Date.now()}-${glbName}`, name: glbName, type: '모델링', url: glbToDataUrl(glb) });
-        setAssetMsg(`✓ FBX→GLB 변환 완료 — 메시 ${meshCount}개 · 더미 마커 ${markerCount}개 보존`);
+        // 압축 로그 — FBX/GLB 크기·감소율·텍스처(WebP)·메시·마커·소요시간
+        const mb = (n: number) => (n / 1024 / 1024).toFixed(2);
+        const ratio = buf.byteLength > 0 ? Math.round((1 - glb.byteLength / buf.byteLength) * 100) : 0;
+        setAssetMsg(
+          `✓ FBX→GLB 변환 완료 — ${mb(buf.byteLength)}MB → ${mb(glb.byteLength)}MB (${ratio >= 0 ? ratio + '%↓' : Math.abs(ratio) + '%↑'})` +
+          ` · WebP 텍스처 ${textureCount}개 · 메시 ${meshCount}개 · 마커 ${markerCount}개 · ${(elapsedMs / 1000).toFixed(1)}s`,
+        );
+        console.log('[FBX→GLB]', { file: file.name, fbxBytes: buf.byteLength, glbBytes: glb.byteLength, ratio: `${ratio}%↓`, textureCount, meshCount, markerCount, elapsedMs: Math.round(elapsedMs) });
       } catch (err) {
         setAssetMsg(`⚠ FBX 변환 실패: ${err instanceof Error ? err.message : String(err)}`);
       } finally {
