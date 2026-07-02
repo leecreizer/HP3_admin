@@ -204,6 +204,8 @@ type Product = {
   /** 구성/교체 슬롯 — 모델링 교체 그룹 연결 (도어→도어그룹 등)
    *  rules: 조건식(evalFormula)→교체 묶음(groupId) 분기. 위에서부터 참인 첫 규칙의 그룹 사용, 없으면 기본 groupId */
   modelingSlots?: { slot: string; groupId: string; defaultModelingId?: string; rules?: { condition: string; groupId: string }[] }[];
+  /** 적용 가능 스타일 — 스타일 그룹 관리의 스타일 id 연결 (스타일 선택 시 부위 일괄 교체 대상) */
+  styleIds?: string[];
   /** 스펙/몰 URL — 이름+주소 쌍 목록 */
   specUrls?: { name: string; url: string }[];
   mallUrls?: { name: string; url: string }[];
@@ -593,6 +595,7 @@ type ProductForm = {
   opValues: Record<string, string>;
   /** 구성/교체 슬롯 */
   modelingSlots: { slot: string; groupId: string; defaultModelingId?: string; rules?: { condition: string; groupId: string }[] }[];
+  styleIds: string[];
   specUrls: { name: string; url: string }[];
   mallUrls: { name: string; url: string }[];
   /** 썸네일·에셋 — 저장 전까지 폼에만 유지 */
@@ -605,7 +608,7 @@ const EMPTY_PRODUCT_FORM: ProductForm = {
   attrType: '모델링', name: '', brand: '한샘', productGroup: '', quoteGroup: '', contentCode: '',
   productCode: '', modelCode: '', itemCode: '', price: '', modelUrl: '', modelGroupId: '', permission: '전체', w: '', d: '', h: '', opSize: { ...EMPTY_OPSIZE }, dp: '', pos: '', nonStandard: false, formula: { w: '', d: '', h: '' }, vars: [], condition: '', placement: '바닥', placeHeight: '0',
   modelingType: '배치형', productKind: '', modelKind: '', folderId: 'f-model', filterValues: [], opValues: {},
-  modelingSlots: [], specUrls: [], mallUrls: [], thumbUrl: undefined, assets: [],
+  modelingSlots: [], styleIds: [], specUrls: [], mallUrls: [], thumbUrl: undefined, assets: [],
 };
 
 type ProductsProps = {
@@ -721,14 +724,23 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
   /** 업로드 후 등록 대기 중인 에셋 (등록 누르면 확정, 취소하면 폐기) */
   const [pendingAsset, setPendingAsset] = useState<NonNullable<Product['assets']>[number] | null>(null);
   const [assetBusy, setAssetBusy] = useState(false);
-  const [assetMsg, setAssetMsg] = useState('');
+  // 변환 로그 — localStorage 영속: 새로고침해도 유지, 새 변환 완료 시 교체.
+  const CONVERT_LOG_KEY = 'hp3-fbx-convert-log';
+  const [assetMsg, _setAssetMsg] = useState(() => {
+    try { return localStorage.getItem(CONVERT_LOG_KEY) ?? ''; } catch { return ''; }
+  });
+  const setAssetMsg = (msg: string) => {
+    _setAssetMsg(msg);
+    try {
+      if (msg) localStorage.setItem(CONVERT_LOG_KEY, msg);
+    } catch { /* ignore */ }
+  };
   const onAssetUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     // 한 번에 하나의 에셋만 — 업로드하면 등록 대기 상태로.
     // data URL(base64)로 읽어 영속화·교차출처(설계 미리보기 iframe) 로드가 가능하게 한다.
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    setAssetMsg(''); // 새 업로드 시작 시 이전 변환 로그 리셋 (완료 후 로그는 다음 업로드까지 유지)
     const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
 
     // FBX는 GLB로 자동 변환 — 더미(DP/hotspot 등)를 이름 마커 메시로 보존해 GLB에 살린다.
@@ -1387,6 +1399,7 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
         filterValues: form.filterValues,
         opValues: form.opValues,
         modelingSlots: form.modelingSlots,
+        styleIds: form.styleIds,
         specUrls: form.specUrls.filter((u) => u.name.trim() || u.url.trim()),
         mallUrls: form.mallUrls.filter((u) => u.name.trim() || u.url.trim()),
         thumbUrl: form.thumbUrl,
@@ -1445,6 +1458,7 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
     filterValues: p.filterValues ?? [],
     opValues: p.opValues ?? {},
     modelingSlots: p.modelingSlots ?? [],
+    styleIds: p.styleIds ?? [],
     specUrls: p.specUrls ?? [],
     mallUrls: p.mallUrls ?? [],
     thumbUrl: p.thumbUrl,
@@ -1654,6 +1668,7 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
               filterValues: form.filterValues,
               opValues: form.opValues,
               modelingSlots: form.modelingSlots,
+              styleIds: form.styleIds,
               specUrls: form.specUrls.filter((u) => u.name.trim() || u.url.trim()),
               mallUrls: form.mallUrls.filter((u) => u.name.trim() || u.url.trim()),
               thumbUrl: form.thumbUrl,
