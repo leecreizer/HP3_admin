@@ -2,5 +2,6 @@
   { "file": "BBIL10132.glb", "name": "샘플 붙박이장 BBIL10132", "group": "수납", "quote": "붙박이장", "kind": "스윙장", "folder": "f-storage", "w": 1200, "d": 620, "h": 2350, "modeling": "설계형" },
   { "file": "130.glb", "name": "샘플 가구 130", "group": "가구", "quote": "가구", "kind": "", "folder": "f-furniture", "w": 800, "d": 800, "h": 750, "modeling": "배치형" },
   { "file": "game_boy_classic.glb", "name": "샘플 소품 게임보이", "group": "소품", "quote": "소품", "kind": "", "folder": "f-props", "w": 90, "d": 30, "h": 150, "modeling": "배치형" },
-  { "file": "salad_plate.glb", "name": "샘플 소품 샐러드", "group": "소품", "quote": "소품", "kind": "", "folder": "f-props", "w": 250, "d": 250, "h": 60, "modeling": "배치형" }
+  { "file": "salad_plate.glb", "name": "샘플 소품 샐러드", "group": "소품", "quote": "소품", "kind": "", "folder": "f-props", "w": 250, "d": 250, "h": 60, "modeling": "배치형" },
+  { "file": "HP_IK00003.glb", "name": "HP_IK00003 장", "group": "수납", "quote": "붙박이장", "kind": "스윙장", "folder": "f-storage", "w": 1015, "d": 741, "h": 2320, "modeling": "설계형" }
 ]
