@@ -76,7 +76,8 @@ const FORMULA_FNS: Record<string, (...a: number[]) => number> = {
 };
 export function evalFormula(expr: string, vars: Record<string, number>): number | boolean | null {
   if (!expr || !expr.trim()) return null;
-  const tokens = expr.match(/>=|<=|==|!=|&&|\|\||[<>+\-*/(),!]|#?[A-Za-z_]\w*|\d*\.?\d+/g);
+  // 변수명: 영문/한글 시작, 점(.) 경로 허용 — 예) #body.LDH (몸통 사용자 변수 참조)
+  const tokens = expr.match(/>=|<=|==|!=|&&|\|\||[<>+\-*/(),!]|#?[A-Za-z_가-힣][\w가-힣]*(?:\.[A-Za-z_가-힣][\w가-힣]*)*|\d*\.?\d+/g);
   if (!tokens) return null;
   let i = 0; let bad = false;
   const peek = () => tokens[i];
@@ -124,7 +125,7 @@ export function evalFormula(expr: string, vars: Record<string, number>): number 
     if (t === undefined) { bad = true; return 0; }
     if (t === '(') { eat(); const v = parseOr(); if (peek() === ')') eat(); else bad = true; return v; }
     eat();
-    if (/^#?[A-Za-z_]/.test(t)) {
+    if (/^#?[A-Za-z_가-힣]/.test(t)) {
       const name = t.replace(/^#/, '');
       const low = name.toLowerCase();
       if (low === 'true') return true; if (low === 'false') return false;
@@ -177,6 +178,8 @@ type Product = {
   h: number;
   /** 운영 사이즈 — 축별 MIN/MAX/GAP. 있으면 기본정보 사이즈를 범위·간격으로 선택 */
   opSize?: OpSize;
+  /** 표시 컬러(hex) — 모델(마감) 라인 구분용. 웹플래너 박스 배치 시 이 색으로 렌더 */
+  color?: string;
   /** DP 정보 — 몸통↔도어 매칭 키. 같은 DP끼리 자동 배치 */
   dp?: string;
   /** POS 정보 — 도어가 몸통에 붙는 위치(예: L/R, 좌우 오프셋) */
@@ -358,6 +361,12 @@ export const INITIAL_FOLDERS: Folder[] = [
   { id: 'f-grp-design', name: '설계형', parentId: ROOT_FOLDER_ID, kind: 'external' },
   { id: 'f-kitchen', name: '부엌', parentId: 'f-grp-design', kind: 'external' },
   { id: 'f-storage', name: '수납', parentId: 'f-grp-design', kind: 'external' },
+  // 수납 하위 — 종류별 최종 폴더(샘플 상품 분류). 상품은 최종 폴더 직속으로만 배치해 목록 혼동 방지.
+  { id: 'f-storage-body', name: '몸통', parentId: 'f-storage', kind: 'external' },
+  { id: 'f-storage-door', name: '도어', parentId: 'f-storage', kind: 'external' },
+  { id: 'f-storage-ep', name: 'EP', parentId: 'f-storage', kind: 'external' },
+  { id: 'f-storage-srd', name: '상부 서라운딩', parentId: 'f-storage', kind: 'external' },
+  { id: 'f-storage-srs', name: '측면 서라운딩', parentId: 'f-storage', kind: 'external' },
   { id: 'f-bath', name: '바스', parentId: 'f-grp-design', kind: 'external' },
   { id: 'f-door', name: '도어', parentId: 'f-grp-design', kind: 'external' },
   { id: 'f-window', name: '창호', parentId: 'f-grp-design', kind: 'external' },
@@ -396,7 +405,7 @@ type SeedDef = {
 const SEED_DEFS: SeedDef[] = [
   { group: '부엌', folder: 'f-kitchen', quote: '키친 시공', placement: '바닥', attr: '모델링', modeling: '설계형', prefix: 'KIT', size: [3600, 1500, 2100] },
   { group: '바스', folder: 'f-bath', quote: '욕실', placement: '바닥', attr: '모델링', modeling: '배치형', prefix: 'BTH', size: [700, 600, 800] },
-  { group: '수납', folder: 'f-storage', quote: '붙박이장', placement: '벽', attr: '모델링', modeling: '설계형', prefix: 'STR', size: [2400, 650, 2350] },
+  { group: '수납', folder: 'f-storage-body', quote: '붙박이장', placement: '벽', attr: '모델링', modeling: '설계형', prefix: 'STR', size: [2400, 650, 2350] },
   { group: '도어', folder: 'f-door', quote: '도어', placement: '벽', attr: '모델링', modeling: '배치형', prefix: 'DOR', size: [900, 50, 2100] },
   { group: '창호', folder: 'f-window', quote: '창호 시공', placement: '벽', attr: '모델링', modeling: '설계형', prefix: 'WIN', size: [2100, 200, 1400] },
   { group: '가구', folder: 'f-furniture', quote: '가구', placement: '바닥', attr: '모델링', modeling: '배치형', prefix: 'FUR', size: [1600, 800, 750] },
@@ -426,7 +435,49 @@ export const DEFAULT_THUMB = `data:image/svg+xml,${encodeURIComponent(
   `<text x='100' y='150' font-family='Pretendard,sans-serif' font-size='16' font-weight='600' fill='#9aa1aa' text-anchor='middle'>썸네일 없음</text>` +
   `</svg>`,
 )}`;
-function seedThumb(): string { return DEFAULT_THUMB; }
+
+/** 수납(f-storage) 직속 상품 → 종류별 최종 폴더 이관 대상 판정.
+ *  수납은 분류(중간) 폴더로 바뀌었으므로 직속 상품은 품목 기준으로 최종 폴더에 배치한다. */
+export function storageLeafFolder(p: { folderId?: string; productKind?: string }): string | null {
+  if (p.folderId !== 'f-storage') return null;
+  const k = p.productKind ?? '';
+  if (k === 'EP') return 'f-storage-ep';
+  if (k.includes('상부')) return 'f-storage-srd';
+  if (k.includes('측면')) return 'f-storage-srs';
+  if (k.includes('도어')) return 'f-storage-door';
+  return 'f-storage-body';
+}
+
+/** 생성 데이터용 썸네일 — 상품 종류 실루엣 + 컬러 + 명칭 라벨 SVG.
+ *  'hp3gen' 마커 포함 → 로더의 구형 SVG 썸네일 정리 로직이 기본 썸네일로 덮지 않는다. */
+export function genThumb(kind: 'door' | 'ep' | 'srd' | 'srs' | 'body' | 'swatch', label: string, color = '#c9cdd2'): string {
+  const edge = `stroke='rgba(30,36,44,.22)' stroke-width='2'`;
+  const glyph =
+    kind === 'door'
+      ? `<rect x='72' y='24' width='56' height='114' rx='6' fill='${color}' ${edge}/>` +
+        `<circle cx='118' cy='82' r='4.5' fill='rgba(255,255,255,.9)' stroke='rgba(30,36,44,.3)'/>`
+      : kind === 'ep'
+      ? `<rect x='86' y='24' width='20' height='114' rx='4' fill='${color}' ${edge}/>` +
+        `<rect x='106' y='30' width='10' height='102' rx='3' fill='${color}' opacity='.55'/>`
+      : kind === 'srd'
+      ? `<rect x='36' y='66' width='128' height='26' rx='6' fill='${color}' ${edge}/>` +
+        `<rect x='36' y='96' width='128' height='6' rx='3' fill='${color}' opacity='.4'/>`
+      : kind === 'srs'
+      ? `<rect x='90' y='24' width='20' height='114' rx='5' fill='${color}' ${edge}/>`
+      : kind === 'body'
+      ? `<rect x='56' y='24' width='88' height='114' rx='7' fill='${color}' ${edge}/>` +
+        `<line x1='100' y1='24' x2='100' y2='138' stroke='rgba(30,36,44,.28)' stroke-width='2'/>` +
+        `<line x1='56' y1='81' x2='144' y2='81' stroke='rgba(30,36,44,.2)' stroke-width='2'/>`
+      : `<rect x='52' y='30' width='96' height='96' rx='14' fill='${color}' ${edge}/>`;
+  const short = label.length > 12 ? `${label.slice(0, 12)}…` : label;
+  return `data:image/svg+xml,${encodeURIComponent(
+    `<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><!--hp3gen-->` +
+    `<rect width='200' height='200' fill='#f4f5f7'/>` +
+    glyph +
+    `<text x='100' y='170' font-family='Pretendard,sans-serif' font-size='15' font-weight='600' fill='#4b5563' text-anchor='middle'>${short}</text>` +
+    `</svg>`,
+  )}`;
+}
 const SEED_EDITORS = ['이동우', '강현우', '한소율', '김지안', '박서준'];
 const SEED_THUMBS: ('' | 'k2' | 'k3')[] = ['', 'k2', 'k3'];
 
@@ -472,7 +523,7 @@ function generateSeedProducts(): Product[] {
         modelKind: model,
         filterValues: [style.fo, color.fo],
         thumb: SEED_THUMBS[i % SEED_THUMBS.length],
-        thumbUrl: seedThumb(),
+        thumbUrl: genThumb('swatch', `${kind} ${color.name}`, color.bg),
         folderId: folder,
         updatedAt: `2026-06-${String(1 + (n % 14)).padStart(2, '0')}`,
         updatedBy: SEED_EDITORS[n % SEED_EDITORS.length],
@@ -482,7 +533,196 @@ function generateSeedProducts(): Product[] {
   return out;
 }
 
-export const INITIAL_PRODUCTS: Product[] = generateSeedProducts();
+/** ── #body.변수명(몸통 사용자 변수 참조) 확인용 샘플 ──
+ *  몸통 1(변수 LDH=20, 패널두께=18) + 도어 3(L/R 수식 참조, X는 조건 미충족 데모).
+ *  설계 미리보기: 수납 폴더에서 "샘플 몸통" 배치 → 스타일 설정 탭 → [샘플 도어(#body 데모)] 클릭.
+ *  기대 결과: 도어 W = #bodyW/2 - #body.패널두께 = 582, H = #bodyH - #body.LDH = 1980,
+ *            X도어는 조건(#body.LDH >= 999) 미충족으로 제외 토스트에 표기. */
+const SAMPLE_COMMON = {
+  brand: '한샘', visible: true, permission: '전체', filterValues: [] as string[],
+  thumb: '' as const, thumbUrl: DEFAULT_THUMB, updatedAt: '2026-07-03', updatedBy: '시스템',
+};
+export const SAMPLE_BODYVAR_PRODUCTS: Product[] = [
+  {
+    ...SAMPLE_COMMON,
+    contentCode: 'SMP-BODY-001', name: '샘플 몸통 — #body 변수 데모',
+    productGroup: '수납', quoteGroup: '붙박이장', productCode: 'SMP10001',
+    thumbUrl: genThumb('body', '샘플 몸통', '#c9a063'), color: '#c9a063',
+    w: 1200, d: 600, h: 2000, dp: 'SMP',
+    vars: [{ name: 'LDH', value: '20' }, { name: '패널두께', value: '18' }],
+    modelingSlots: [{ slot: '도어', groupId: 'sg-sample-bodyvar-door' }],
+    placement: '바닥', placeHeight: 0, attrType: '모델링', modelingType: '설계형',
+    productKind: '스윙장', modelKind: '', folderId: 'f-storage-body',
+  },
+  {
+    ...SAMPLE_COMMON,
+    contentCode: 'SMP-DOOR-L01', name: '샘플 도어 L — W=#bodyW/2-#body.패널두께',
+    productGroup: '도어', quoteGroup: '도어', productCode: 'SMP20001',
+    thumbUrl: genThumb('door', '샘플 도어 L'),
+    w: 600, d: 20, h: 2000, dp: 'SMP', pos: 'L',
+    formula: { w: '#bodyW/2 - #body.패널두께', h: '#bodyH - #body.LDH' },
+    condition: '#body.LDH >= 20',
+    placement: '벽', placeHeight: 0, attrType: '모델링', modelingType: '배치형',
+    productKind: '여닫이도어', modelKind: '', folderId: 'fi-door',
+  },
+  {
+    ...SAMPLE_COMMON,
+    contentCode: 'SMP-DOOR-R01', name: '샘플 도어 R — H=#bodyH-#body.LDH',
+    productGroup: '도어', quoteGroup: '도어', productCode: 'SMP20002',
+    thumbUrl: genThumb('door', '샘플 도어 R'),
+    w: 600, d: 20, h: 2000, dp: 'SMP', pos: 'R',
+    formula: { w: '#bodyW/2 - #body.패널두께', h: '#bodyH - #body.LDH' },
+    condition: '#body.LDH >= 20',
+    placement: '벽', placeHeight: 0, attrType: '모델링', modelingType: '배치형',
+    productKind: '여닫이도어', modelKind: '', folderId: 'fi-door',
+  },
+  {
+    ...SAMPLE_COMMON,
+    contentCode: 'SMP-DOOR-X01', name: '샘플 도어 X — 조건 미충족 데모(#body.LDH >= 999)',
+    productGroup: '도어', quoteGroup: '도어', productCode: 'SMP20003',
+    thumbUrl: genThumb('door', '샘플 도어 X'),
+    w: 600, d: 20, h: 2000, dp: 'SMP', pos: 'X',
+    formula: { h: '#bodyH - #body.LDH' },
+    condition: '#body.LDH >= 999',
+    placement: '벽', placeHeight: 0, attrType: '모델링', modelingType: '배치형',
+    productKind: '여닫이도어', modelKind: '', folderId: 'fi-door',
+  },
+  // ── 수납 몸통 부속 샘플 (노출 폴더 f-storage) ──
+  {
+    ...SAMPLE_COMMON,
+    contentCode: 'SMP-EP-001', name: '샘플 EP — 비규격 (W/D 최대 현재크기 · H 최대 9999)',
+    productGroup: '수납', quoteGroup: '붙박이장', productCode: 'SMP30001',
+    thumbUrl: genThumb('ep', '샘플 EP'),
+    w: 20, d: 700, h: 2400, nonStandard: true,
+    opSize: { minW: 10, maxW: 20, gapW: 1, minD: 10, maxD: 700, gapD: 1, minH: 10, maxH: 9999, gapH: 1 },
+    placement: '바닥', placeHeight: 0, attrType: '모델링', modelingType: '설계형',
+    productKind: 'EP', modelKind: '', folderId: 'f-storage-ep',
+  },
+  // 상부 서라운딩 — H 50(기본)/75/100/200 형제 변형(같은 modelCode+itemCode → 설계에서 H 단계 선택)
+  ...[50, 75, 100, 200].map((sh, i): Product => ({
+    ...SAMPLE_COMMON,
+    contentCode: `SMP-SRD-${String(sh).padStart(3, '0')}`,
+    name: `샘플 상부 서라운딩 H${sh} — 비규격 (W 최대 9999)`,
+    productGroup: '수납', quoteGroup: '붙박이장', productCode: `SMP4000${i + 1}`,
+    thumbUrl: genThumb('srd', `상부 H${sh}`),
+    modelCode: 'SMP-SRD', itemCode: 'SRD',
+    w: 2400, d: 20, h: sh, nonStandard: true,
+    opSize: { minW: 10, maxW: 9999, gapW: 1, minD: 10, maxD: 20, gapD: 1, minH: 10, maxH: sh, gapH: 1 },
+    placement: '벽', placeHeight: 2400 - sh, attrType: '모델링', modelingType: '설계형',
+    productKind: '상부 서라운딩', modelKind: '', folderId: 'f-storage-srd',
+  })),
+  // 측면 서라운딩 — W 50(기본)/75/100/200 개별 추가(같은 modelCode+itemCode → 설계에서 W 단계 선택)
+  ...[50, 75, 100, 200].map((sw, i): Product => ({
+    ...SAMPLE_COMMON,
+    contentCode: `SMP-SRS-${String(sw).padStart(3, '0')}`,
+    name: `샘플 측면 서라운딩 W${sw} — 비규격 (H 최대 9999)`,
+    productGroup: '수납', quoteGroup: '붙박이장', productCode: `SMP4500${i + 1}`,
+    thumbUrl: genThumb('srs', `측면 W${sw}`),
+    modelCode: 'SMP-SRS', itemCode: 'SRS',
+    w: sw, d: 20, h: 2400, nonStandard: true,
+    opSize: { minW: 10, maxW: sw, gapW: 1, minD: 10, maxD: 20, gapD: 1, minH: 10, maxH: 9999, gapH: 1 },
+    placement: '벽', placeHeight: 0, attrType: '모델링', modelingType: '설계형',
+    productKind: '측면 서라운딩', modelKind: '', folderId: 'f-storage-srs',
+  })),
+  // ── 수납 노출 폴더 도어 샘플 — DP/POS/수식 정보 포함 ──
+  {
+    ...SAMPLE_COMMON,
+    contentCode: 'SMP-DOOR-N01', name: '샘플 여닫이도어 L — 노출 (DP SMP · H=#bodyH-#body.LDH)',
+    productGroup: '도어', quoteGroup: '도어', productCode: 'SMP50001',
+    thumbUrl: genThumb('door', '여닫이도어 L'),
+    w: 600, d: 20, h: 2400, dp: 'SMP', pos: 'L', nonStandard: true,
+    opSize: { minW: 10, maxW: 600, gapW: 1, minD: 10, maxD: 20, gapD: 1, minH: 10, maxH: 9999, gapH: 1 },
+    formula: { w: '#bodyW/2 - #body.패널두께', h: '#bodyH - #body.LDH' },
+    condition: '#body.LDH >= 20',
+    placement: '벽', placeHeight: 0, attrType: '모델링', modelingType: '배치형',
+    productKind: '여닫이도어', modelKind: '', folderId: 'f-storage-door',
+  },
+  {
+    ...SAMPLE_COMMON,
+    contentCode: 'SMP-DOOR-N02', name: '샘플 여닫이도어 R — 노출 (DP SMP · W=#bodyW/2-#body.패널두께)',
+    productGroup: '도어', quoteGroup: '도어', productCode: 'SMP50002',
+    thumbUrl: genThumb('door', '여닫이도어 R'),
+    w: 600, d: 20, h: 2400, dp: 'SMP', pos: 'R', nonStandard: true,
+    opSize: { minW: 10, maxW: 600, gapW: 1, minD: 10, maxD: 20, gapD: 1, minH: 10, maxH: 9999, gapH: 1 },
+    formula: { w: '#bodyW/2 - #body.패널두께', h: '#bodyH - #body.LDH' },
+    condition: '#body.LDH >= 20',
+    placement: '벽', placeHeight: 0, attrType: '모델링', modelingType: '배치형',
+    productKind: '여닫이도어', modelKind: '', folderId: 'f-storage-door',
+  },
+  // ── 컬러(마감 모델)별 도어·EP·서라운딩 상품 세트 ──
+  //    모델 라인(예: 매트화이트)마다 도어 L/R + EP + 상부/측면 서라운딩을 개별 상품으로 생성·등록.
+  //    사이즈 규칙은 위 기준 상품과 동일: EP W10~20·D10~700·H10~9999, 상부 H단계·W10~9999, 측면 W단계·H10~9999 (갭1).
+  ...([
+    { name: '매트화이트', code: 'MWH', fo: 'fo-white', hex: '#e9eae7' },
+    { name: '크림아이보리', code: 'CIV', fo: 'fo-white', hex: '#f0e8d6' },
+    { name: '매트그레이', code: 'MGR', fo: 'fo-gray', hex: '#a2a8b0' },
+    { name: '스톤차콜', code: 'SCH', fo: 'fo-gray', hex: '#6a7076' },
+    { name: '리노아베이지', code: 'LBG', fo: 'fo-wood', hex: '#d8c6ab' },
+    { name: '네추럴오크', code: 'NOK', fo: 'fo-wood', hex: '#c79a63' },
+    { name: '월넛브라운', code: 'WNB', fo: 'fo-wood', hex: '#7e5a3a' },
+    { name: '세이지그린', code: 'SGN', fo: 'fo-gray', hex: '#a4b8a1' },
+    { name: '미드나잇네이비', code: 'MNV', fo: 'fo-black', hex: '#33405c' },
+    { name: '매트블랙', code: 'MBK', fo: 'fo-black', hex: '#43474d' },
+  ] as const).flatMap((c, ci): Product[] => [
+    // 여닫이도어 L/R — DP 'SMP', #body 수식·조건 포함
+    ...(['L', 'R'] as const).map((pos, pi): Product => ({
+      ...SAMPLE_COMMON,
+      contentCode: `SMP-DOOR-${c.code}-${pos}`,
+      name: `${c.name} 여닫이도어 ${pos}`,
+      productGroup: '도어', quoteGroup: '도어', productCode: `SMP6${ci}0${pi + 1}`,
+      color: c.hex, thumbUrl: genThumb('door', `${c.name} ${pos}`, c.hex),
+      w: 600, d: 20, h: 2400, dp: 'SMP', pos, nonStandard: true,
+      opSize: { minW: 10, maxW: 600, gapW: 1, minD: 10, maxD: 20, gapD: 1, minH: 10, maxH: 9999, gapH: 1 },
+      formula: { w: '#bodyW/2 - #body.패널두께', h: '#bodyH - #body.LDH' },
+      condition: '#body.LDH >= 20',
+      filterValues: [c.fo],
+      placement: '벽', placeHeight: 0, attrType: '모델링', modelingType: '배치형',
+      productKind: '여닫이도어', modelKind: c.name, folderId: 'f-storage-door',
+    })),
+    // EP — W 10~20 · D 10~700 · H 10~9999 (갭1)
+    {
+      ...SAMPLE_COMMON,
+      contentCode: `SMP-EP-${c.code}`, name: `${c.name} EP`,
+      productGroup: '수납', quoteGroup: '붙박이장', productCode: `SMP6${ci}03`,
+      color: c.hex, thumbUrl: genThumb('ep', `${c.name} EP`, c.hex),
+      w: 20, d: 700, h: 2400, nonStandard: true,
+      opSize: { minW: 10, maxW: 20, gapW: 1, minD: 10, maxD: 700, gapD: 1, minH: 10, maxH: 9999, gapH: 1 },
+      filterValues: [c.fo],
+      placement: '바닥', placeHeight: 0, attrType: '모델링', modelingType: '설계형',
+      productKind: 'EP', modelKind: c.name, folderId: 'f-storage-ep',
+    },
+    // 상부 서라운딩 — H 50/75/100/200 개별(모델별 형제 라인, W 10~9999)
+    ...[50, 75, 100, 200].map((sh, i): Product => ({
+      ...SAMPLE_COMMON,
+      contentCode: `SMP-SRD-${c.code}-${String(sh).padStart(3, '0')}`,
+      name: `${c.name} 상부 서라운딩 H${sh}`,
+      productGroup: '수납', quoteGroup: '붙박이장', productCode: `SMP6${ci}1${i + 1}`,
+      color: c.hex, thumbUrl: genThumb('srd', `${c.name} H${sh}`, c.hex),
+      modelCode: `SMP-SRD-${c.code}`, itemCode: 'SRD',
+      w: 2400, d: 20, h: sh, nonStandard: true,
+      opSize: { minW: 10, maxW: 9999, gapW: 1, minD: 10, maxD: 20, gapD: 1, minH: 10, maxH: sh, gapH: 1 },
+      filterValues: [c.fo],
+      placement: '벽', placeHeight: 2400 - sh, attrType: '모델링', modelingType: '설계형',
+      productKind: '상부 서라운딩', modelKind: c.name, folderId: 'f-storage-srd',
+    })),
+    // 측면 서라운딩 — W 50/75/100/200 개별(모델별 형제 라인, H 10~9999)
+    ...[50, 75, 100, 200].map((sw, i): Product => ({
+      ...SAMPLE_COMMON,
+      contentCode: `SMP-SRS-${c.code}-${String(sw).padStart(3, '0')}`,
+      name: `${c.name} 측면 서라운딩 W${sw}`,
+      productGroup: '수납', quoteGroup: '붙박이장', productCode: `SMP6${ci}2${i + 1}`,
+      color: c.hex, thumbUrl: genThumb('srs', `${c.name} W${sw}`, c.hex),
+      modelCode: `SMP-SRS-${c.code}`, itemCode: 'SRS',
+      w: sw, d: 20, h: 2400, nonStandard: true,
+      opSize: { minW: 10, maxW: sw, gapW: 1, minD: 10, maxD: 20, gapD: 1, minH: 10, maxH: 9999, gapH: 1 },
+      filterValues: [c.fo],
+      placement: '벽', placeHeight: 0, attrType: '모델링', modelingType: '설계형',
+      productKind: '측면 서라운딩', modelKind: c.name, folderId: 'f-storage-srs',
+    })),
+  ]),
+];
+
+export const INITIAL_PRODUCTS: Product[] = [...SAMPLE_BODYVAR_PRODUCTS, ...generateSeedProducts()];
 export const PRODUCTS_STORE_KEY_EXPORT = 'hp3-products-state';
 
 let folderSeq = 0;
@@ -513,14 +753,30 @@ function loadProductsState(): Partial<ProductsSnapshot> {
     const data = raw as Partial<ProductsSnapshot>;
     // 썸네일 없는 기존 상품에 이름 기반 썸네일 자동 채움
     if (data.products) {
-      // 업로드 이미지(jpeg/png)는 유지, 없거나 옛 생성 SVG 라벨이면 기본 회색+아이콘으로 교체
+      // 업로드 이미지(jpeg/png)와 생성 썸네일('hp3gen' 마커)은 유지, 없거나 옛 SVG 라벨이면 기본 회색+아이콘으로 교체
       data.products = data.products.map((p) =>
-        (p.thumbUrl && !p.thumbUrl.startsWith('data:image/svg')) ? p : { ...p, thumbUrl: DEFAULT_THUMB });
+        (p.thumbUrl && (!p.thumbUrl.startsWith('data:image/svg') || p.thumbUrl.includes('hp3gen'))) ? p : { ...p, thumbUrl: DEFAULT_THUMB });
+      // 수납 직속 상품 → 종류별 최종 폴더 이관 (수납은 분류 폴더)
+      data.products = data.products.map((p) => {
+        const leaf = storageLeafFolder(p);
+        return leaf ? { ...p, folderId: leaf } : p;
+      });
+      // #body 변수 데모 샘플 — 저장본에 없으면 추가, 사용자가 수정하지 않은 것(updatedBy='시스템')은 최신 시드로 동기화
+      for (const sp of SAMPLE_BODYVAR_PRODUCTS) {
+        const idx = data.products.findIndex((p) => p.contentCode === sp.contentCode);
+        if (idx < 0) data.products.unshift(sp);
+        else if (data.products[idx].updatedBy === '시스템') data.products[idx] = sp;
+      }
     }
     // 노출/비노출 미분류 루트는 항상 존재해야 함
     if (data.folders) {
       if (!data.folders.some((f) => f.id === ROOT_FOLDER_ID)) data.folders.unshift({ id: ROOT_FOLDER_ID, name: '미분류', parentId: null, kind: 'external' });
       if (!data.folders.some((f) => f.id === INT_ROOT_ID)) data.folders.push({ id: INT_ROOT_ID, name: '미분류', parentId: null, kind: 'internal' });
+      // 수납 하위 샘플 분류 폴더(몸통/도어/EP/서라운딩) 보장 — 기존 저장본에 없으면 병합
+      const fl = data.folders;
+      for (const sf of INITIAL_FOLDERS.filter((f) => f.parentId === 'f-storage')) {
+        if (!fl.some((f) => f.id === sf.id)) fl.push({ ...sf });
+      }
     }
     return data;
   } catch {
@@ -2400,7 +2656,7 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
             {/* 사용자 정의 변수 */}
             <div className="panel-head" style={{ marginTop: 14 }}>
               <h2 style={{ fontSize: '0.92rem' }}>변수 정의</h2>
-              <span className="sel-info" style={{ marginLeft: 12 }}>수식에서 #이름 으로 참조 · 기본 변수: #W #D #H(도어), #bodyW #bodyD #bodyH(몸통)</span>
+              <span className="sel-info" style={{ marginLeft: 12 }}>수식에서 #이름 으로 참조 · 기본 변수: #W #D #H(도어), #bodyW #bodyD #bodyH(몸통), #body.이름(몸통 사용자 변수)</span>
               <button className="btn-mini" style={{ marginLeft: 'auto' }}
                 onClick={() => setForm((f) => ({ ...f, vars: [...f.vars, { name: '', value: '' }] }))}>+ 변수</button>
             </div>
@@ -2461,37 +2717,6 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
           </section>
           )}
 
-          {/* DP·POS — 모델링 도어/EP 컨텐츠에 노출(배치형/설계형 무관). 도어=DP+POS, EP=POS만 */}
-          {form.attrType === '모델링' && (() => {
-            const kind = (form.productKind || '').trim();
-            const showDP = kind.includes('도어');
-            const showPOS = showDP || kind.includes('EP');
-            if (!showDP && !showPOS) return null;
-            return (
-              <section className="panel">
-                <div className="panel-head">
-                  <h2>{showDP ? 'DP · POS' : 'POS'}</h2>
-                  <span className="sel-info" style={{ marginLeft: 12 }}>{showDP ? 'DP=도어형태+붙는위치 · POS=열림방향' : 'POS=열림방향'}</span>
-                </div>
-                <div className="form-grid two-col">
-                  {showDP && (
-                    <label className="form-field">
-                      <span>DP <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(도어 형태 + 붙는 위치)</small></span>
-                      <input className="inline-input full" value={form.dp} placeholder="예: DP01"
-                        onChange={(e) => setForm((f) => ({ ...f, dp: e.target.value }))} />
-                    </label>
-                  )}
-                  {showPOS && (
-                    <label className="form-field">
-                      <span>POS <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(열림 방향)</small></span>
-                      <input className="inline-input full" value={form.pos} placeholder="예: L, R"
-                        onChange={(e) => setForm((f) => ({ ...f, pos: e.target.value }))} />
-                    </label>
-                  )}
-                </div>
-              </section>
-            );
-          })()}
         </div>
       </main>
     );
@@ -3065,7 +3290,7 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
 
                 <div className="panel-head" style={{ marginTop: 14 }}>
                   <h2 style={{ fontSize: '0.92rem' }}>변수 정의</h2>
-                  <span className="sel-info" style={{ marginLeft: 12 }}>수식에서 #이름 으로 참조</span>
+                  <span className="sel-info" style={{ marginLeft: 12 }}>수식에서 #이름 으로 참조 · 도어 수식은 #bodyW #bodyD #bodyH, #body.이름(몸통 사용자 변수)도 사용 가능</span>
                   <button className="btn-mini" style={{ marginLeft: 'auto' }}
                     onClick={() => setForm((f) => ({ ...f, vars: [...f.vars, { name: '', value: '' }] }))}>+ 변수</button>
                 </div>

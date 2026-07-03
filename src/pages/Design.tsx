@@ -49,6 +49,8 @@ type LibProduct = ReturnType<typeof loadProducts>[number] & {
   itemCode?: string;
   dp?: string;
   pos?: string;
+  /** 모델(마감) 표시 컬러 — 웹플래너 박스 렌더 색 */
+  color?: string;
   formula?: { w?: string; d?: string; h?: string };
   vars?: { name: string; value: string }[];
   condition?: string;
@@ -267,7 +269,7 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
   const sendPlace = (p: LibProduct) => {
     const dm = effDims(p);
     iframeRef.current?.contentWindow?.postMessage(
-      { type: 'hp3:place-product', name: p.name, code: p.productCode, modelUrl: modelUrlOf(p), ...dm },
+      { type: 'hp3:place-product', name: p.name, code: p.productCode, modelUrl: modelUrlOf(p), color: p.color, ...dm },
       '*',
     );
   };
@@ -278,7 +280,7 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
     setActiveCode(p.contentCode);
     const dm = effDims(p);
     iframeRef.current?.contentWindow?.postMessage(
-      { type: 'hp3:swap-product', name: p.name, code: p.productCode, modelUrl: modelUrlOf(p), ...dm },
+      { type: 'hp3:swap-product', name: p.name, code: p.productCode, modelUrl: modelUrlOf(p), color: p.color, ...dm },
       '*',
     );
   };
@@ -337,7 +339,7 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
     setActiveCode(t.contentCode);
     // 하나의 컨텐츠를 그 자리에서 변형 + 코드/이름 교체 (새 배치 아님)
     iframeRef.current?.contentWindow?.postMessage(
-      { type: 'hp3:update-product', code: t.productCode, name: t.name, modelUrl: modelUrlOf(t), w: t.w ?? 0, d: t.d ?? 0, h: t.h ?? 0 },
+      { type: 'hp3:update-product', code: t.productCode, name: t.name, modelUrl: modelUrlOf(t), color: t.color, w: t.w ?? 0, d: t.d ?? 0, h: t.h ?? 0 },
       '*',
     );
   };
@@ -361,9 +363,22 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
     if (matched.length === 0) { setAttachMsg(`⚠ "${label}"에 DP "${dpLabel}" 도어가 없습니다.`); return; }
     const bd = effDims(sel);
     const toNum = (v: number | boolean | null): number | null => (typeof v === 'number' ? v : v === true ? 1 : v === false ? 0 : null);
-    type DoorVariant = { size: number; code?: string; name: string; masterW?: number; masterH?: number; masterD?: number; modelUrl?: string };
+    // 몸통(호스트) 사용자 변수 — 몸통 자신의 치수 컨텍스트(#W/#D/#H=몸통값)로 순차 평가한 뒤
+    // 도어 수식에서 #body.변수명 으로 참조할 수 있게 주입한다.
+    const bodyVars: Record<string, number> = {};
+    {
+      const bctx: Record<string, number> = { W: bd.w, D: bd.d, H: bd.h, w: bd.w, d: bd.d, h: bd.h };
+      for (const bv of sel.vars ?? []) {
+        if (!bv.name?.trim()) continue;
+        const r = bv.value?.trim() ? toNum(evalFormula(bv.value, bctx)) : null;
+        const val = r ?? (Number(bv.value) || 0);
+        bctx[bv.name.trim()] = val;
+        bodyVars[`body.${bv.name.trim()}`] = val;
+      }
+    }
+    type DoorVariant = { size: number; code?: string; name: string; masterW?: number; masterH?: number; masterD?: number; modelUrl?: string; color?: string };
     const placeable: {
-      code?: string; name: string; modelUrl?: string; w: number; d: number; h: number; pos: string;
+      code?: string; name: string; modelUrl?: string; color?: string; w: number; d: number; h: number; pos: string;
       // 견적용(콘텐츠 마스터 사이즈) — 실제 stretch 지오메트리(w/h)와 별개로 카탈로그 변형 상품의 등록 치수.
       masterW?: number; masterH?: number; masterD?: number; modelCode?: string; itemCode?: string;
       // 사이즈 변형 테이블 — 웹이 리사이즈 시 사이즈에 맞는 변형(코드/이름/마스터/모델)을 직접 선택.
@@ -412,10 +427,10 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
         // 변형 테이블 — 웹이 리사이즈 시 사이즈에 맞는 변형(코드/이름/마스터/모델)을 직접 선택해 표기 갱신.
         const variants: DoorVariant[] = fam.map((v) => ({
           size: v.w ?? 0, code: v.productCode, name: v.name,
-          masterW: v.w, masterH: v.h, masterD: v.d, modelUrl: modelUrlOf(v),
+          masterW: v.w, masterH: v.h, masterD: v.d, modelUrl: modelUrlOf(v), color: v.color,
         }));
         placeable.push({
-          code: variant.productCode, name: variant.name, modelUrl: modelUrlOf(variant),
+          code: variant.productCode, name: variant.name, modelUrl: modelUrlOf(variant), color: variant.color ?? base.color,
           // 지오메트리: 슬롯 측정값으로 stretch(몸통에 꽉 채움). 깊이는 변형 상품 자기값.
           w: slot.w, d: variant.d ?? base.d ?? 30, h: slot.h, pos: slot.pos,
           // 견적: 변형 상품의 콘텐츠 마스터 사이즈 + 식별코드.
@@ -432,10 +447,11 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
     }
 
     for (const dr of matched) {
-      // 변수 맵: 도어 자기값(#W/#D/#H, #w/#d/#h) + 몸통(#bodyW/#bodyD/#bodyH) + 사용자 정의 변수
+      // 변수 맵: 도어 자기값(#W/#D/#H, #w/#d/#h) + 몸통(#bodyW/#bodyD/#bodyH) + 몸통 사용자 변수(#body.이름) + 사용자 정의 변수
       const vmap: Record<string, number> = {
         W: dr.w ?? 0, D: dr.d ?? 0, H: dr.h ?? 0, w: dr.w ?? 0, d: dr.d ?? 0, h: dr.h ?? 0,
         bodyW: bd.w, bodyD: bd.d, bodyH: bd.h,
+        ...bodyVars,
       };
       for (const uv of dr.vars ?? []) {
         if (!uv.name?.trim()) continue;
@@ -457,7 +473,7 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
       const sides = (ddp === 'X' || dpos === 'X' || dpos === '') ? ['L', 'R'] : [dpos.includes('R') ? 'R' : 'L'];
       for (const side of sides) {
         placeable.push({
-          code: dr.productCode, name: dr.name, modelUrl: modelUrlOf(dr),
+          code: dr.productCode, name: dr.name, modelUrl: modelUrlOf(dr), color: dr.color,
           w: fw ?? dr.w ?? 0, d: fd ?? dr.d ?? 0, h: fh ?? dr.h ?? 0,
           pos: side,
         });
@@ -716,23 +732,19 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
                 <div className="bi-fields">
                   {([['W 폭', 'w', 'W'], ['D 깊이', 'd', 'D'], ['H 높이', 'h', 'H'], ['배치 높이', 'lift', null]] as const).map(([label, k, ax]) => {
                     const v = effDims(sel)[k];
-                    // 1) 모델+품목 형제 변형 (lift 제외) — 값이 여러개면 선택, 하나면 고정
+                    // 1) 모델+품목 형제 변형 (lift 제외) — 값이 여러개일 때만 사이즈 선택.
+                    //    값이 하나뿐인 축은 아래 opSize(비규격 범위/규격 단계) 규칙으로 넘긴다.
                     const sib = ax && siblings.length > 1 ? siblingVals(k as 'w' | 'd' | 'h') : [];
-                    if (sib.length > 0) {
-                      const fixedSib = sib.length === 1;
-                      const hintSib = fixedSib ? `고정값: ${sib[0]} mm` : `선택 가능: ${sib.join(', ')} mm (사이즈별 상품 교체)`;
+                    if (sib.length > 1) {
+                      const hintSib = `선택 가능: ${sib.join(', ')} mm (사이즈별 상품 교체)`;
                       return (
                         <div className="bi-field" key={k}>
                           <label>{label}<span className="bi-range-tag" title={hintSib}> ⓘ</span></label>
                           <div className="bi-input" title={hintSib}>
-                            {fixedSib ? (
-                              <input type="number" value={sib[0]} readOnly title={hintSib} />
-                            ) : (
-                              <select value={sib.includes(v) ? v : sib[0]} title={hintSib}
-                                onChange={(e) => swapToSiblingSize(k as 'w' | 'd' | 'h', Number(e.target.value))}>
-                                {sib.map((o) => <option key={o} value={o}>{o}</option>)}
-                              </select>
-                            )}
+                            <select value={sib.includes(v) ? v : sib[0]} title={hintSib}
+                              onChange={(e) => swapToSiblingSize(k as 'w' | 'd' | 'h', Number(e.target.value))}>
+                              {sib.map((o) => <option key={o} value={o}>{o}</option>)}
+                            </select>
                             <span className="bi-unit">mm</span>
                           </div>
                         </div>
@@ -828,6 +840,9 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
                     return sel.modelingSlots!.map((s, si) => {
                       const { gid, cond } = resolveSlot(s);
                       const g = swapState.groups.find((x) => x.id === gid);
+                      // DP(X/HD)는 몸통에 도어/서랍이 "붙을 때"만 참고 — 몸통·손잡이 그룹은
+                      // 부착 대상이 아니므로 구성 그룹 목록에서 제외한다.
+                      if (g?.kind === '몸통' || g?.kind === '손잡이') return null;
                       const codes = memberMap[gid] ?? [];
                       const branched = (s.rules ?? []).length > 0;
                       return (

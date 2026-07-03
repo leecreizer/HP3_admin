@@ -343,8 +343,9 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
   position: fixed; top: 18px; right: 28px; z-index: 30;
   display: flex; align-items: center;
 }
-/* 로그인 정보와 겹치지 않게 각 페이지 첫 헤더의 우측 여백 확보 */
-.main > .page-head:first-child { margin-right: 235px; }
+/* 로그인 정보와 겹치지 않게 각 페이지 상단 헤더의 우측 여백 확보
+   (:first-child는 숨은 input/모달이 앞에 있는 페이지에서 빗나가므로 직계 page-head 전체에 적용) */
+.main > .page-head { margin-right: 235px; }
 .search {
   margin-left: auto; display: flex; align-items: center; gap: 8px;
   background: rgba(255, 255, 255, 0.55);
