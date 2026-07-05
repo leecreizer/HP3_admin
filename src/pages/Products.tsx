@@ -184,11 +184,13 @@ type Product = {
   dp?: string;
   /** POS 정보 — 도어가 몸통에 붙는 위치(예: L/R, 좌우 오프셋) */
   pos?: string;
-  /** 내보내기 수식 — 배치 시 W/D/H를 변수로 계산. 빈값이면 기본값 사용 */
+  /** (구버전) 내보내기 수식 — 이름 W/D/H '수식' 변수로 대체. 기존 데이터 호환용으로만 유지 */
   formula?: { w?: string; d?: string; h?: string };
-  /** 사용자 정의 변수 — 수식에서 #name 으로 참조 (value는 숫자 또는 식) */
-  vars?: { name: string; value: string }[];
-  /** 조건식 — TRUE/FALSE. 도어 자동배치 등에서 충족 시에만 적용 */
+  /** 사용자 정의 변수 — 수식에서 #name 으로 참조.
+   *  type: 고정값(숫자) / 수식(계산식 — 이름이 W·D·H면 내보내기 치수로 사용) / 조건식(모두 TRUE일 때만 자동배치).
+   *  type 미지정(구버전)은 값이 숫자면 고정값, 아니면 수식으로 취급. */
+  vars?: { name: string; value: string; type?: VarType; expose?: boolean }[];
+  /** (구버전) 조건식 — '조건식' 유형 변수로 대체. 기존 데이터 호환용으로만 유지 */
   condition?: string;
   placement: '바닥' | '벽' | '천장';
   /** 배치 높이 — 바닥배치 기본 0, 벽장 등은 벽장배치 높이 */
@@ -224,6 +226,8 @@ type Product = {
   folderId: string;
   updatedAt: string;
   updatedBy: string;
+  /** 수정 이력 — 저장 시 '수정 내용' 입력값을 누적 기록 (일시/수정자/내용). */
+  editLogs?: { at: string; by: string; note: string }[];
 };
 
 
@@ -436,6 +440,15 @@ export const DEFAULT_THUMB = `data:image/svg+xml,${encodeURIComponent(
   `</svg>`,
 )}`;
 
+/** 변수 값 유형 — 고정값(숫자) / 수식(계산식) / 조건식(TRUE·FALSE 판정) */
+export type VarType = '고정값' | '수식' | '조건식';
+export const VAR_TYPES: VarType[] = ['고정값', '수식', '조건식'];
+/** 구버전(type 미지정) 변수의 유형 판별 — 숫자면 고정값, 아니면 수식 */
+export function varTypeOf(v: { value: string; type?: VarType }): VarType {
+  if (v.type) return v.type;
+  return v.value.trim() !== '' && !Number.isNaN(Number(v.value)) ? '고정값' : '수식';
+}
+
 /** 수납(f-storage) 직속 상품 → 종류별 최종 폴더 이관 대상 판정.
  *  수납은 분류(중간) 폴더로 바뀌었으므로 직속 상품은 품목 기준으로 최종 폴더에 배치한다. */
 export function storageLeafFolder(p: { folderId?: string; productKind?: string }): string | null {
@@ -549,7 +562,10 @@ export const SAMPLE_BODYVAR_PRODUCTS: Product[] = [
     productGroup: '수납', quoteGroup: '붙박이장', productCode: 'SMP10001',
     thumbUrl: genThumb('body', '샘플 몸통', '#c9a063'), color: '#c9a063',
     w: 1200, d: 600, h: 2000, dp: 'SMP',
-    vars: [{ name: 'LDH', value: '20' }, { name: '패널두께', value: '18' }],
+    vars: [
+      { name: 'LDH', value: '20', type: '고정값', expose: true },
+      { name: '패널두께', value: '18', type: '고정값', expose: true },
+    ],
     modelingSlots: [{ slot: '도어', groupId: 'sg-sample-bodyvar-door' }],
     placement: '바닥', placeHeight: 0, attrType: '모델링', modelingType: '설계형',
     productKind: '스윙장', modelKind: '', folderId: 'f-storage-body',
@@ -560,8 +576,11 @@ export const SAMPLE_BODYVAR_PRODUCTS: Product[] = [
     productGroup: '도어', quoteGroup: '도어', productCode: 'SMP20001',
     thumbUrl: genThumb('door', '샘플 도어 L'),
     w: 600, d: 20, h: 2000, dp: 'SMP', pos: 'L',
-    formula: { w: '#bodyW/2 - #body.패널두께', h: '#bodyH - #body.LDH' },
-    condition: '#body.LDH >= 20',
+    vars: [
+      { name: 'W', value: '#bodyW/2 - #body.패널두께', type: '수식' },
+      { name: 'H', value: '#bodyH - #body.LDH', type: '수식' },
+      { name: '배치가능', value: '#body.LDH >= 20', type: '조건식' },
+    ],
     placement: '벽', placeHeight: 0, attrType: '모델링', modelingType: '배치형',
     productKind: '여닫이도어', modelKind: '', folderId: 'fi-door',
   },
@@ -571,8 +590,11 @@ export const SAMPLE_BODYVAR_PRODUCTS: Product[] = [
     productGroup: '도어', quoteGroup: '도어', productCode: 'SMP20002',
     thumbUrl: genThumb('door', '샘플 도어 R'),
     w: 600, d: 20, h: 2000, dp: 'SMP', pos: 'R',
-    formula: { w: '#bodyW/2 - #body.패널두께', h: '#bodyH - #body.LDH' },
-    condition: '#body.LDH >= 20',
+    vars: [
+      { name: 'W', value: '#bodyW/2 - #body.패널두께', type: '수식' },
+      { name: 'H', value: '#bodyH - #body.LDH', type: '수식' },
+      { name: '배치가능', value: '#body.LDH >= 20', type: '조건식' },
+    ],
     placement: '벽', placeHeight: 0, attrType: '모델링', modelingType: '배치형',
     productKind: '여닫이도어', modelKind: '', folderId: 'fi-door',
   },
@@ -582,8 +604,10 @@ export const SAMPLE_BODYVAR_PRODUCTS: Product[] = [
     productGroup: '도어', quoteGroup: '도어', productCode: 'SMP20003',
     thumbUrl: genThumb('door', '샘플 도어 X'),
     w: 600, d: 20, h: 2000, dp: 'SMP', pos: 'X',
-    formula: { h: '#bodyH - #body.LDH' },
-    condition: '#body.LDH >= 999',
+    vars: [
+      { name: 'H', value: '#bodyH - #body.LDH', type: '수식' },
+      { name: '배치가능', value: '#body.LDH >= 999', type: '조건식' },
+    ],
     placement: '벽', placeHeight: 0, attrType: '모델링', modelingType: '배치형',
     productKind: '여닫이도어', modelKind: '', folderId: 'fi-door',
   },
@@ -632,8 +656,11 @@ export const SAMPLE_BODYVAR_PRODUCTS: Product[] = [
     thumbUrl: genThumb('door', '여닫이도어 L'),
     w: 600, d: 20, h: 2400, dp: 'SMP', pos: 'L', nonStandard: true,
     opSize: { minW: 10, maxW: 600, gapW: 1, minD: 10, maxD: 20, gapD: 1, minH: 10, maxH: 9999, gapH: 1 },
-    formula: { w: '#bodyW/2 - #body.패널두께', h: '#bodyH - #body.LDH' },
-    condition: '#body.LDH >= 20',
+    vars: [
+      { name: 'W', value: '#bodyW/2 - #body.패널두께', type: '수식' },
+      { name: 'H', value: '#bodyH - #body.LDH', type: '수식' },
+      { name: '배치가능', value: '#body.LDH >= 20', type: '조건식' },
+    ],
     placement: '벽', placeHeight: 0, attrType: '모델링', modelingType: '배치형',
     productKind: '여닫이도어', modelKind: '', folderId: 'f-storage-door',
   },
@@ -644,8 +671,11 @@ export const SAMPLE_BODYVAR_PRODUCTS: Product[] = [
     thumbUrl: genThumb('door', '여닫이도어 R'),
     w: 600, d: 20, h: 2400, dp: 'SMP', pos: 'R', nonStandard: true,
     opSize: { minW: 10, maxW: 600, gapW: 1, minD: 10, maxD: 20, gapD: 1, minH: 10, maxH: 9999, gapH: 1 },
-    formula: { w: '#bodyW/2 - #body.패널두께', h: '#bodyH - #body.LDH' },
-    condition: '#body.LDH >= 20',
+    vars: [
+      { name: 'W', value: '#bodyW/2 - #body.패널두께', type: '수식' },
+      { name: 'H', value: '#bodyH - #body.LDH', type: '수식' },
+      { name: '배치가능', value: '#body.LDH >= 20', type: '조건식' },
+    ],
     placement: '벽', placeHeight: 0, attrType: '모델링', modelingType: '배치형',
     productKind: '여닫이도어', modelKind: '', folderId: 'f-storage-door',
   },
@@ -673,8 +703,11 @@ export const SAMPLE_BODYVAR_PRODUCTS: Product[] = [
       color: c.hex, thumbUrl: genThumb('door', `${c.name} ${pos}`, c.hex),
       w: 600, d: 20, h: 2400, dp: 'SMP', pos, nonStandard: true,
       opSize: { minW: 10, maxW: 600, gapW: 1, minD: 10, maxD: 20, gapD: 1, minH: 10, maxH: 9999, gapH: 1 },
-      formula: { w: '#bodyW/2 - #body.패널두께', h: '#bodyH - #body.LDH' },
-      condition: '#body.LDH >= 20',
+      vars: [
+        { name: 'W', value: '#bodyW/2 - #body.패널두께', type: '수식' },
+        { name: 'H', value: '#bodyH - #body.LDH', type: '수식' },
+        { name: '배치가능', value: '#body.LDH >= 20', type: '조건식' },
+      ],
       filterValues: [c.fo],
       placement: '벽', placeHeight: 0, attrType: '모델링', modelingType: '배치형',
       productKind: '여닫이도어', modelKind: c.name, folderId: 'f-storage-door',
@@ -816,6 +849,8 @@ function collectSubtree(folders: Folder[], rootId: string): Set<string> {
 }
 
 type ProductForm = {
+  /** 이번 저장의 수정 내용 메모 — 저장 시 editLogs 에 기록되고 비워짐. */
+  editNote: string;
   attrType: AttrType;
   name: string;
   brand: string;
@@ -838,7 +873,7 @@ type ProductForm = {
   pos: string;
   nonStandard: boolean;
   formula: { w: string; d: string; h: string };
-  vars: { name: string; value: string }[];
+  vars: { name: string; value: string; type?: VarType; expose?: boolean }[];
   condition: string;
   placement: '바닥' | '벽' | '천장';
   placeHeight: string;
@@ -861,6 +896,7 @@ type ProductForm = {
 
 const EMPTY_OPSIZE = { minW: '', maxW: '', gapW: '', minD: '', maxD: '', gapD: '', minH: '', maxH: '', gapH: '' };
 const EMPTY_PRODUCT_FORM: ProductForm = {
+  editNote: '',
   attrType: '모델링', name: '', brand: '한샘', productGroup: '', quoteGroup: '', contentCode: '',
   productCode: '', modelCode: '', itemCode: '', price: '', modelUrl: '', modelGroupId: '', permission: '전체', w: '', d: '', h: '', opSize: { ...EMPTY_OPSIZE }, dp: '', pos: '', nonStandard: false, formula: { w: '', d: '', h: '' }, vars: [], condition: '', placement: '바닥', placeHeight: '0',
   modelingType: '배치형', productKind: '', modelKind: '', folderId: 'f-model', filterValues: [], opValues: {},
@@ -1682,6 +1718,7 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
     key === 'contentCode' ? false : (fields.find((f) => f.key === key)?.editable ?? true);
 
   const productToForm = (p: Product): ProductForm => ({
+    editNote: '',
     attrType: p.attrType,
     modelingType: p.modelingType ?? '배치형',
     name: p.name,
@@ -1932,6 +1969,10 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
               folderId: form.folderId,
               updatedAt: today,
               updatedBy: currentUser,
+              // 수정 이력 — 메모가 입력된 경우에만 기록 (최신이 마지막)
+              editLogs: form.editNote.trim()
+                ? [...(p.editLogs ?? []), { at: today, by: currentUser, note: form.editNote.trim() }]
+                : p.editLogs,
             }
           : p,
       );
@@ -2475,6 +2516,28 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
                 <span>상품명 *</span>
                 <input className="inline-input full" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
               </label>
+              {/* 수정 이력 — 이번 수정 내용을 기록으로 남긴다 (저장 시 일시/수정자와 함께 누적) */}
+              <label className="form-field span-2">
+                <span>수정 내용 (이력 기록)</span>
+                <input
+                  className="inline-input full"
+                  placeholder="이번 수정의 변경 내용을 입력 — 저장 시 이력에 남습니다"
+                  value={form.editNote}
+                  onChange={(e) => setForm((f) => ({ ...f, editNote: e.target.value }))}
+                />
+              </label>
+              {editing && (editing.editLogs?.length ?? 0) > 0 && (
+                <div className="form-field span-2" style={{ maxHeight: 120, overflowY: 'auto', border: '1px solid var(--line)', borderRadius: 6, padding: '6px 8px' }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-3)' }}>수정 이력 · {editing.editLogs!.length}건</span>
+                  {[...editing.editLogs!].reverse().map((l, i) => (
+                    <div key={i} style={{ fontSize: 12, lineHeight: 1.7, display: 'flex', gap: 8 }}>
+                      <span style={{ color: 'var(--text-3)', whiteSpace: 'nowrap' }}>{l.at}</span>
+                      <span style={{ color: 'var(--text-2)', whiteSpace: 'nowrap' }}>{l.by}</span>
+                      <span style={{ flex: 1 }}>{l.note}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
               <label className="form-field">
                 <span>브랜드</span>
                 <input className="inline-input full" value={form.brand} onChange={(e) => setForm((f) => ({ ...f, brand: e.target.value }))} />
@@ -2653,46 +2716,33 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
             </div>
             {renderOpSize()}
 
-            {/* 사용자 정의 변수 */}
+            {/* 사용자 정의 변수 — 유형(고정값/수식/조건식) + 설계 노출 여부 */}
             <div className="panel-head" style={{ marginTop: 14 }}>
               <h2 style={{ fontSize: '0.92rem' }}>변수 정의</h2>
-              <span className="sel-info" style={{ marginLeft: 12 }}>수식에서 #이름 으로 참조 · 기본 변수: #W #D #H(도어), #bodyW #bodyD #bodyH(몸통), #body.이름(몸통 사용자 변수)</span>
+              <span className="sel-info" style={{ marginLeft: 12 }}>#이름 참조 · 이름 W/D/H '수식' = 내보내기 치수 · '조건식'은 모두 TRUE일 때만 배치 · 노출☑ = 설계 화면에 표시</span>
               <button className="btn-mini" style={{ marginLeft: 'auto' }}
-                onClick={() => setForm((f) => ({ ...f, vars: [...f.vars, { name: '', value: '' }] }))}>+ 변수</button>
+                onClick={() => setForm((f) => ({ ...f, vars: [...f.vars, { name: '', value: '', type: '고정값' as VarType }] }))}>+ 변수</button>
             </div>
             <div className="form-grid">
-              {form.vars.length === 0 && <p className="hint">필요하면 변수를 추가하세요. 예) 이름 <b>LDH</b>, 값 <b>20</b> → 수식에서 <b>#LDH</b> 사용.</p>}
+              {form.vars.length === 0 && <p className="hint">필요하면 변수를 추가하세요. 예) 이름 <b>LDH</b>, 유형 <b>고정값</b>, 값 <b>20</b> → 수식에서 <b>#LDH</b> · 도어 치수는 이름 <b>W</b>/<b>H</b>의 수식 변수로.</p>}
               {form.vars.map((v, i) => (
-                <div key={i} className="opsize-row" style={{ gridTemplateColumns: '1fr 1.6fr 28px' }}>
-                  <input type="text" placeholder="이름 (예: LDH)" value={v.name}
+                <div key={i} className="opsize-row" style={{ gridTemplateColumns: '1fr 92px 1.6fr 52px 28px' }}>
+                  <input type="text" placeholder="이름 (예: LDH, W)" value={v.name}
                     onChange={(e) => setForm((f) => ({ ...f, vars: f.vars.map((x, j) => j === i ? { ...x, name: e.target.value } : x) }))} />
-                  <input type="text" placeholder="값 또는 식 (예: 20, #H/2)" value={v.value}
+                  <select value={varTypeOf(v)} aria-label="값 유형"
+                    onChange={(e) => setForm((f) => ({ ...f, vars: f.vars.map((x, j) => j === i ? { ...x, type: e.target.value as VarType } : x) }))}>
+                    {VAR_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                  <input type="text" value={v.value}
+                    placeholder={varTypeOf(v) === '고정값' ? '숫자 (예: 20)' : varTypeOf(v) === '조건식' ? '예: #body.LDH >= 20' : '식 (예: #bodyH - #body.LDH)'}
                     onChange={(e) => setForm((f) => ({ ...f, vars: f.vars.map((x, j) => j === i ? { ...x, value: e.target.value } : x) }))} />
+                  <label className="visible-toggle" title="설계 화면(모델링 선택 시)에 이 변수 노출" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.72rem' }}>
+                    <input type="checkbox" checked={!!v.expose}
+                      onChange={(e) => setForm((f) => ({ ...f, vars: f.vars.map((x, j) => j === i ? { ...x, expose: e.target.checked } : x) }))} />노출
+                  </label>
                   <button className="order-btn" title="변수 삭제" onClick={() => setForm((f) => ({ ...f, vars: f.vars.filter((_, j) => j !== i) }))}><TrashIcon size={12} /></button>
                 </div>
               ))}
-            </div>
-
-            {/* 내보내기 수식 + 조건식 */}
-            <div className="panel-head" style={{ marginTop: 14 }}>
-              <h2 style={{ fontSize: '0.92rem' }}>내보내기 수식 · 조건식</h2>
-              <span className="sel-info" style={{ marginLeft: 12 }}>예: #H+24-#LDH / 조건: #W &gt;= 200 AND #H &gt; 1200</span>
-            </div>
-            <div className="form-grid">
-              <div className="size-row">
-                {([['W 수식', 'w'], ['D 수식', 'd'], ['H 수식', 'h']] as const).map(([lab, k]) => (
-                  <label className="size-cell" key={k}>
-                    <span>{lab}</span>
-                    <input type="text" placeholder="예: #bodyW/2 - 9" value={form.formula[k]}
-                      onChange={(e) => setForm((f) => ({ ...f, formula: { ...f.formula, [k]: e.target.value } }))} />
-                  </label>
-                ))}
-              </div>
-              <label className="form-field">
-                <span>조건식 <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(TRUE일 때만 자동배치 적용)</small></span>
-                <input className="inline-input full" type="text" placeholder="예: #bodyW >= 200 AND #bodyH > 1200" value={form.condition}
-                  onChange={(e) => setForm((f) => ({ ...f, condition: e.target.value }))} />
-              </label>
             </div>
 
             <div className="panel-head" style={{ marginTop: 18 }}>
@@ -3290,42 +3340,30 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
 
                 <div className="panel-head" style={{ marginTop: 14 }}>
                   <h2 style={{ fontSize: '0.92rem' }}>변수 정의</h2>
-                  <span className="sel-info" style={{ marginLeft: 12 }}>수식에서 #이름 으로 참조 · 도어 수식은 #bodyW #bodyD #bodyH, #body.이름(몸통 사용자 변수)도 사용 가능</span>
+                  <span className="sel-info" style={{ marginLeft: 12 }}>#이름 참조 · 이름 W/D/H '수식' = 내보내기 치수 · '조건식'은 모두 TRUE일 때만 배치 · 노출☑ = 설계 화면에 표시</span>
                   <button className="btn-mini" style={{ marginLeft: 'auto' }}
-                    onClick={() => setForm((f) => ({ ...f, vars: [...f.vars, { name: '', value: '' }] }))}>+ 변수</button>
+                    onClick={() => setForm((f) => ({ ...f, vars: [...f.vars, { name: '', value: '', type: '고정값' as VarType }] }))}>+ 변수</button>
                 </div>
                 <div className="form-grid">
-                  {form.vars.length === 0 && <p className="hint">필요하면 변수를 추가하세요. 예) 이름 <b>LDH</b>, 값 <b>20</b> → 수식에서 <b>#LDH</b> 사용.</p>}
+                  {form.vars.length === 0 && <p className="hint">필요하면 변수를 추가하세요. 예) 이름 <b>LDH</b>, 유형 <b>고정값</b>, 값 <b>20</b> → 수식에서 <b>#LDH</b> · 도어 치수는 이름 <b>W</b>/<b>H</b>의 수식 변수로.</p>}
                   {form.vars.map((v, i) => (
-                    <div key={i} className="opsize-row" style={{ gridTemplateColumns: '1fr 1.6fr 28px' }}>
-                      <input type="text" placeholder="이름 (예: LDH)" value={v.name}
+                    <div key={i} className="opsize-row" style={{ gridTemplateColumns: '1fr 92px 1.6fr 52px 28px' }}>
+                      <input type="text" placeholder="이름 (예: LDH, W)" value={v.name}
                         onChange={(e) => setForm((f) => ({ ...f, vars: f.vars.map((x, j) => j === i ? { ...x, name: e.target.value } : x) }))} />
-                      <input type="text" placeholder="값 또는 식 (예: 20, #H/2)" value={v.value}
+                      <select value={varTypeOf(v)} aria-label="값 유형"
+                        onChange={(e) => setForm((f) => ({ ...f, vars: f.vars.map((x, j) => j === i ? { ...x, type: e.target.value as VarType } : x) }))}>
+                        {VAR_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                      <input type="text" value={v.value}
+                        placeholder={varTypeOf(v) === '고정값' ? '숫자 (예: 20)' : varTypeOf(v) === '조건식' ? '예: #body.LDH >= 20' : '식 (예: #bodyH - #body.LDH)'}
                         onChange={(e) => setForm((f) => ({ ...f, vars: f.vars.map((x, j) => j === i ? { ...x, value: e.target.value } : x) }))} />
+                      <label className="visible-toggle" title="설계 화면(모델링 선택 시)에 이 변수 노출" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.72rem' }}>
+                        <input type="checkbox" checked={!!v.expose}
+                          onChange={(e) => setForm((f) => ({ ...f, vars: f.vars.map((x, j) => j === i ? { ...x, expose: e.target.checked } : x) }))} />노출
+                      </label>
                       <button className="order-btn" title="변수 삭제" onClick={() => setForm((f) => ({ ...f, vars: f.vars.filter((_, j) => j !== i) }))}><TrashIcon size={12} /></button>
                     </div>
                   ))}
-                </div>
-
-                <div className="panel-head" style={{ marginTop: 14 }}>
-                  <h2 style={{ fontSize: '0.92rem' }}>내보내기 수식 · 조건식</h2>
-                  <span className="sel-info" style={{ marginLeft: 12 }}>예: #H+24-#LDH / 조건: #W &gt;= 200 AND #H &gt; 1200</span>
-                </div>
-                <div className="form-grid">
-                  <div className="size-row">
-                    {([['W 수식', 'w'], ['D 수식', 'd'], ['H 수식', 'h']] as const).map(([lab, k]) => (
-                      <label className="size-cell" key={k}>
-                        <span>{lab}</span>
-                        <input type="text" placeholder="예: #bodyW/2 - 9" value={form.formula[k]}
-                          onChange={(e) => setForm((f) => ({ ...f, formula: { ...f.formula, [k]: e.target.value } }))} />
-                      </label>
-                    ))}
-                  </div>
-                  <label className="form-field">
-                    <span>조건식 <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(TRUE일 때만 자동배치 적용)</small></span>
-                    <input className="inline-input full" type="text" placeholder="예: #bodyW >= 200 AND #bodyH > 1200" value={form.condition}
-                      onChange={(e) => setForm((f) => ({ ...f, condition: e.target.value }))} />
-                  </label>
                 </div>
 
                 <div className="panel-head" style={{ marginTop: 18 }}>
