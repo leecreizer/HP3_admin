@@ -45,8 +45,10 @@ export type AdminConfig = {
   mainMenu: MenuConfig[];
   /** 사용자가 명시적으로 삭제한 기본 메뉴 키 — 새 기본 메뉴 병합 시 부활 방지 */
   removedMenus: string[];
-  /** 상품관리 하위메뉴 — 이름변경·표시숨김·순서 */
+  /** (구버전 호환) 상품관리 하위메뉴 — subMenus.content로 대체됨 */
   productSubMenus: MenuConfig[];
+  /** 메뉴별 하위메뉴 — 부모 메뉴 키 → 하위메뉴 목록(이름·표시·순서 설정 가능, 키는 시스템 고정) */
+  subMenus: Record<string, MenuConfig[]>;
   topbar: TopbarConfig;
   /** 등급(권한) 정의 — 운영자/서비스 사용자 */
   roles: Role[];
@@ -80,6 +82,24 @@ export const DEFAULT_PRODUCT_SUBMENUS: MenuConfig[] = [
   { key: 'products/filters', label: '필터 관리', visible: true },
 ];
 
+/** 메뉴별 하위메뉴 기본값 — 키·연결 화면은 시스템 고정, 라벨·표시·순서만 설정 가능 */
+export const DEFAULT_SUBMENUS: Record<string, MenuConfig[]> = {
+  users: [
+    { key: 'users/operators', label: '어드민 사용자 관리', visible: true },
+    { key: 'content-users', label: '홈플래너 사용자 관리', visible: true },
+    { key: 'brands', label: '브랜드 관리', visible: true },
+    { key: 'users/roles', label: '어드민 권한 관리', visible: true },
+  ],
+  content: [
+    { key: 'products', label: '상품 관리', visible: true },
+    ...DEFAULT_PRODUCT_SUBMENUS,
+  ],
+  drawings: [
+    { key: 'floorplans', label: '사용자 도면 관리', visible: true },
+    { key: 'drawings/apt', label: 'APT 도면 관리', visible: true },
+  ],
+};
+
 export const DEFAULT_CONFIG: AdminConfig = {
   mainMenu: [
     { key: 'users', label: '사용자 관리', visible: true },
@@ -89,6 +109,7 @@ export const DEFAULT_CONFIG: AdminConfig = {
   ],
   removedMenus: [],
   productSubMenus: DEFAULT_PRODUCT_SUBMENUS,
+  subMenus: DEFAULT_SUBMENUS,
   topbar: {
     brandTitle: 'HomePlanner3',
     brandSub: 'HANSSEM ADMIN',
@@ -124,6 +145,19 @@ export function loadConfig(): AdminConfig {
       .filter((s) => DEFAULT_PRODUCT_SUBMENUS.some((d) => d.key === s.key))
       .map((s) => ({ ...s, label: DEFAULT_PRODUCT_SUBMENUS.find((d) => d.key === s.key)!.label }));
     const missingSubs = DEFAULT_PRODUCT_SUBMENUS.filter((d) => !savedSubs.some((s) => s.key === d.key));
+    // 메뉴별 하위메뉴 — 저장본 순서/표시 유지, 라벨은 최신 기본값. 누락 항목·부모 병합.
+    // 구버전(subMenus 없음)은 productSubMenus를 content 하위로 마이그레이션.
+    const savedSubMenus: Record<string, MenuConfig[]> = saved.subMenus
+      ?? { ...DEFAULT_SUBMENUS, content: [{ key: 'products', label: '상품 관리', visible: true }, ...savedSubs, ...missingSubs] };
+    const mergedSubMenus: Record<string, MenuConfig[]> = {};
+    for (const parent of Object.keys(DEFAULT_SUBMENUS)) {
+      const defs = DEFAULT_SUBMENUS[parent];
+      const savedList = (savedSubMenus[parent] ?? [])
+        .filter((s) => defs.some((d) => d.key === s.key))
+        .map((s) => ({ ...s, label: defs.find((d) => d.key === s.key)!.label }));
+      const missingList = defs.filter((d) => !savedList.some((s) => s.key === d.key));
+      mergedSubMenus[parent] = [...savedList, ...missingList];
+    }
     // 등급 — 저장본 유지, 없으면 기본값. 기본 등급(builtin)은 항상 병합 보장
     const savedRoles = saved.roles ?? [];
     const mergedRoles = [
@@ -143,6 +177,7 @@ export function loadConfig(): AdminConfig {
       mainMenu: [...validMenu, ...missing],
       removedMenus: removed,
       productSubMenus: [...savedSubs, ...missingSubs],
+      subMenus: mergedSubMenus,
       topbar: { ...DEFAULT_CONFIG.topbar, ...saved.topbar },
       roles: mergedRoles,
       currentRoleId,

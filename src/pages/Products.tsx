@@ -449,6 +449,62 @@ export function varTypeOf(v: { value: string; type?: VarType }): VarType {
   return v.value.trim() !== '' && !Number.isNaN(Number(v.value)) ? '고정값' : '수식';
 }
 
+/** 기본 정보·운영정보 필드 도움말 — ⍰ 클릭 시 자기 변수명(#참조명) 뱃지 + 활용법 안내.
+ *  v: 이 필드의 수식 변수명(없으면 수식 변수 아님) / body: 도어(부착 상품)에서 몸통 값 참조명 / d: 설명 */
+type FieldHint = { v?: string; body?: string; d: string };
+const FIELD_HINTS: Record<string, FieldHint> = {
+  name: { d: '설계 화면 라이브러리·견적서에 표기되는 이름 (기준정보와 다르게 설정 가능)' },
+  brand: { d: '브랜드 표기·필터 분류용' },
+  quoteGroup: { d: '견적 계산 로직 연결 키 — 견적그룹 관리에서 정의, 견적보기에 사용' },
+  productGroup: { d: '대분류 — 품목·모델·견적그룹 목록의 기준' },
+  productKind: { d: '품목(형태) — 부위 교체·도어 DP 매칭·수납 폴더 분류의 기준' },
+  modelKind: { d: '시리즈 — 모델 구분 관리에서 등록, 설계 라이브러리 표기' },
+  contentCode: { d: '배치 상품 식별 키코드 — 웹플래너 배치·견적(hp3:scene)·그룹 연결에 사용' },
+  productCode: { d: '견적 가격 조회 키 — 형제 사이즈 변형 교체 시 이 코드로 표기 갱신' },
+  modelCode: { d: '형제 변형 매칭 키 — 같은 모델코드+품목코드 상품끼리 설계에서 W/H 사이즈 단계 교체' },
+  itemCode: { d: '형제 변형 매칭 키(품목) — 모델코드와 쌍으로 사이즈 변형 라인을 구성' },
+  permission: { d: '노출 권한 — 설계 화면에서 이 그룹 소속 사용자에게만 표시 (전체=모두)' },
+  price: { v: '#price', body: '#bodyPrice', d: '가격(원). 수식·조건식에서 사용 (예: #price > 100000)' },
+  attrType: { d: '컨텐츠 성격 — 모델링(배치형/설계형)·텍스쳐·머터리얼. 설계 라이브러리 분류' },
+  nonStandard: { d: '비규격 = 운영 사이즈 MIN~MAX 범위 자유 입력 / 규격 = GAP 단계 선택' },
+  size: { v: '#W #D #H', body: '#bodyW #bodyD #bodyH', d: '자기 치수(mm) — 수식·조건식에서 참조' },
+  w: { v: '#W', body: '#bodyW', d: '자기 폭(mm) (예: #bodyW/2 - 9)' },
+  d: { v: '#D', body: '#bodyD', d: '자기 깊이(mm)' },
+  h: { v: '#H', body: '#bodyH', d: '자기 높이(mm) (예: #bodyH - #body.LDH)' },
+  placement: { d: '설계 배치 기준면 — 바닥/벽/천장. 벽 배치는 배치 높이와 함께 사용' },
+  placeHeight: { v: '#lift', body: '#bodyLift', d: '배치 높이(mm, 바닥에서 띄움)' },
+  opSize: { v: '#minW #maxW #gapW · #minD #maxD #gapD · #minH #maxH #gapH', body: '#bodyMinW …', d: '값을 설정한 축만 참조 가능 (예: #maxH - 50). 규격+GAP>1: 단계 선택 / 비규격: 자유 입력' },
+  vars: { v: '#이름', body: '#body.이름', d: "사용자 변수. 이름 W/D/H '수식' = 내보내기 치수, '조건식' = 모두 TRUE일 때만 배치, 노출☑ = 설계 화면 표시·조정. 내장 변수: #W #D #H #lift #price #minW~#gapH" },
+};
+
+/** ⍰ 도움말 아이콘 — 클릭 시 변수명 뱃지 + 활용법 팝오버 표시 (호버 인지 어려움 보완) */
+export function HelpTip({ text }: { text: FieldHint | string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [open]);
+  const hint: FieldHint = typeof text === 'string' ? { d: text } : text;
+  return (
+    <span className="help-tip-wrap" ref={ref} onClick={(e) => e.stopPropagation()}>
+      <button type="button" className="help-tip" aria-label="사용법 보기" aria-expanded={open}
+        onClick={(e) => { e.preventDefault(); setOpen((v) => !v); }}>?</button>
+      {open && (
+        <span className="help-pop" role="tooltip">
+          <span className="help-pop-var">
+            {hint.v ? <code>{hint.v}</code> : <em>수식 변수 아님</em>}
+            {hint.body && <small> · 부착 상품(도어)에서 몸통 값: <code>{hint.body}</code></small>}
+          </span>
+          {hint.d}
+        </span>
+      )}
+    </span>
+  );
+}
+
 /** 수납(f-storage) 직속 상품 → 종류별 최종 폴더 이관 대상 판정.
  *  수납은 분류(중간) 폴더로 바뀌었으므로 직속 상품은 품목 기준으로 최종 폴더에 배치한다. */
 export function storageLeafFolder(p: { folderId?: string; productKind?: string }): string | null {
@@ -2147,7 +2203,7 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
   const currentAttrKey = form.attrType === '모델링' ? form.modelingType : form.attrType;
   const renderAttrSelector = () => (
     <div className="form-field span-2">
-      <span>속성 구분 *</span>
+      <span>속성 구분 *<HelpTip text={FIELD_HINTS.attrType} /></span>
       <div className="seg" role="radiogroup" aria-label="속성 구분" style={{ flexWrap: 'wrap' }}>
         {ATTR_OPTIONS.map((o) => (
           <button
@@ -2224,67 +2280,72 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
 
   /** 구성/교체 — 부위 상품 교체 그룹 연결 (조립형 상품의 슬롯 구성) */
   const renderModelingSlots = () => {
-    const used = new Set(form.modelingSlots.map((s) => s.groupId).filter(Boolean));
-    const addableGroups = swapState.groups.filter((g) => !used.has(g.id));
     const setSlots = (next: ProductForm['modelingSlots']) => setForm((f) => ({ ...f, modelingSlots: next }));
     const swapMembers = expandMembers(swapState, folders, products as never);
     const memberProducts = (gid: string) =>
       (swapMembers[gid] ?? []).map((code) => products.find((p) => p.contentCode === code)).filter(Boolean) as Product[];
+    // 탭(부위) = 구분 타이틀 — 컨텐츠 그룹 관리에서 그룹(교체 묶음·폴더 단위 노출)이 등록된 부위만 나열
+    const cats = swapState.categories.filter((cat) => swapState.groups.some((g) => g.kind === cat));
+    if (cats.length === 0) return <p className="hint"><b>컨텐츠 그룹 관리</b>에서 부위(탭)와 교체 묶음을 먼저 구성하세요.</p>;
+    const groupLabel = (g: (typeof swapState.groups)[number]) => `${g.name}${g.type === 'grouping' ? ' — 폴더 노출' : ''}`;
     return (
       <div className="mslot-box">
-        {form.modelingSlots.length === 0 && <p className="hint">조립형 상품이면 구성 슬롯을 추가해 부위별 교체 그룹(도어·장·손잡이 등)을 연결하세요. (단일형 상품은 비워둠)</p>}
-        {form.modelingSlots.map((row, i) => {
-          const group = swapState.groups.find((g) => g.id === row.groupId);
-          const members = row.groupId ? memberProducts(row.groupId) : [];
-          const slotKind = group?.kind ?? row.slot;
-          const candidateGroups = swapState.groups.filter((g) => g.kind === slotKind && g.type !== 'grouping');
-          const setRules = (rules: { condition: string; groupId: string }[]) =>
-            setSlots(form.modelingSlots.map((s, j) => (j === i ? { ...s, rules } : s)));
-          const rules = row.rules ?? [];
+        <p className="hint">부위(탭)별로 교체 묶음 또는 폴더 단위 노출 그룹을 연결하세요 — 연결한 부위만 설계 화면 구성 슬롯으로 동작합니다. (단일형 상품은 전부 미연결)</p>
+        {cats.map((cat) => {
+          const catGroups = swapState.groups.filter((g) => g.kind === cat);
+          const si = form.modelingSlots.findIndex(
+            (s) => (swapState.groups.find((g) => g.id === s.groupId)?.kind ?? s.slot) === cat,
+          );
+          const row = si >= 0 ? form.modelingSlots[si] : null;
+          const members = row?.groupId ? memberProducts(row.groupId) : [];
+          const rules = row?.rules ?? [];
+          const setRules = (r: { condition: string; groupId: string }[]) => {
+            if (si >= 0) setSlots(form.modelingSlots.map((s, j) => (j === si ? { ...s, rules: r } : s)));
+          };
           return (
-            <div className="mslot-block" key={i}>
+            <div className="mslot-block" key={cat}>
               <div className="mslot-row">
-                <span className="mslot-slot">{slotKind || '슬롯'}</span>
-                <select className="inline-input" value={row.groupId}
-                  onChange={(e) => { const g = swapState.groups.find((x) => x.id === e.target.value); setSlots(form.modelingSlots.map((s, j) => (j === i ? { ...s, groupId: e.target.value, slot: g?.kind ?? '', defaultModelingId: '' } : s))); }}>
-                  <option value="">교체 묶음 선택(기본)</option>
-                  {swapState.groups.map((g) => <option key={g.id} value={g.id}>{g.name} ({g.kind})</option>)}
+                <span className="mslot-slot">{cat}</span>
+                <select className="inline-input" value={row?.groupId ?? ''}
+                  onChange={(e) => {
+                    const gid = e.target.value;
+                    if (!gid) { if (si >= 0) setSlots(form.modelingSlots.filter((_, j) => j !== si)); return; }
+                    if (si >= 0) setSlots(form.modelingSlots.map((s, j) => (j === si ? { ...s, groupId: gid, slot: cat, defaultModelingId: '' } : s)));
+                    else setSlots([...form.modelingSlots, { slot: cat, groupId: gid, defaultModelingId: '' }]);
+                  }}>
+                  <option value="">미연결</option>
+                  {catGroups.map((g) => <option key={g.id} value={g.id}>{groupLabel(g)}</option>)}
                 </select>
-                <select className="inline-input" value={row.defaultModelingId ?? ''} disabled={!row.groupId}
-                  onChange={(e) => setSlots(form.modelingSlots.map((s, j) => (j === i ? { ...s, defaultModelingId: e.target.value } : s)))}>
+                <select className="inline-input" value={row?.defaultModelingId ?? ''} disabled={!row?.groupId}
+                  onChange={(e) => { if (si >= 0) setSlots(form.modelingSlots.map((s, j) => (j === si ? { ...s, defaultModelingId: e.target.value } : s))); }}>
                   <option value="">기본 부위 상품</option>
                   {members.map((m) => <option key={m.contentCode} value={m.contentCode}>{m.name}</option>)}
                 </select>
-                <span className="mslot-cnt">{members.length}개</span>
-                <button className="order-btn" title="슬롯 제거" onClick={() => setSlots(form.modelingSlots.filter((_, j) => j !== i))}><TrashIcon size={12} /></button>
+                <span className="mslot-cnt">{row ? `${members.length}개` : '—'}</span>
               </div>
-              {/* 조건 분기 — 조건식이 참인 첫 규칙의 교체 묶음을 사용(예: 창높이별 손잡이) */}
-              <div className="mslot-rules">
-                {rules.map((r, ri) => (
-                  <div className="mslot-rule" key={ri}>
-                    <span className="mslot-rule-tag">조건</span>
-                    <input className="inline-input" placeholder="예: #H <= 1200 (빈칸=그 외 기본)" value={r.condition}
-                      onChange={(e) => setRules(rules.map((x, k) => (k === ri ? { ...x, condition: e.target.value } : x)))} />
-                    <span className="mslot-rule-arrow">→</span>
-                    <select className="inline-input" value={r.groupId}
-                      onChange={(e) => setRules(rules.map((x, k) => (k === ri ? { ...x, groupId: e.target.value } : x)))}>
-                      <option value="">교체 묶음 선택</option>
-                      {candidateGroups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-                    </select>
-                    <button className="order-btn" title="규칙 제거" onClick={() => setRules(rules.filter((_, k) => k !== ri))}><TrashIcon size={11} /></button>
-                  </div>
-                ))}
-                <button className="link-mini" disabled={!slotKind} onClick={() => setRules([...rules, { condition: '', groupId: '' }])}>+ 조건 규칙</button>
-              </div>
+              {/* 조건 분기 — 조건식이 참인 첫 규칙의 교체 묶음을 사용(예: 창높이별 손잡이). 연결된 부위만 */}
+              {row && (
+                <div className="mslot-rules">
+                  {rules.map((r, ri) => (
+                    <div className="mslot-rule" key={ri}>
+                      <span className="mslot-rule-tag">조건</span>
+                      <input className="inline-input" placeholder="예: #H <= 1200 (빈칸=그 외 기본)" value={r.condition}
+                        onChange={(e) => setRules(rules.map((x, k) => (k === ri ? { ...x, condition: e.target.value } : x)))} />
+                      <span className="mslot-rule-arrow">→</span>
+                      <select className="inline-input" value={r.groupId}
+                        onChange={(e) => setRules(rules.map((x, k) => (k === ri ? { ...x, groupId: e.target.value } : x)))}>
+                        <option value="">그룹 선택</option>
+                        {catGroups.map((g) => <option key={g.id} value={g.id}>{groupLabel(g)}</option>)}
+                      </select>
+                      <button className="order-btn" title="규칙 제거" onClick={() => setRules(rules.filter((_, k) => k !== ri))}><TrashIcon size={11} /></button>
+                    </div>
+                  ))}
+                  <button className="link-mini" onClick={() => setRules([...rules, { condition: '', groupId: '' }])}>+ 조건 규칙</button>
+                </div>
+              )}
             </div>
           );
         })}
-        {addableGroups.length > 0 && (
-          <select className="inline-input mslot-add" value="" onChange={(e) => { const g = swapState.groups.find((x) => x.id === e.target.value); if (g) setSlots([...form.modelingSlots, { slot: g.kind, groupId: g.id, defaultModelingId: '' }]); }}>
-            <option value="">+ 구성 슬롯(교체 그룹) 추가</option>
-            {addableGroups.map((g) => <option key={g.id} value={g.id}>{g.name} ({g.kind})</option>)}
-          </select>
-        )}
       </div>
     );
   };
@@ -2513,7 +2574,7 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
             <div className="panel-head"><h2>기본 정보</h2></div>
             <div className="form-grid two-col">
               <label className="form-field span-2">
-                <span>상품명 *</span>
+                <span>상품명 *<HelpTip text={FIELD_HINTS.name} /></span>
                 <input className="inline-input full" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
               </label>
               {/* 수정 이력 — 이번 수정 내용을 기록으로 남긴다 (저장 시 일시/수정자와 함께 누적) */}
@@ -2539,11 +2600,11 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
                 </div>
               )}
               <label className="form-field">
-                <span>브랜드</span>
+                <span>브랜드<HelpTip text={FIELD_HINTS.brand} /></span>
                 <input className="inline-input full" value={form.brand} onChange={(e) => setForm((f) => ({ ...f, brand: e.target.value }))} />
               </label>
               <label className="form-field">
-                <span>견적그룹 *</span>
+                <span>견적그룹 *<HelpTip text={FIELD_HINTS.quoteGroup} /></span>
                 <select className="inline-input full" value={form.quoteGroup} onChange={(e) => setForm((f) => ({ ...f, quoteGroup: e.target.value }))}>
                   <option value="">선택</option>
                   {(() => {
@@ -2554,7 +2615,7 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
                 </select>
               </label>
               <label className="form-field">
-                <span>상품군 *</span>
+                <span>상품군 *<HelpTip text={FIELD_HINTS.productGroup} /></span>
                 <select
                   className="inline-input full"
                   value={form.productGroup}
@@ -2573,7 +2634,7 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
                 </select>
               </label>
               <label className="form-field">
-                <span>상품 구분 *</span>
+                <span>상품 구분 *<HelpTip text={FIELD_HINTS.productKind} /></span>
                 <select
                   className="inline-input full"
                   value={form.productKind}
@@ -2584,7 +2645,7 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
                 </select>
               </label>
               <label className="form-field">
-                <span>모델 구분 <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(모델 구분 관리 등록)</small></span>
+                <span>모델 구분 <HelpTip text={FIELD_HINTS.modelKind} /> <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(모델 구분 관리 등록)</small></span>
                 <select className="inline-input full" value={form.modelKind}
                   onChange={(e) => setForm((f) => ({ ...f, modelKind: e.target.value }))}>
                   <option value="">{form.productGroup ? (modelsByGroup[form.productGroup] ?? []).length ? '모델 선택' : '모델 관리에서 등록 필요' : '상품군을 먼저 선택'}</option>
@@ -2593,28 +2654,28 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
               </label>
               <div className="span-2 code-pair-grid">
                 <label className="form-field">
-                  <span>컨텐츠 코드 <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>{fieldEditable('contentCode') ? '(키코드)' : '(수정 불가)'}</small></span>
+                  <span>컨텐츠 코드 <HelpTip text={FIELD_HINTS.contentCode} /> <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>{fieldEditable('contentCode') ? '(키코드)' : '(수정 불가)'}</small></span>
                   <input className="inline-input full" value={form.contentCode} disabled={!fieldEditable('contentCode')}
                     onChange={(e) => setForm((f) => ({ ...f, contentCode: e.target.value }))} />
                 </label>
                 <label className="form-field">
-                  <span>상품코드 <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>{fieldEditable('productCode') ? '' : '(수정 불가)'}</small></span>
+                  <span>상품코드 <HelpTip text={FIELD_HINTS.productCode} /> <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>{fieldEditable('productCode') ? '' : '(수정 불가)'}</small></span>
                   <input className="inline-input full" value={form.productCode} disabled={!fieldEditable('productCode')}
                     onChange={(e) => setForm((f) => ({ ...f, productCode: e.target.value }))} />
                 </label>
                 <label className="form-field">
-                  <span>모델코드</span>
+                  <span>모델코드<HelpTip text={FIELD_HINTS.modelCode} /></span>
                   <input className="inline-input full" value={form.modelCode} placeholder="모델 식별 코드"
                     onChange={(e) => setForm((f) => ({ ...f, modelCode: e.target.value }))} />
                 </label>
                 <label className="form-field">
-                  <span>품목코드</span>
+                  <span>품목코드<HelpTip text={FIELD_HINTS.itemCode} /></span>
                   <input className="inline-input full" value={form.itemCode} placeholder="품목 식별 코드"
                     onChange={(e) => setForm((f) => ({ ...f, itemCode: e.target.value }))} />
                 </label>
               </div>
               <label className="form-field">
-                <span>사용자 그룹 <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(이 그룹 사용자에게 노출)</small></span>
+                <span>사용자 그룹 <HelpTip text={FIELD_HINTS.permission} /> <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(이 그룹 사용자에게 노출)</small></span>
                 <select className="inline-input full" value={editPermission} onChange={(e) => setEditPermission(e.target.value)}>
                   <option value="전체">전체</option>
                   {groups.map((g) => (
@@ -2623,13 +2684,13 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
                 </select>
               </label>
               <label className="form-field">
-                <span>가격 (원)</span>
+                <span>가격 (원)<HelpTip text={FIELD_HINTS.price} /></span>
                 <input className="inline-input full" type="number" value={form.price}
                   placeholder="0" onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))} />
               </label>
               {/* 속성 구분 */}
               <div className="form-field span-2">
-                <span>속성 구분 *</span>
+                <span>속성 구분 *<HelpTip text={FIELD_HINTS.attrType} /></span>
                 <div className="seg" role="radiogroup" aria-label="속성 구분" style={{ flexWrap: 'wrap' }}>
                   {ATTR_OPTIONS.map((o) => (
                     <button
@@ -2645,7 +2706,7 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
               <div className="form-field span-2">
                 <div className="attr-visible-row">
                   <div style={{ flex: 1 }}>
-                    <span>규격유무</span>
+                    <span>규격유무<HelpTip text={FIELD_HINTS.nonStandard} /></span>
                     <div className="seg" role="radiogroup" aria-label="규격유무">
                       <button role="radio" aria-checked={!form.nonStandard}
                         className={`seg-item${!form.nonStandard ? ' active' : ''}`}
@@ -2667,15 +2728,15 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
               </div>
 
               <div className="form-field span-2">
-                <span>컨텐츠 크기 (mm) <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(기본은 모델링 사이즈, 직접 입력 가능)</small></span>
+                <span>컨텐츠 크기 (mm) <HelpTip text={FIELD_HINTS.size} /> <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(기본은 모델링 사이즈, 직접 입력 가능)</small></span>
                 <div className="size-row">
-                  <label className="size-cell"><span>W 폭</span><input type="number" min="0" placeholder="0" value={form.w} aria-label="폭 W" onChange={(e) => setForm((f) => ({ ...f, w: e.target.value }))} /></label>
-                  <label className="size-cell"><span>D 깊이</span><input type="number" min="0" placeholder="0" value={form.d} aria-label="깊이 D" onChange={(e) => setForm((f) => ({ ...f, d: e.target.value }))} /></label>
-                  <label className="size-cell"><span>H 높이</span><input type="number" min="0" placeholder="0" value={form.h} aria-label="높이 H" onChange={(e) => setForm((f) => ({ ...f, h: e.target.value }))} /></label>
+                  <label className="size-cell"><span>W 폭<HelpTip text={FIELD_HINTS.w} /></span><input type="number" min="0" placeholder="0" value={form.w} aria-label="폭 W" onChange={(e) => setForm((f) => ({ ...f, w: e.target.value }))} /></label>
+                  <label className="size-cell"><span>D 깊이<HelpTip text={FIELD_HINTS.d} /></span><input type="number" min="0" placeholder="0" value={form.d} aria-label="깊이 D" onChange={(e) => setForm((f) => ({ ...f, d: e.target.value }))} /></label>
+                  <label className="size-cell"><span>H 높이<HelpTip text={FIELD_HINTS.h} /></span><input type="number" min="0" placeholder="0" value={form.h} aria-label="높이 H" onChange={(e) => setForm((f) => ({ ...f, h: e.target.value }))} /></label>
                 </div>
               </div>
               <label className="form-field">
-                <span>배치 위치</span>
+                <span>배치 위치<HelpTip text={FIELD_HINTS.placement} /></span>
                 <select className="inline-input full" value={form.placement} onChange={(e) => setForm((f) => ({ ...f, placement: e.target.value as ProductForm['placement'] }))}>
                   <option value="바닥">바닥</option>
                   <option value="벽">벽</option>
@@ -2683,7 +2744,7 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
                 </select>
               </label>
               <label className="form-field">
-                <span>배치 높이 (mm)</span>
+                <span>배치 높이 (mm)<HelpTip text={FIELD_HINTS.placeHeight} /></span>
                 <input className="inline-input full" type="number" min="0" value={form.placeHeight} placeholder="바닥배치 기본 0" onChange={(e) => setForm((f) => ({ ...f, placeHeight: e.target.value }))} />
               </label>
 
@@ -2711,14 +2772,14 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
 
             {/* 운영 사이즈 — MIN·MAX·GAP 선택형 사이즈 (비규격이면 명칭 변경) */}
             <div className="panel-head" style={{ marginTop: 4 }}>
-              <h2 style={{ fontSize: '0.92rem' }}>{form.nonStandard ? '비규격 사이즈' : '운영 사이즈'}</h2>
+              <h2 style={{ fontSize: '0.92rem' }}>{form.nonStandard ? '비규격 사이즈' : '운영 사이즈'}<HelpTip text={FIELD_HINTS.opSize} /></h2>
               <span className="sel-info" style={{ marginLeft: 12 }}>MIN·MAX·GAP — 기본정보 사이즈 선택 범위</span>
             </div>
             {renderOpSize()}
 
             {/* 사용자 정의 변수 — 유형(고정값/수식/조건식) + 설계 노출 여부 */}
             <div className="panel-head" style={{ marginTop: 14 }}>
-              <h2 style={{ fontSize: '0.92rem' }}>변수 정의</h2>
+              <h2 style={{ fontSize: '0.92rem' }}>변수 정의<HelpTip text={FIELD_HINTS.vars} /></h2>
               <span className="sel-info" style={{ marginLeft: 12 }}>#이름 참조 · 이름 W/D/H '수식' = 내보내기 치수 · '조건식'은 모두 TRUE일 때만 배치 · 노출☑ = 설계 화면에 표시</span>
               <button className="btn-mini" style={{ marginLeft: 'auto' }}
                 onClick={() => setForm((f) => ({ ...f, vars: [...f.vars, { name: '', value: '', type: '고정값' as VarType }] }))}>+ 변수</button>
@@ -2728,6 +2789,7 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
               {form.vars.map((v, i) => (
                 <div key={i} className="opsize-row" style={{ gridTemplateColumns: '1fr 92px 1.6fr 52px 28px' }}>
                   <input type="text" placeholder="이름 (예: LDH, W)" value={v.name}
+                    title={`수식에서 #${v.name.trim() || '이름'} 으로 참조 · 부착 상품(도어)에서는 #body.${v.name.trim() || '이름'}`}
                     onChange={(e) => setForm((f) => ({ ...f, vars: f.vars.map((x, j) => j === i ? { ...x, name: e.target.value } : x) }))} />
                   <select value={varTypeOf(v)} aria-label="값 유형"
                     onChange={(e) => setForm((f) => ({ ...f, vars: f.vars.map((x, j) => j === i ? { ...x, type: e.target.value as VarType } : x) }))}>
@@ -3148,7 +3210,7 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
             <div className="reg-right">
             <div className="form-grid two-col">
               <label className="form-field span-2">
-                <span>상품명 *</span>
+                <span>상품명 *<HelpTip text={FIELD_HINTS.name} /></span>
                 <input
                   autoFocus
                   className="inline-input full"
@@ -3158,7 +3220,7 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
                 />
               </label>
               <label className="form-field">
-                <span>브랜드</span>
+                <span>브랜드<HelpTip text={FIELD_HINTS.brand} /></span>
                 <input
                   className="inline-input full"
                   value={form.brand}
@@ -3167,7 +3229,7 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
                 />
               </label>
               <label className="form-field">
-                <span>견적그룹 *</span>
+                <span>견적그룹 *<HelpTip text={FIELD_HINTS.quoteGroup} /></span>
                 <select
                   className="inline-input full"
                   value={form.quoteGroup}
@@ -3178,7 +3240,7 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
                 </select>
               </label>
               <label className="form-field">
-                <span>상품군 *</span>
+                <span>상품군 *<HelpTip text={FIELD_HINTS.productGroup} /></span>
                 <select
                   className="inline-input full"
                   value={form.productGroup}
@@ -3211,7 +3273,7 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
                 </label>
               ) : (
                 <label className="form-field">
-                  <span>상품 구분 *</span>
+                  <span>상품 구분 *<HelpTip text={FIELD_HINTS.productKind} /></span>
                   <select
                     className="inline-input full"
                     value={form.productKind}
@@ -3223,7 +3285,7 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
                 </label>
               )}
               <label className="form-field">
-                <span>모델 구분 <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(모델 구분 관리 등록)</small></span>
+                <span>모델 구분 <HelpTip text={FIELD_HINTS.modelKind} /> <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(모델 구분 관리 등록)</small></span>
                 <select className="inline-input full" value={form.modelKind}
                   onChange={(e) => setForm((f) => ({ ...f, modelKind: e.target.value }))}>
                   <option value="">{form.productGroup ? (modelsByGroup[form.productGroup] ?? []).length ? '모델 선택' : '모델 관리에서 등록 필요' : '상품군을 먼저 선택'}</option>
@@ -3233,11 +3295,11 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
 
               <div className="span-2 code-pair-grid">
                 <label className="form-field">
-                  <span>컨텐츠 코드 <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(자동 생성 · 수정 불가)</small></span>
+                  <span>컨텐츠 코드 <HelpTip text={FIELD_HINTS.contentCode} /> <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(자동 생성 · 수정 불가)</small></span>
                   <input className="inline-input full" value="등록 시 자동 생성됩니다" disabled readOnly />
                 </label>
                 <label className="form-field">
-                  <span>상품코드 * <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(등록 후 수정 불가)</small></span>
+                  <span>상품코드 * <HelpTip text={FIELD_HINTS.productCode} /> <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(등록 후 수정 불가)</small></span>
                   <input
                     className="inline-input full"
                     value={form.productCode}
@@ -3246,18 +3308,18 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
                   />
                 </label>
                 <label className="form-field">
-                  <span>모델코드</span>
+                  <span>모델코드<HelpTip text={FIELD_HINTS.modelCode} /></span>
                   <input className="inline-input full" value={form.modelCode} placeholder="모델 식별 코드"
                     onChange={(e) => setForm((f) => ({ ...f, modelCode: e.target.value }))} />
                 </label>
                 <label className="form-field">
-                  <span>품목코드</span>
+                  <span>품목코드<HelpTip text={FIELD_HINTS.itemCode} /></span>
                   <input className="inline-input full" value={form.itemCode} placeholder="품목 식별 코드"
                     onChange={(e) => setForm((f) => ({ ...f, itemCode: e.target.value }))} />
                 </label>
               </div>
               <label className="form-field">
-                <span>사용자 그룹 <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(이 그룹 사용자에게 노출)</small></span>
+                <span>사용자 그룹 <HelpTip text={FIELD_HINTS.permission} /> <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(이 그룹 사용자에게 노출)</small></span>
                 <select
                   className="inline-input full"
                   value={form.permission}
@@ -3286,15 +3348,15 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
               {renderAttrSelector()}
 
               <div className="form-field span-2">
-                <span>컨텐츠 크기 (mm) <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(기본은 모델링 사이즈, 직접 입력 가능)</small></span>
+                <span>컨텐츠 크기 (mm) <HelpTip text={FIELD_HINTS.size} /> <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(기본은 모델링 사이즈, 직접 입력 가능)</small></span>
                 <div className="size-row">
-                  <label className="size-cell"><span>W 폭</span><input type="number" min="0" placeholder="0" value={form.w} aria-label="폭 W" onChange={(e) => setForm((f) => ({ ...f, w: e.target.value }))} /></label>
-                  <label className="size-cell"><span>D 깊이</span><input type="number" min="0" placeholder="0" value={form.d} aria-label="깊이 D" onChange={(e) => setForm((f) => ({ ...f, d: e.target.value }))} /></label>
-                  <label className="size-cell"><span>H 높이</span><input type="number" min="0" placeholder="0" value={form.h} aria-label="높이 H" onChange={(e) => setForm((f) => ({ ...f, h: e.target.value }))} /></label>
+                  <label className="size-cell"><span>W 폭<HelpTip text={FIELD_HINTS.w} /></span><input type="number" min="0" placeholder="0" value={form.w} aria-label="폭 W" onChange={(e) => setForm((f) => ({ ...f, w: e.target.value }))} /></label>
+                  <label className="size-cell"><span>D 깊이<HelpTip text={FIELD_HINTS.d} /></span><input type="number" min="0" placeholder="0" value={form.d} aria-label="깊이 D" onChange={(e) => setForm((f) => ({ ...f, d: e.target.value }))} /></label>
+                  <label className="size-cell"><span>H 높이<HelpTip text={FIELD_HINTS.h} /></span><input type="number" min="0" placeholder="0" value={form.h} aria-label="높이 H" onChange={(e) => setForm((f) => ({ ...f, h: e.target.value }))} /></label>
                 </div>
               </div>
               <label className="form-field">
-                <span>배치 위치</span>
+                <span>배치 위치<HelpTip text={FIELD_HINTS.placement} /></span>
                 <select
                   className="inline-input full"
                   value={form.placement}
@@ -3306,7 +3368,7 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
                 </select>
               </label>
               <label className="form-field">
-                <span>배치 높이 (mm)</span>
+                <span>배치 높이 (mm)<HelpTip text={FIELD_HINTS.placeHeight} /></span>
                 <input className="inline-input full" type="number" min="0" value={form.placeHeight} placeholder="바닥배치 기본 0" onChange={(e) => setForm((f) => ({ ...f, placeHeight: e.target.value }))} />
               </label>
 
@@ -3333,13 +3395,13 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
                 </div>
 
                 <div className="panel-head" style={{ marginTop: 4 }}>
-                  <h2 style={{ fontSize: '0.92rem' }}>{form.nonStandard ? '비규격 사이즈' : '운영 사이즈'}</h2>
+                  <h2 style={{ fontSize: '0.92rem' }}>{form.nonStandard ? '비규격 사이즈' : '운영 사이즈'}<HelpTip text={FIELD_HINTS.opSize} /></h2>
                   <span className="sel-info" style={{ marginLeft: 12 }}>MIN·MAX·GAP — 기본정보 사이즈 선택 범위</span>
                 </div>
                 {renderOpSize()}
 
                 <div className="panel-head" style={{ marginTop: 14 }}>
-                  <h2 style={{ fontSize: '0.92rem' }}>변수 정의</h2>
+                  <h2 style={{ fontSize: '0.92rem' }}>변수 정의<HelpTip text={FIELD_HINTS.vars} /></h2>
                   <span className="sel-info" style={{ marginLeft: 12 }}>#이름 참조 · 이름 W/D/H '수식' = 내보내기 치수 · '조건식'은 모두 TRUE일 때만 배치 · 노출☑ = 설계 화면에 표시</span>
                   <button className="btn-mini" style={{ marginLeft: 'auto' }}
                     onClick={() => setForm((f) => ({ ...f, vars: [...f.vars, { name: '', value: '', type: '고정값' as VarType }] }))}>+ 변수</button>
@@ -3349,6 +3411,7 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
                   {form.vars.map((v, i) => (
                     <div key={i} className="opsize-row" style={{ gridTemplateColumns: '1fr 92px 1.6fr 52px 28px' }}>
                       <input type="text" placeholder="이름 (예: LDH, W)" value={v.name}
+                    title={`수식에서 #${v.name.trim() || '이름'} 으로 참조 · 부착 상품(도어)에서는 #body.${v.name.trim() || '이름'}`}
                         onChange={(e) => setForm((f) => ({ ...f, vars: f.vars.map((x, j) => j === i ? { ...x, name: e.target.value } : x) }))} />
                       <select value={varTypeOf(v)} aria-label="값 유형"
                         onChange={(e) => setForm((f) => ({ ...f, vars: f.vars.map((x, j) => j === i ? { ...x, type: e.target.value as VarType } : x) }))}>

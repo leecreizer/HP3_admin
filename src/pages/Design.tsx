@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { loadFolders, loadProducts, folderSubtree, loadFilterGroups, loadSwapState, expandMembers, folderRepThumb } from '../data/groups';
-import { opSizeOptions, evalFormula, type OpSize } from './Products';
+import { opSizeOptions, evalFormula, varTypeOf, type OpSize, type VarType } from './Products';
 import { getAssets } from '../data/assetStore';
 
 /**
@@ -51,8 +51,9 @@ type LibProduct = ReturnType<typeof loadProducts>[number] & {
   pos?: string;
   /** 모델(마감) 표시 컬러 — 웹플래너 박스 렌더 색 */
   color?: string;
+  price?: number;
   formula?: { w?: string; d?: string; h?: string };
-  vars?: { name: string; value: string }[];
+  vars?: { name: string; value: string; type?: VarType; expose?: boolean }[];
   condition?: string;
 };
 
@@ -203,6 +204,8 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
   const [swapFilters, setSwapFilters] = useState<Set<string>>(new Set());
   const toggleSwapFilter = (id: string) => setSwapFilters((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const [priceOv, setPriceOv] = useState<Record<string, string>>({});
+  /** 노출 변수 값 오버라이드 — contentCode → 변수명 → 값. 설계 화면에서 조정한 값이 수식 평가에 우선 적용 */
+  const [varOv, setVarOv] = useState<Record<string, Record<string, number>>>({});
   const [placedCount, setPlacedCount] = useState(0);
   /** webplaner가 보낸 배치 목록 — 견적보기에서 사용 */
   type PlacedItem = { id: string; code?: string; name: string; w: number; d: number; h: number; lift: number };
@@ -265,11 +268,38 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
       lift: o.lift ?? p.placeHeight ?? 0,
     };
   };
+
+  /** 상품의 기본 정보를 수식 변수로 펼침 — #lift(배치높이), #price(가격), #minW·#maxW·#gapW…(운영 사이즈).
+   *  prefix를 주면 몸통 참조용 별칭(#bodyLift, #bodyMinW …)으로 등록한다. */
+  const builtinVars = (p: LibProduct, dims: { w: number; d: number; h: number; lift: number }, prefix = ''): Record<string, number> => {
+    const key = (n: string) => prefix ? `${prefix}${n[0].toUpperCase()}${n.slice(1)}` : n;
+    const out: Record<string, number> = {
+      [key('lift')]: dims.lift,
+      [key('price')]: Number(p.price) || 0,
+    };
+    const op = p.opSize ?? {};
+    for (const k of ['minW', 'maxW', 'gapW', 'minD', 'maxD', 'gapD', 'minH', 'maxH', 'gapH'] as const) {
+      const v = (op as Record<string, number | undefined>)[k];
+      if (v != null) out[key(k)] = v;
+    }
+    return out;
+  };
   /** 웹플래너로 배치(또는 갱신) 요청 — 현재 유효 치수 전송 */
   const sendPlace = (p: LibProduct) => {
     const dm = effDims(p);
+    // 축별 가변 사이즈 범위 — 웹플래너 리사이즈 핸들(길이 변경 UI)용. 범위 미설정 축은 고정.
+    const op = p.opSize;
+    const rng = (min?: number, max?: number, gap?: number) =>
+      min != null && max != null && max > min ? { min, max, gap: gap || 0 } : undefined;
+    const sizeRange = op
+      ? {
+          ...(rng(op.minW, op.maxW, op.gapW) ? { w: rng(op.minW, op.maxW, op.gapW) } : {}),
+          ...(rng(op.minD, op.maxD, op.gapD) ? { d: rng(op.minD, op.maxD, op.gapD) } : {}),
+          ...(rng(op.minH, op.maxH, op.gapH) ? { h: rng(op.minH, op.maxH, op.gapH) } : {}),
+        }
+      : undefined;
     iframeRef.current?.contentWindow?.postMessage(
-      { type: 'hp3:place-product', name: p.name, code: p.productCode, modelUrl: modelUrlOf(p), color: p.color, ...dm },
+      { type: 'hp3:place-product', name: p.name, code: p.productCode, modelUrl: modelUrlOf(p), color: p.color, ...dm, sizeRange },
       '*',
     );
   };
@@ -346,7 +376,7 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
 
   const [attachMsg, setAttachMsg] = useState('');
   /** 도어 컨텐츠코드 묶음 → 몸통 DP 매칭 도어를 POS(좌/우)에 자동 배치 (그룹/폴더 공통) */
-  const attachDoorsFromCodes = (codes: string[], label: string) => {
+  const attachDoorsFromCodes = (codes: string[], label: string, opts?: { selectBest?: boolean }) => {
     if (!sel) { setAttachMsg('⚠ 먼저 캔버스에서 몸통(베이스)을 배치·선택하세요.'); return; }
     // 몸통 DP 타입 — 모델(GLB)에서 읽은 것 우선, 없으면 상품 DP 속성 fallback.
     const modelDp = (sel.productCode ? modelDpRef.current[sel.productCode] : undefined) ?? [];
@@ -364,16 +394,18 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
     const bd = effDims(sel);
     const toNum = (v: number | boolean | null): number | null => (typeof v === 'number' ? v : v === true ? 1 : v === false ? 0 : null);
     // 몸통(호스트) 사용자 변수 — 몸통 자신의 치수 컨텍스트(#W/#D/#H=몸통값)로 순차 평가한 뒤
-    // 도어 수식에서 #body.변수명 으로 참조할 수 있게 주입한다.
-    const bodyVars: Record<string, number> = {};
+    // 도어 수식에서 #body.변수명 으로 참조할 수 있게 주입한다. (조건식 유형 제외, 노출 변수는 오버라이드 우선)
+    const bodyVars: Record<string, number> = builtinVars(sel, bd, 'body');
     {
-      const bctx: Record<string, number> = { W: bd.w, D: bd.d, H: bd.h, w: bd.w, d: bd.d, h: bd.h };
+      const bctx: Record<string, number> = { W: bd.w, D: bd.d, H: bd.h, w: bd.w, d: bd.d, h: bd.h, ...builtinVars(sel, bd) };
       for (const bv of sel.vars ?? []) {
-        if (!bv.name?.trim()) continue;
-        const r = bv.value?.trim() ? toNum(evalFormula(bv.value, bctx)) : null;
+        if (!bv.name?.trim() || varTypeOf(bv) === '조건식') continue;
+        const name = bv.name.trim();
+        const ov = varOv[sel.contentCode]?.[name];
+        const r = ov ?? (bv.value?.trim() ? toNum(evalFormula(bv.value, bctx)) : null);
         const val = r ?? (Number(bv.value) || 0);
-        bctx[bv.name.trim()] = val;
-        bodyVars[`body.${bv.name.trim()}`] = val;
+        bctx[name] = val;
+        bodyVars[`body.${name}`] = val;
       }
     }
     type DoorVariant = { size: number; code?: string; name: string; masterW?: number; masterH?: number; masterD?: number; modelUrl?: string; color?: string };
@@ -446,38 +478,68 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
       return;
     }
 
-    for (const dr of matched) {
+    // 부착 대상 결정 — 기본: 매칭 도어 전부(POS별) / selectBest(모델그룹 폴더 선택):
+    // 사이드(L·R)별로 목표 폭(몸통폭÷2)에 가장 가까운 도어 1개씩만 골라 부착.
+    const sideOf = (d: LibProduct): string[] => {
+      const dpos2 = (d.pos || '').trim().toUpperCase();
+      const ddp2 = (d.dp || '').trim().toUpperCase();
+      return (ddp2 === 'X' || dpos2 === 'X' || dpos2 === '') ? ['L', 'R'] : [dpos2.includes('R') ? 'R' : 'L'];
+    };
+    let jobs: { dr: LibProduct; side: string }[] = [];
+    if (opts?.selectBest) {
+      const targetW = bd.w / 2;
+      for (const side of ['L', 'R']) {
+        const cands = matched.filter((m) => sideOf(m).includes(side));
+        if (cands.length === 0) continue;
+        const best = cands.slice().sort((a, b) => Math.abs((a.w ?? 0) - targetW) - Math.abs((b.w ?? 0) - targetW))[0];
+        jobs.push({ dr: best, side });
+      }
+    } else {
+      jobs = matched.flatMap((d) => sideOf(d).map((side) => ({ dr: d, side })));
+    }
+    for (const { dr, side } of jobs) {
       // 변수 맵: 도어 자기값(#W/#D/#H, #w/#d/#h) + 몸통(#bodyW/#bodyD/#bodyH) + 몸통 사용자 변수(#body.이름) + 사용자 정의 변수
       const vmap: Record<string, number> = {
         W: dr.w ?? 0, D: dr.d ?? 0, H: dr.h ?? 0, w: dr.w ?? 0, d: dr.d ?? 0, h: dr.h ?? 0,
+        ...builtinVars(dr, { w: dr.w ?? 0, d: dr.d ?? 0, h: dr.h ?? 0, lift: dr.placeHeight ?? 0 }),
         bodyW: bd.w, bodyD: bd.d, bodyH: bd.h,
         ...bodyVars,
       };
+      // 변수 순차 평가 — 고정값/수식은 vmap 등록, 조건식은 배치 판정용으로 수집.
+      // 이름 W/D/H(대소문자)의 '수식' 변수는 내보내기 치수로 사용(구버전 formula 대체).
+      const conds: { name: string; value: string }[] = [];
+      const dimVar: { w?: number | null; d?: number | null; h?: number | null } = {};
       for (const uv of dr.vars ?? []) {
         if (!uv.name?.trim()) continue;
-        const r = uv.value?.trim() ? toNum(evalFormula(uv.value, vmap)) : null;
-        vmap[uv.name.trim()] = r ?? (Number(uv.value) || 0);
+        const name = uv.name.trim();
+        const t = varTypeOf(uv);
+        if (t === '조건식') { if (uv.value?.trim()) conds.push({ name, value: uv.value }); continue; }
+        const ov = varOv[dr.contentCode]?.[name];
+        const r = ov ?? (uv.value?.trim() ? toNum(evalFormula(uv.value, vmap)) : null);
+        const val = r ?? (Number(uv.value) || 0);
+        vmap[name] = val;
+        const low = name.toLowerCase();
+        if (low === 'w' || low === 'd' || low === 'h') {
+          vmap[low] = val; vmap[low.toUpperCase()] = val; // 자기 치수 별칭(#W/#w) 동기화
+          if (t === '수식') dimVar[low as 'w' | 'd' | 'h'] = r;
+        }
       }
-      // 조건식 — TRUE일 때만 배치
-      if (dr.condition?.trim()) {
-        const c = evalFormula(dr.condition, vmap);
-        if (!(c === true || toNum(c) === 1)) { skipped.push(`${dr.name}(조건 미충족)`); continue; }
-      }
-      const fw = dr.formula?.w?.trim() ? toNum(evalFormula(dr.formula.w, vmap)) : null;
-      const fd = dr.formula?.d?.trim() ? toNum(evalFormula(dr.formula.d, vmap)) : null;
-      const fh = dr.formula?.h?.trim() ? toNum(evalFormula(dr.formula.h, vmap)) : null;
-      // 부착 면(side) 결정 — DP 'X' 또는 POS 'X'는 양쪽(L,R)에 다 붙는다.
-      // 그 외엔 POS에 R이 포함되면 우측, 아니면 좌측.
-      const dpos = (dr.pos || '').trim().toUpperCase();
-      const ddp = (dr.dp || '').trim().toUpperCase();
-      const sides = (ddp === 'X' || dpos === 'X' || dpos === '') ? ['L', 'R'] : [dpos.includes('R') ? 'R' : 'L'];
-      for (const side of sides) {
-        placeable.push({
-          code: dr.productCode, name: dr.name, modelUrl: modelUrlOf(dr), color: dr.color,
-          w: fw ?? dr.w ?? 0, d: fd ?? dr.d ?? 0, h: fh ?? dr.h ?? 0,
-          pos: side,
-        });
-      }
+      // 조건식 — 모두 TRUE일 때만 배치 (구버전 condition 필드도 함께 검사)
+      const legacyConds = dr.condition?.trim() ? [{ name: '조건', value: dr.condition }] : [];
+      const failed = [...conds, ...legacyConds].find((c) => {
+        const v = evalFormula(c.value, vmap);
+        return !(v === true || toNum(v) === 1);
+      });
+      if (failed) { skipped.push(`${dr.name}(조건 미충족)`); continue; }
+      // 내보내기 치수 — W/D/H 수식 변수 우선, 없으면 구버전 formula 필드 폴백
+      const fw = dimVar.w ?? (dr.formula?.w?.trim() ? toNum(evalFormula(dr.formula.w, vmap)) : null);
+      const fd = dimVar.d ?? (dr.formula?.d?.trim() ? toNum(evalFormula(dr.formula.d, vmap)) : null);
+      const fh = dimVar.h ?? (dr.formula?.h?.trim() ? toNum(evalFormula(dr.formula.h, vmap)) : null);
+      placeable.push({
+        code: dr.productCode, name: dr.name, modelUrl: modelUrlOf(dr), color: dr.color,
+        w: fw ?? dr.w ?? 0, d: fd ?? dr.d ?? 0, h: fh ?? dr.h ?? 0,
+        pos: side,
+      });
     }
     if (placeable.length === 0) { setAttachMsg(`⚠ DP "${dpLabel}" 도어가 조건을 충족하지 못해 배치 안 됨${skipped.length ? ` (${skipped.join(', ')})` : ''}`); return; }
     iframeRef.current?.contentWindow?.postMessage(
@@ -486,13 +548,11 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
     );
     setAttachMsg(`✓ DP "${dpLabel}" 도어 ${placeable.length}개 배치 — ${placeable.map((d) => `${d.name}(${d.pos || '-'} ${d.w}×${d.h})`).join(', ')}${skipped.length ? ` / 제외 ${skipped.length}` : ''}`);
   };
-  /** 모델 그룹 클릭 → 그룹 멤버로 자동 부착 */
-  const attachDoorsForGroup = (groupId: string, groupName: string) => attachDoorsFromCodes(memberMap[groupId] ?? [], groupName);
-  /** 상품화 폴더 클릭 → 폴더(하위 포함) 상품으로 자동 부착 */
+  /** 모델그룹 폴더 선택 → 폴더(하위 포함) 상품 중 몸통 DP·POS·사이즈에 맞는 도어만 골라 자동 부착 */
   const attachFolderAsProduct = (folderId: string, folderName: string) => {
     const ids = folderSubtree(extFolders, folderId);
     const codes = products.filter((p) => p.folderId && ids.has(p.folderId)).map((p) => p.contentCode);
-    attachDoorsFromCodes(codes, folderName);
+    attachDoorsFromCodes(codes, folderName, { selectBest: true });
   };
 
   // 운영 사이즈를 가진 상품 선택 시 정규화.
@@ -792,6 +852,31 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
                       </div>
                     );
                   })}
+                  {/* 노출 변수 — 상품 편집에서 '노출' 체크한 변수만 표시. 값 조정 시 수식·조건 평가에 우선 적용 */}
+                  {(sel.vars ?? []).filter((v) => v.expose && v.name?.trim()).map((v) => {
+                    const name = v.name.trim();
+                    const t = varTypeOf(v);
+                    const isCond = t === '조건식';
+                    const ov = varOv[sel.contentCode]?.[name];
+                    const hint = `변수 ${name} (${t}) · 등록값: ${v.value || '—'}`;
+                    return (
+                      <div className="bi-field" key={`var-${name}`}>
+                        <label>{name}<span className="bi-range-tag" title={hint}> ⓘ</span></label>
+                        <div className="bi-input" title={hint}>
+                          {isCond ? (
+                            <input type="text" value={v.value} readOnly />
+                          ) : (
+                            <input type="number" value={ov ?? (Number(v.value) || 0)}
+                              onChange={(e) => {
+                                const n = Number(e.target.value);
+                                setVarOv((s) => ({ ...s, [sel.contentCode]: { ...s[sel.contentCode], [name]: Number.isNaN(n) ? 0 : n } }));
+                              }} />
+                          )}
+                          {!isCond && <span className="bi-unit">mm</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
                   <div className="bi-field">
                     <label>스펙파일</label>
                     {(sel.specUrls ?? []).filter((u) => u.url?.trim()).length > 0 ? (
@@ -821,61 +906,68 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
                     </div>
                   </div>
                 </div>
-              ) : (sel.modelingSlots && sel.modelingSlots.length > 0) ? (
-                /* 조립형(수납장·부엌장 등): 구성 그룹을 누르면 우측에 그 그룹 상품 리스트 */
-                <div className="bi-swap">
-                  <div className="bi-swap-title">구성 그룹 <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(DP {sel.dp || '미설정'})</small></div>
-                  {(() => {
-                    // 호스트(선택 상품) 변수맵 — 조건식(#H 등) 평가용
-                    const vmap: Record<string, number> = { W: Number(sel.w) || 0, D: Number(sel.d) || 0, H: Number(sel.h) || 0 };
-                    (sel.vars ?? []).forEach((v) => { const n = v.value?.trim() ? Number(evalFormula(v.value, vmap)) : NaN; if (!Number.isNaN(n)) vmap[v.name] = n; });
-                    const resolveSlot = (s: NonNullable<LibProduct['modelingSlots']>[number]) => {
-                      for (const r of s.rules ?? []) {
-                        if (!r.groupId) continue;
-                        if (!r.condition?.trim()) return { gid: r.groupId, cond: r.condition };
-                        try { const v = evalFormula(r.condition, vmap); if (v === true || (typeof v === 'number' && v !== 0)) return { gid: r.groupId, cond: r.condition }; } catch { /* ignore */ }
-                      }
-                      return { gid: s.groupId, cond: null as string | null };
-                    };
-                    return sel.modelingSlots!.map((s, si) => {
-                      const { gid, cond } = resolveSlot(s);
-                      const g = swapState.groups.find((x) => x.id === gid);
-                      // DP(X/HD)는 몸통에 도어/서랍이 "붙을 때"만 참고 — 몸통·손잡이 그룹은
-                      // 부착 대상이 아니므로 구성 그룹 목록에서 제외한다.
-                      if (g?.kind === '몸통' || g?.kind === '손잡이') return null;
-                      const codes = memberMap[gid] ?? [];
-                      const branched = (s.rules ?? []).length > 0;
-                      return (
-                        <button key={`${s.slot}-${si}`} className="bi-swap-folder"
-                          title="클릭 시 몸통 DP와 같은 도어를 자동 배치"
-                          onClick={() => attachDoorsForGroup(gid, g?.name ?? '그룹')}>
-                          <span className="bi-cgroup-kind">{g?.kind || s.slot}</span>
-                          <span className="bi-swap-fname">{g?.name ?? '미지정 그룹'}{branched && <small style={{ color: 'var(--text-3)', marginLeft: 6 }}>{cond ? `· 조건: ${cond}` : '· 기본'}</small>}</span>
-                          <span className="bi-swap-cnt">{codes.length}</span>
-                        </button>
-                      );
-                    });
-                  })()}
-                  {attachMsg && <p className="hint" style={{ margin: '6px 2px', color: attachMsg.startsWith('✓') ? 'var(--ink)' : '#c0392b' }}>{attachMsg}</p>}
-                  <p className="hint" style={{ margin: '4px 2px' }}>그룹을 누르면 그룹 안에서 몸통 DP와 일치하는 도어를 자동으로 배치합니다.</p>
-                </div>
               ) : (
                 (() => {
-                  const swaps = products.filter((p) =>
-                    p.productGroup === sel.productGroup &&
-                    (p.modelKind || '') === (sel.modelKind || '') &&
-                    p.contentCode !== sel.contentCode);
+                  /* 스타일 설정 — 컨텐츠 그룹 관리의 탭(부위)이 구분 타이틀로 표기되고,
+                     그 아래에 해당 부위의 교체 묶음·폴더 단위 노출 그룹이 나열된다.
+                     그룹이 없는 부위(탭)는 숨김. 구성 슬롯 조건 규칙이 있으면 해석 결과 그룹에 배지 표시. */
+                  const hostDims = effDims(sel);
+                  const vmap: Record<string, number> = {
+                    W: Number(sel.w) || 0, D: Number(sel.d) || 0, H: Number(sel.h) || 0,
+                    ...builtinVars(sel, hostDims),
+                  };
+                  (sel.vars ?? []).forEach((v) => {
+                    if (!v.name?.trim() || varTypeOf(v) === '조건식') return;
+                    const ov = varOv[sel.contentCode]?.[v.name.trim()];
+                    const n = ov ?? (v.value?.trim() ? Number(evalFormula(v.value, vmap)) : NaN);
+                    if (!Number.isNaN(n)) vmap[v.name.trim()] = n;
+                  });
+                  // 구성 슬롯 규칙 해석 — 활성 그룹 id → 적용 조건(없으면 null)
+                  const slotCond = new Map<string, string | null>();
+                  for (const s of sel.modelingSlots ?? []) {
+                    let gid = s.groupId; let cond: string | null = null;
+                    for (const r of s.rules ?? []) {
+                      if (!r.groupId) continue;
+                      if (!r.condition?.trim()) { gid = r.groupId; cond = null; break; }
+                      try { const v = evalFormula(r.condition, vmap); if (v === true || (typeof v === 'number' && v !== 0)) { gid = r.groupId; cond = r.condition; break; } } catch { /* ignore */ }
+                    }
+                    if (gid) slotCond.set(gid, cond);
+                  }
+                  const openGroupFlyout = (gid: string) => { setSwapGroupId(gid); setSwapFolderId(null); setSwapOpen(true); };
+                  const sections = swapState.categories.map((cat) => {
+                    const groups = swapState.groups.filter((g) => g.kind === cat && (memberMap[g.id]?.length ?? 0) > 0);
+                    if (groups.length === 0) return null;
+                    const doorish = cat.includes('도어');
+                    return (
+                      <div className="bi-swap" key={cat}>
+                        <div className="bi-swap-title">{cat}{doorish && <small style={{ fontWeight: 400, color: 'var(--text-3)' }}> (DP {sel.dp || '미설정'})</small>}</div>
+                        {groups.map((g) => {
+                          const codes = memberMap[g.id] ?? [];
+                          const active = slotCond.has(g.id);
+                          const cond = slotCond.get(g.id);
+                          return (
+                            <button key={g.id} className="bi-swap-folder"
+                              title="클릭 시 왼쪽에 이 그룹의 상품 리스트가 열립니다"
+                              onClick={() => openGroupFlyout(g.id)}>
+                              <span className="bi-cgroup-kind">{g.type === 'grouping' ? '폴더 노출' : '교체 묶음'}</span>
+                              <span className="bi-swap-fname">{g.name}
+                                {active && <small style={{ color: 'var(--text-3)', marginLeft: 6 }}>{cond ? `· 조건: ${cond}` : '· 구성 슬롯'}</small>}
+                              </span>
+                              <span className="bi-swap-cnt">{codes.length}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  }).filter(Boolean);
                   return (
-                    <div className="bi-swap">
-                      <div className="bi-swap-title">상품교체</div>
-                      <button className="bi-swap-folder" onClick={() => { setSwapGroupId(null); setSwapOpen((v) => !v); }}>
-                        <span className={`tree-caret${swapOpen ? ' open' : ''}`}>›</span>
-                        <span className="bi-swap-fico">📁</span>
-                        <span className="bi-swap-fname">{sel.modelKind || sel.productGroup} 교체</span>
-                        <span className="bi-swap-cnt">{swaps.length + 1}</span>
-                      </button>
-                      <p className="hint" style={{ margin: '4px 2px' }}>폴더를 누르면 왼쪽에 교체 상품 목록이 열립니다.</p>
-                    </div>
+                    <>
+                      {sections}
+                      {sections.length === 0 && (
+                        <p className="hint" style={{ margin: '4px 2px' }}>등록된 부위 그룹이 없습니다 — 컨텐츠 그룹 관리에서 교체 묶음 또는 폴더 단위 노출을 구성하세요.</p>
+                      )}
+                      {attachMsg && <p className="hint" style={{ margin: '6px 2px', color: attachMsg.startsWith('✓') ? 'var(--ink)' : '#c0392b' }}>{attachMsg}</p>}
+                    </>
                   );
                 })()
               )}
@@ -898,7 +990,21 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
           const inGroup = swapGroupId
             ? (swapFolderId ? products.filter((p) => p.folderId === swapFolderId) : [])
             : products.filter((p) => p.productGroup === sel.productGroup);
-          const groupName = swapGroupId ? (swapState.groups.find((g) => g.id === swapGroupId)?.name ?? '교체 상품') : '교체 상품';
+          const swapGroup = swapGroupId ? swapState.groups.find((g) => g.id === swapGroupId) : undefined;
+          const groupName = swapGroup?.name ?? '교체 상품';
+          // 폴더 단위 노출 그룹 — 폴더(모델그룹)를 진입하지 않고 상품처럼 선택.
+          // 선택 시 폴더 안 상품들 중 몸통 DP·POS·사이즈에 맞는 도어를 자동 부착한다.
+          const folderUnit = swapGroup?.type === 'grouping';
+          // 그룹에 직접 추가된 상품(폴더 없이 items로 담긴 것) — 폴더 목록 모드에서 함께 표시
+          const directProducts = showFolderList
+            ? ((swapState.items?.[swapGroupId!] ?? []).map((c) => products.find((p) => p.contentCode === c)).filter(Boolean) as LibProduct[])
+            : [];
+          // 리스트에서 상품 선택 — 도어(DP 보유 부속)는 몸통에 부착, 그 외는 배치 상품 교체
+          const pickFromFlyout = (p: LibProduct) => {
+            const isDoorPart = !!(p.dp || '').trim() && (p.productKind || '').includes('도어');
+            if (isDoorPart) attachDoorsFromCodes([p.contentCode], p.name);
+            else swapProduct(p);
+          };
           const drillName = swapFolderId ? (folders.find((f) => f.id === swapFolderId)?.name ?? '') : '';
           const flyoutTitle = swapFolderId ? `${groupName} › ${drillName}` : groupName;
           const q = swapQuery.trim().toLowerCase();
@@ -965,17 +1071,29 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
                       const cnt = folderSubtree(folders, f.id);
                       const n = products.filter((p) => p.folderId && cnt.has(p.folderId)).length;
                       return (
-                        <button key={f.id} className="bi-swap-item folder" onClick={() => setSwapFolderId(f.id)}>
+                        <button key={f.id} className="bi-swap-item folder"
+                          title={folderUnit ? '선택 시 폴더 안에서 몸통 DP·POS·사이즈에 맞는 도어를 자동 배치' : '폴더 열기'}
+                          onClick={() => (folderUnit ? attachFolderAsProduct(f.id, f.name) : setSwapFolderId(f.id))}>
                           <span className="bi-swap-thumb">{rep ? <img src={rep} alt="" /> : <img src="/folder.png" alt="" />}</span>
                           <span className="bi-swap-info">
                             <span className="bi-swap-n">{f.name}</span>
-                            <span className="bi-swap-c">상품 {n}개</span>
+                            <span className="bi-swap-c">{folderUnit ? `모델그룹 · ${n}개 (자동 매칭)` : `상품 ${n}개`}</span>
                           </span>
-                          <span className="tree-caret">›</span>
+                          {!folderUnit && <span className="tree-caret">›</span>}
                         </button>
                       );
                     })}
-                    {groupFolders.length === 0 && <p className="empty-block">이 그룹에 연결된 폴더가 없습니다.<br />그룹 관리에서 폴더를 연결하세요.</p>}
+                    {/* 그룹에 직접 추가된 상품 — 폴더와 같은 레벨에 표시. 도어는 클릭 시 몸통에 부착 */}
+                    {directProducts.map((p) => (
+                      <button key={p.contentCode} className={`bi-swap-item${p.contentCode === sel.contentCode ? ' active' : ''}`} onClick={() => pickFromFlyout(p)}>
+                        <span className="bi-swap-thumb">{p.thumbUrl ? <img src={p.thumbUrl} alt="" /> : (p.productKind || '·')}</span>
+                        <span className="bi-swap-info">
+                          <span className="bi-swap-n">{p.name}</span>
+                          <span className="bi-swap-c">{p.productCode} · {p.modelKind || '-'}</span>
+                        </span>
+                      </button>
+                    ))}
+                    {groupFolders.length === 0 && directProducts.length === 0 && <p className="empty-block">이 그룹에 연결된 폴더·상품이 없습니다.<br />컨텐츠 그룹 관리에서 담아주세요.</p>}
                   </>
                 ) : (
                   <>
@@ -991,7 +1109,7 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
                       );
                     })}
                     {list.map((p) => (
-                      <button key={p.contentCode} className={`bi-swap-item${p.contentCode === sel.contentCode ? ' active' : ''}`} onClick={() => swapProduct(p)}>
+                      <button key={p.contentCode} className={`bi-swap-item${p.contentCode === sel.contentCode ? ' active' : ''}`} onClick={() => pickFromFlyout(p)}>
                         <span className="bi-swap-thumb">{p.thumbUrl ? <img src={p.thumbUrl} alt="" /> : (p.productKind || '·')}</span>
                         <span className="bi-swap-info">
                           <span className="bi-swap-n">{p.name}</span>

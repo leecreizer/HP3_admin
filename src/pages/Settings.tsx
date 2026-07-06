@@ -15,6 +15,8 @@ type SettingsProps = {
 
 export function Settings({ config, onChange, dirty, onSave }: SettingsProps) {
   const [newMenuName, setNewMenuName] = useState('');
+  /** 좌측 메뉴 관리에서 선택된 메뉴 — 우측 패널이 이 메뉴의 하위메뉴 설정으로 전환 */
+  const [selMenu, setSelMenu] = useState<MenuKey>(config.mainMenu[0]?.key ?? 'users');
 
   const addMenu = () => {
     const label = newMenuName.trim();
@@ -82,18 +84,22 @@ export function Settings({ config, onChange, dirty, onSave }: SettingsProps) {
     onChange({ ...config, mainMenu: next });
   };
 
-  /* ---- 상품관리 하위메뉴 (이름변경·표시·순서) ---- */
+  /* ---- 메뉴별 하위메뉴 (이름변경·표시·순서) — 좌측에서 메뉴 선택 → 우측에서 편집 ---- */
+  const subList = config.subMenus[selMenu] ?? [];
+  const selMenuLabel = config.mainMenu.find((m) => m.key === selMenu)?.label ?? selMenu;
+  const patchSubs = (next: typeof subList) =>
+    onChange({ ...config, subMenus: { ...config.subMenus, [selMenu]: next } });
   const setSubLabel = (key: string, label: string) =>
-    onChange({ ...config, productSubMenus: config.productSubMenus.map((s) => (s.key === key ? { ...s, label } : s)) });
+    patchSubs(subList.map((s) => (s.key === key ? { ...s, label } : s)));
   const setSubVisible = (key: string, visible: boolean) =>
-    onChange({ ...config, productSubMenus: config.productSubMenus.map((s) => (s.key === key ? { ...s, visible } : s)) });
+    patchSubs(subList.map((s) => (s.key === key ? { ...s, visible } : s)));
   const moveSub = (key: string, dir: -1 | 1) => {
-    const idx = config.productSubMenus.findIndex((s) => s.key === key);
+    const idx = subList.findIndex((s) => s.key === key);
     const to = idx + dir;
-    if (to < 0 || to >= config.productSubMenus.length) return;
-    const next = [...config.productSubMenus];
+    if (to < 0 || to >= subList.length) return;
+    const next = [...subList];
     [next[idx], next[to]] = [next[to], next[idx]];
-    onChange({ ...config, productSubMenus: next });
+    patchSubs(next);
   };
 
   return (
@@ -113,7 +119,7 @@ export function Settings({ config, onChange, dirty, onSave }: SettingsProps) {
         <section className="panel">
           <div className="panel-head">
             <h2>좌측 메뉴 관리</h2>
-            <span className="sel-info" style={{ marginLeft: 12 }}>순서 · 이름 · 표시 여부</span>
+            <span className="sel-info" style={{ marginLeft: 12 }}>순서 · 이름 · 표시 — 행을 선택하면 우측에서 하위메뉴 설정</span>
           </div>
           <table>
             <thead>
@@ -126,7 +132,12 @@ export function Settings({ config, onChange, dirty, onSave }: SettingsProps) {
             </thead>
             <tbody>
               {config.mainMenu.map((m, i) => (
-                <tr key={m.key}>
+                <tr
+                  key={m.key}
+                  onClick={() => setSelMenu(m.key)}
+                  style={selMenu === m.key ? { background: 'rgba(30, 42, 58, 0.07)', cursor: 'pointer' } : { cursor: 'pointer' }}
+                  aria-selected={selMenu === m.key}
+                >
                   <td>
                     <span className="order-btns">
                       <button
@@ -196,51 +207,57 @@ export function Settings({ config, onChange, dirty, onSave }: SettingsProps) {
           </p>
         </section>
 
-        {/* ---- 상품관리 하위메뉴 관리 ---- */}
+        {/* ---- 하위메뉴 관리 — 좌측에서 선택한 메뉴의 하위메뉴 ---- */}
         <section className="panel">
           <div className="panel-head">
-            <h2>상품관리 하위메뉴</h2>
+            <h2>하위메뉴 관리 — {selMenuLabel}</h2>
             <span className="sel-info" style={{ marginLeft: 12 }}>순서 · 이름 · 표시 여부</span>
           </div>
-          <table>
-            <thead>
-              <tr>
-                <th style={{ width: 70 }}>순서</th>
-                <th>메뉴 이름</th>
-                <th style={{ width: 70 }}>표시</th>
-              </tr>
-            </thead>
-            <tbody>
-              {config.productSubMenus.map((s, i) => (
-                <tr key={s.key}>
-                  <td>
-                    <span className="order-btns">
-                      <button className="order-btn" aria-label={`${s.label} 위로`} disabled={i === 0} onClick={() => moveSub(s.key, -1)}>▲</button>
-                      <button className="order-btn" aria-label={`${s.label} 아래로`} disabled={i === config.productSubMenus.length - 1} onClick={() => moveSub(s.key, 1)}>▼</button>
-                    </span>
-                  </td>
-                  <td>
-                    <input
-                      className="inline-input"
-                      value={s.label}
-                      aria-label={`${s.key} 하위메뉴 이름`}
-                      onChange={(e) => setSubLabel(s.key, e.target.value)}
-                    />
-                  </td>
-                  <td>
-                    <button
-                      className={`switch${s.visible ? ' on' : ''}`}
-                      role="switch"
-                      aria-checked={s.visible}
-                      aria-label={`${s.label} 표시 여부`}
-                      onClick={() => setSubVisible(s.key, !s.visible)}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <p className="hint">상품 관리 메뉴 아래에 펼쳐지는 하위메뉴입니다. 각 항목은 정해진 관리 화면에 연결되어 있어 이름·표시·순서만 조정됩니다.</p>
+          {subList.length === 0 ? (
+            <p className="hint">이 메뉴에는 하위메뉴가 없습니다. 좌측에서 사용자 관리·컨텐츠 관리·도면 관리를 선택하면 하위메뉴를 설정할 수 있습니다.</p>
+          ) : (
+            <>
+              <table>
+                <thead>
+                  <tr>
+                    <th style={{ width: 70 }}>순서</th>
+                    <th>메뉴 이름</th>
+                    <th style={{ width: 70 }}>표시</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {subList.map((s, i) => (
+                    <tr key={s.key}>
+                      <td>
+                        <span className="order-btns">
+                          <button className="order-btn" aria-label={`${s.label} 위로`} disabled={i === 0} onClick={() => moveSub(s.key, -1)}>▲</button>
+                          <button className="order-btn" aria-label={`${s.label} 아래로`} disabled={i === subList.length - 1} onClick={() => moveSub(s.key, 1)}>▼</button>
+                        </span>
+                      </td>
+                      <td>
+                        <input
+                          className="inline-input"
+                          value={s.label}
+                          aria-label={`${s.key} 하위메뉴 이름`}
+                          onChange={(e) => setSubLabel(s.key, e.target.value)}
+                        />
+                      </td>
+                      <td>
+                        <button
+                          className={`switch${s.visible ? ' on' : ''}`}
+                          role="switch"
+                          aria-checked={s.visible}
+                          aria-label={`${s.label} 표시 여부`}
+                          onClick={() => setSubVisible(s.key, !s.visible)}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="hint">'{selMenuLabel}' 메뉴 아래에 펼쳐지는 하위메뉴입니다. 각 항목은 정해진 화면에 연결되어 있어 이름·표시·순서만 조정됩니다.</p>
+            </>
+          )}
         </section>
 
         {/* ---- 상부 메뉴 관리 ---- */}

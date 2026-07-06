@@ -424,6 +424,35 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 
 /* ---------- Main ---------- */
 .main { padding: 22px 28px 40px 24px; }
+
+/* ---------- ⍰ 도움말 아이콘 + 클릭 팝오버 (필드 사용법 안내) ---------- */
+.help-tip-wrap { position: relative; display: inline-flex; margin-left: 5px; vertical-align: middle; }
+.help-tip {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 1.2px solid var(--text-3); color: var(--text-3); background: none;
+  font-size: 9.5px; font-weight: 700; line-height: 1; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; padding: 0;
+}
+.help-tip:hover, .help-tip[aria-expanded="true"] { border-color: var(--ink); color: var(--ink); background: rgba(30, 42, 58, 0.06); }
+.help-pop-var {
+  display: block; margin-bottom: 6px; padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+}
+.help-pop-var code {
+  font-family: var(--num, monospace); font-size: 0.78rem; font-weight: 700;
+  color: #7dd3fc; background: rgba(125, 211, 252, 0.12);
+  border-radius: 4px; padding: 1px 6px;
+}
+.help-pop-var em { color: #cbd5e1; font-style: normal; font-size: 0.7rem; }
+.help-pop-var small { color: #aeb8c8; font-size: 0.68rem; margin-left: 4px; }
+.help-pop {
+  position: absolute; left: 0; top: 20px; z-index: 80; width: 260px;
+  background: #2b3440; color: #f2f5f8;
+  font-size: 0.73rem; font-weight: 400; line-height: 1.55; letter-spacing: 0;
+  padding: 9px 12px; border-radius: 9px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  white-space: normal; text-align: left; text-transform: none;
+}
 .page-head { display: flex; align-items: flex-end; gap: 14px; margin-bottom: 22px; padding: 0 4px; }
 .page-head h1 { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
 .page-head .date { font-family: var(--num); font-size: 0.8rem; color: var(--text-2); padding-bottom: 4px; }

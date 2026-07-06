@@ -36,33 +36,8 @@ const SYSTEM_MENU: { key: MenuKey; label: string }[] = [
   { key: 'settings', label: '설정' },
 ];
 
-/** 사용자 관리 하위 메뉴 (고정) — 부모 '사용자 관리'는 빈 그룹, 실제 화면은 하위에서 */
-const USER_SUBMENUS: { key: MenuKey; label: string }[] = [
-  { key: 'users/operators', label: '어드민 사용자 관리' },
-  { key: 'content-users', label: '홈플래너 사용자 관리' },
-  { key: 'brands', label: '브랜드 관리' },
-  { key: 'users/roles', label: '어드민 권한 관리' },
-];
-
-/** 컨텐츠 관리 하위 메뉴 — 상품 관리와 관리 메뉴들(상품 하위)을 같은 레벨로 나열 */
-const CONTENT_SUBMENUS: { key: MenuKey; label: string }[] = [
-  { key: 'products', label: '상품 관리' },
-];
-
-/** 도면 관리 하위 메뉴 — 사용자 도면 / APT 도면 */
-const DRAWING_SUBMENUS: { key: MenuKey; label: string }[] = [
-  { key: 'floorplans', label: '사용자 도면 관리' },
-  { key: 'drawings/apt', label: 'APT 도면 관리' },
-];
-
 /** 'products/groups' → 'products' */
 const baseKey = (k: MenuKey) => k.split('/')[0];
-/** 부모 메뉴가 포함하는 하위 base 키들(펼침·활성 판정용) */
-const childBases = (key: MenuKey): string[] =>
-  key === 'users' ? ['users', 'content-users', 'brands']
-  : key === 'content' ? ['content', 'products']
-  : key === 'drawings' ? ['drawings', 'floorplans']
-  : [key];
 
 type SidebarProps = {
   active: MenuKey;
@@ -154,13 +129,11 @@ export function Sidebar({ active, collapsed, config, allowedMenus, onSelect, onT
         </div>
 
         {visibleMenu.map((item) => {
-          const subs =
-            item.key === 'users' ? USER_SUBMENUS
-            // 컨텐츠 관리 = 상품 관리 + 관리 메뉴들(상품 하위)을 같은 레벨로 나열
-            : item.key === 'content' ? [...CONTENT_SUBMENUS, ...config.productSubMenus.filter((s) => s.visible)]
-            : item.key === 'drawings' ? DRAWING_SUBMENUS
-            : undefined;
-          const baseActive = childBases(item.key).includes(baseKey(active));
+          // 메뉴별 하위메뉴 — 설정(좌측 메뉴 선택 → 하위메뉴 관리)에서 이름·표시·순서 구성
+          const subs = (config.subMenus[item.key] ?? []).filter((s) => s.visible);
+          // 부모 활성/펼침 판정 — 하위메뉴들의 base 키 포함 여부
+          const bases = [item.key, ...(config.subMenus[item.key] ?? []).map((s) => baseKey(s.key))];
+          const baseActive = bases.includes(baseKey(active));
           return (
             <div key={item.key} className="rail-group">
               <RailButton

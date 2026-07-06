@@ -137,6 +137,14 @@ export function expandMembers(state: SwapState, allFolders: PartFolder[], produc
     const direct = state.items?.[g.id] ?? [];
     out[g.id] = [...new Set([...fromFolders, ...direct])];
   }
+  // 그룹핑(폴더 단위 노출) 그룹 — groupRefs로 다시 묶은 일반 그룹들의 멤버를 합산
+  for (const g of state.groups) {
+    const refs = state.groupRefs?.[g.id] ?? [];
+    if (refs.length === 0) continue;
+    const merged = new Set(out[g.id] ?? []);
+    for (const rid of refs) for (const c of out[rid] ?? []) merged.add(c);
+    out[g.id] = [...merged];
+  }
   return out;
 }
 
