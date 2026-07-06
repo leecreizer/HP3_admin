@@ -7,7 +7,7 @@ import { AssetViewer } from '../components/AssetViewer';
 import { useConfirm } from '../components/confirm';
 import type { Group } from '../data/org';
 import { loadSwapState, expandMembers } from '../data/groups';
-import { putAsset, getAssets } from '../data/assetStore';
+import { putAsset, getAsset, getAssets } from '../data/assetStore';
 import { convertFbxToGlb, glbToDataUrl } from '../data/fbxConvert';
 
 /** kind: 'external'=설계 메뉴 노출 폴더 / 'internal'=숨김(부위 상품 보관, 그룹으로만 노출) */
@@ -74,57 +74,72 @@ const FORMULA_FNS: Record<string, (...a: number[]) => number> = {
   sqrt: Math.sqrt, abs: Math.abs, round: Math.round, floor: Math.floor, ceil: Math.ceil,
   min: (...a) => Math.min(...a), max: (...a) => Math.max(...a), pow: (a, b) => Math.pow(a, b),
 };
-export function evalFormula(expr: string, vars: Record<string, number>): number | boolean | null {
+/** 수식 값 — 숫자·불리언·문자(필드값 비교용) */
+type FormulaVal = number | boolean | string;
+export function evalFormula(expr: string, vars: Record<string, number | string>): number | boolean | string | null {
   if (!expr || !expr.trim()) return null;
-  // 변수명: 영문/한글 시작, 점(.) 경로 허용 — 예) #body.LDH (몸통 사용자 변수 참조)
-  const tokens = expr.match(/>=|<=|==|!=|&&|\|\||[<>+\-*/(),!]|#?[A-Za-z_가-힣][\w가-힣]*(?:\.[A-Za-z_가-힣][\w가-힣]*)*|\d*\.?\d+/g);
+  // 변수명: 영문/한글 시작, 점(.) 경로 허용 — 예) #body.LDH. 문자 리터럴: '값' 또는 "값"
+  const tokens = expr.match(/'[^']*'|"[^"]*"|>=|<=|==|!=|&&|\|\||[<>+\-*/(),!]|#?[A-Za-z_가-힣][\w가-힣]*(?:\.[A-Za-z_가-힣][\w가-힣]*)*|\d*\.?\d+/g);
   if (!tokens) return null;
   let i = 0; let bad = false;
   const peek = () => tokens[i];
   const eat = () => tokens[i++];
   const kw = (t: string | undefined, w: string) => !!t && t.toLowerCase() === w;
-  const num = (v: number | boolean): number => (typeof v === 'boolean' ? (v ? 1 : 0) : v);
+  const num = (v: FormulaVal): number => {
+    if (typeof v === 'boolean') return v ? 1 : 0;
+    if (typeof v === 'string') { const n = Number(v); if (Number.isNaN(n)) { bad = true; return 0; } return n; }
+    return v;
+  };
 
-  const parseOr = (): number | boolean => {
+  const parseOr = (): FormulaVal => {
     let v = parseAnd();
     while (kw(peek(), 'or') || peek() === '||') { eat(); const r = parseAnd(); v = (!!num(v) || !!num(r)); }
     return v;
   };
-  const parseAnd = (): number | boolean => {
+  const parseAnd = (): FormulaVal => {
     let v = parseCmp();
     while (kw(peek(), 'and') || peek() === '&&') { eat(); const r = parseCmp(); v = (!!num(v) && !!num(r)); }
     return v;
   };
-  const parseCmp = (): number | boolean => {
-    let v: number | boolean = parseAdd();
+  const parseCmp = (): FormulaVal => {
+    let v: FormulaVal = parseAdd();
     while (['>=', '<=', '>', '<', '==', '!='].includes(peek() ?? '')) {
-      const op = eat(); const r = num(parseAdd()); const l = num(v);
+      const op = eat(); const rv = parseAdd();
+      // ==/!= 는 한쪽이라도 문자면 문자 비교(필드값 매칭: #productKind == '여닫이도어')
+      if ((op === '==' || op === '!=') && (typeof v === 'string' || typeof rv === 'string')) {
+        const eq = String(v) === String(rv);
+        v = op === '==' ? eq : !eq;
+        continue;
+      }
+      const r = num(rv); const l = num(v);
       v = op === '>=' ? l >= r : op === '<=' ? l <= r : op === '>' ? l > r : op === '<' ? l < r : op === '==' ? l === r : l !== r;
     }
     return v;
   };
-  const parseAdd = (): number => {
+  const parseAdd = (): FormulaVal => {
     let v = parseMul();
-    while (peek() === '+' || peek() === '-') { const op = eat(); const r = parseMul(); v = op === '+' ? v + r : v - r; }
+    while (peek() === '+' || peek() === '-') { const op = eat(); const r = num(parseMul()); v = op === '+' ? num(v) + r : num(v) - r; }
     return v;
   };
-  const parseMul = (): number => {
+  const parseMul = (): FormulaVal => {
     let v = parseUnary();
-    while (peek() === '*' || peek() === '/') { const op = eat(); const r = parseUnary(); v = op === '*' ? v * r : v / r; }
+    while (peek() === '*' || peek() === '/') { const op = eat(); const r = num(parseUnary()); v = op === '*' ? num(v) * r : num(v) / r; }
     return v;
   };
-  const parseUnary = (): number => {
+  const parseUnary = (): FormulaVal => {
     const t = peek();
-    if (t === '-') { eat(); return -parseUnary(); }
-    if (t === '+') { eat(); return parseUnary(); }
+    if (t === '-') { eat(); return -num(parseUnary()); }
+    if (t === '+') { eat(); return num(parseUnary()); }
     if (t === '!' || kw(t, 'not')) { eat(); return num(parseUnary()) ? 0 : 1; }
-    return num(parsePrimary());
+    return parsePrimary();
   };
-  const parsePrimary = (): number | boolean => {
+  const parsePrimary = (): FormulaVal => {
     const t = peek();
     if (t === undefined) { bad = true; return 0; }
     if (t === '(') { eat(); const v = parseOr(); if (peek() === ')') eat(); else bad = true; return v; }
     eat();
+    // 문자 리터럴 — '여닫이도어', "SMP10001"
+    if (/^['"]/.test(t)) return t.slice(1, -1);
     if (/^#?[A-Za-z_가-힣]/.test(t)) {
       const name = t.replace(/^#/, '');
       const low = name.toLowerCase();
@@ -145,7 +160,7 @@ export function evalFormula(expr: string, vars: Record<string, number>): number 
   };
   const result = parseOr();
   if (bad || i !== tokens.length) return null;
-  if (typeof result === 'boolean') return result;
+  if (typeof result === 'boolean' || typeof result === 'string') return result;
   return Number.isFinite(result) ? result : null;
 }
 
@@ -450,31 +465,31 @@ export function varTypeOf(v: { value: string; type?: VarType }): VarType {
 }
 
 /** 기본 정보·운영정보 필드 도움말 — ⍰ 클릭 시 자기 변수명(#참조명) 뱃지 + 활용법 안내.
- *  v: 이 필드의 수식 변수명(없으면 수식 변수 아님) / body: 도어(부착 상품)에서 몸통 값 참조명 / d: 설명 */
-type FieldHint = { v?: string; body?: string; d: string };
+ *  v: 이 필드의 수식 변수명 / d: 설명 */
+type FieldHint = { v?: string; d: string };
 const FIELD_HINTS: Record<string, FieldHint> = {
-  name: { d: '설계 화면 라이브러리·견적서에 표기되는 이름 (기준정보와 다르게 설정 가능)' },
-  brand: { d: '브랜드 표기·필터 분류용' },
-  quoteGroup: { d: '견적 계산 로직 연결 키 — 견적그룹 관리에서 정의, 견적보기에 사용' },
-  productGroup: { d: '대분류 — 품목·모델·견적그룹 목록의 기준' },
-  productKind: { d: '품목(형태) — 부위 교체·도어 DP 매칭·수납 폴더 분류의 기준' },
-  modelKind: { d: '시리즈 — 모델 구분 관리에서 등록, 설계 라이브러리 표기' },
-  contentCode: { d: '배치 상품 식별 키코드 — 웹플래너 배치·견적(hp3:scene)·그룹 연결에 사용' },
-  productCode: { d: '견적 가격 조회 키 — 형제 사이즈 변형 교체 시 이 코드로 표기 갱신' },
-  modelCode: { d: '형제 변형 매칭 키 — 같은 모델코드+품목코드 상품끼리 설계에서 W/H 사이즈 단계 교체' },
-  itemCode: { d: '형제 변형 매칭 키(품목) — 모델코드와 쌍으로 사이즈 변형 라인을 구성' },
-  permission: { d: '노출 권한 — 설계 화면에서 이 그룹 소속 사용자에게만 표시 (전체=모두)' },
-  price: { v: '#price', body: '#bodyPrice', d: '가격(원). 수식·조건식에서 사용 (예: #price > 100000)' },
-  attrType: { d: '컨텐츠 성격 — 모델링(배치형/설계형)·텍스쳐·머터리얼. 설계 라이브러리 분류' },
-  nonStandard: { d: '비규격 = 운영 사이즈 MIN~MAX 범위 자유 입력 / 규격 = GAP 단계 선택' },
-  size: { v: '#W #D #H', body: '#bodyW #bodyD #bodyH', d: '자기 치수(mm) — 수식·조건식에서 참조' },
-  w: { v: '#W', body: '#bodyW', d: '자기 폭(mm) (예: #bodyW/2 - 9)' },
-  d: { v: '#D', body: '#bodyD', d: '자기 깊이(mm)' },
-  h: { v: '#H', body: '#bodyH', d: '자기 높이(mm) (예: #bodyH - #body.LDH)' },
-  placement: { d: '설계 배치 기준면 — 바닥/벽/천장. 벽 배치는 배치 높이와 함께 사용' },
-  placeHeight: { v: '#lift', body: '#bodyLift', d: '배치 높이(mm, 바닥에서 띄움)' },
-  opSize: { v: '#minW #maxW #gapW · #minD #maxD #gapD · #minH #maxH #gapH', body: '#bodyMinW …', d: '값을 설정한 축만 참조 가능 (예: #maxH - 50). 규격+GAP>1: 단계 선택 / 비규격: 자유 입력' },
-  vars: { v: '#이름', body: '#body.이름', d: "사용자 변수. 이름 W/D/H '수식' = 내보내기 치수, '조건식' = 모두 TRUE일 때만 배치, 노출☑ = 설계 화면 표시·조정. 내장 변수: #W #D #H #lift #price #minW~#gapH" },
+  name: { v: '#name', d: "설계 화면·견적서 표기 이름. 문자값 — 조건식 비교: #name == '샘플 몸통'" },
+  brand: { v: '#brand', d: "브랜드 표기·필터 분류. 문자값 — 예: #brand == '한샘'" },
+  quoteGroup: { v: '#quoteGroup', d: "견적 계산 로직 연결 키. 문자값 — 예: #quoteGroup == '붙박이장'" },
+  productGroup: { v: '#productGroup', d: "대분류. 문자값 — 예: #productGroup == '수납'" },
+  productKind: { v: '#productKind', d: "품목(형태) — 부위 교체·DP 매칭 기준. 문자값 — 예: #productKind == '여닫이도어'" },
+  modelKind: { v: '#modelKind', d: "시리즈(마감 모델). 문자값 — 예: #modelKind == '매트화이트'" },
+  contentCode: { v: '#contentCode', d: "배치 상품 식별 키코드. 문자값 — 예: #contentCode == 'SMP-BODY-001'" },
+  productCode: { v: '#productCode', d: "견적 가격 조회 키. 문자값 — 예: #productCode == 'SMP10001'" },
+  modelCode: { v: '#modelCode', d: '형제 변형 매칭 키 — 같은 모델코드+품목코드끼리 사이즈 단계 교체. 문자값' },
+  itemCode: { v: '#itemCode', d: '형제 변형 매칭 키(품목). 문자값' },
+  permission: { v: '#permission', d: "노출 권한(그룹 id 또는 '전체'). 문자값" },
+  price: { v: '#price', d: '가격(원). 수식·조건식에서 사용 (예: #price > 100000)' },
+  attrType: { v: '#attrType', d: "컨텐츠 성격. 문자값 — 예: #attrType == '모델링'" },
+  nonStandard: { v: '#nonStandard', d: '규격유무 — 비규격=1, 규격=0 (예: #nonStandard == 1)' },
+  size: { v: '#W #D #H', d: '자기 치수(mm) — 수식·조건식에서 참조' },
+  w: { v: '#W', d: '자기 폭(mm) (예: #W/2 - 9)' },
+  d: { v: '#D', d: '자기 깊이(mm)' },
+  h: { v: '#H', d: '자기 높이(mm) (예: #H - #LDH)' },
+  placement: { v: '#placement', d: "배치 기준면. 문자값 — 예: #placement == '벽'" },
+  placeHeight: { v: '#lift', d: '배치 높이(mm, 바닥에서 띄움)' },
+  opSize: { v: '#minW #maxW #gapW · #minD #maxD #gapD · #minH #maxH #gapH', d: '값을 설정한 축만 참조 가능 (예: #maxH - 50). 규격+GAP>1: 단계 선택 / 비규격: 자유 입력' },
+  vars: { v: '#이름', d: "사용자 변수. 이름 W/D/H '수식' = 내보내기 치수, '조건식' = 모두 TRUE일 때만 배치, 노출☑ = 설계 화면 표시·조정. 내장 변수: #W #D #H #lift #price #minW~#gapH" },
 };
 
 /** ⍰ 도움말 아이콘 — 클릭 시 변수명 뱃지 + 활용법 팝오버 표시 (호버 인지 어려움 보완) */
@@ -496,7 +511,6 @@ export function HelpTip({ text }: { text: FieldHint | string }) {
         <span className="help-pop" role="tooltip">
           <span className="help-pop-var">
             {hint.v ? <code>{hint.v}</code> : <em>수식 변수 아님</em>}
-            {hint.body && <small> · 부착 상품(도어)에서 몸통 값: <code>{hint.body}</code></small>}
           </span>
           {hint.d}
         </span>
@@ -882,10 +896,22 @@ function saveProductsState(s: ProductsSnapshot) {
         if (a.url && a.url.startsWith('data:')) putAsset(a.id, a.url); // IDB 저장(비동기, 대기 불필요)
         return { id: a.id, name: a.name, type: a.type };
       }),
+      // ⭐ 썸네일 data URL 도 IDB 로 오프로드 — localStorage quota 초과로 저장 전체가
+      //   조용히 실패하던 문제(폴더 이동 등 '저장했는데 반영 안 됨')의 주범.
+      thumbUrl:
+        p.thumbUrl && p.thumbUrl.startsWith('data:')
+          ? (putAsset(`thumb:${p.contentCode}`, p.thumbUrl), `idb:thumb:${p.contentCode}`)
+          : p.thumbUrl,
     }));
     localStorage.setItem(PRODUCTS_STORE_KEY, JSON.stringify({ ...s, products, __v: PRODUCTS_STORE_VERSION }));
-  } catch {
-    /* localStorage 용량 초과 등은 무시 (바이너리는 IDB에 있음) */
+  } catch (err) {
+    // 무음 실패 금지 — 사용자에게 즉시 알림 (반영 안 된 채 새로고침하면 데이터 유실 체감)
+    console.error('[Products] 저장 실패', err);
+    window.alert(
+      '⚠ 상품 데이터 저장에 실패했습니다 (브라우저 저장공간 부족 가능).
+' +
+      '설정 > 백업 내보내기로 데이터를 보관한 뒤, 사용하지 않는 상품/이미지를 정리해 주세요.',
+    );
   }
 }
 
@@ -971,6 +997,19 @@ type ProductsProps = {
 
 export function Products({ groups, panel = 'list', onClosePanel, currentUser = '관리자' }: ProductsProps) {
   const saved = useRef(loadProductsState()).current;
+  // 저장 시 IDB 로 오프로드한 썸네일(idb:thumb:*) 복원
+  useEffect(() => {
+    const needs = (saved.products ?? []).filter((p) => p.thumbUrl?.startsWith('idb:thumb:'));
+    if (needs.length === 0) return;
+    void Promise.all(
+      needs.map(async (p) => ({ code: p.contentCode, url: await getAsset(`thumb:${p.contentCode}`) })),
+    ).then((rows) => {
+      const map = new Map(rows.filter((r) => r.url).map((r) => [r.code, r.url!]));
+      if (map.size === 0) return;
+      setProducts((prev) => prev.map((p) => (map.has(p.contentCode) ? { ...p, thumbUrl: map.get(p.contentCode)! } : p)));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [folders, setFolders] = useState<Folder[]>(saved.folders ?? INITIAL_FOLDERS);
   const [products, setProducts] = useState<Product[]>(saved.products ?? INITIAL_PRODUCTS);
   const [activeFolder, setActiveFolder] = useState<string>(saved.activeFolder ?? ROOT_FOLDER_ID);
@@ -2789,14 +2828,14 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
               {form.vars.map((v, i) => (
                 <div key={i} className="opsize-row" style={{ gridTemplateColumns: '1fr 92px 1.6fr 52px 28px' }}>
                   <input type="text" placeholder="이름 (예: LDH, W)" value={v.name}
-                    title={`수식에서 #${v.name.trim() || '이름'} 으로 참조 · 부착 상품(도어)에서는 #body.${v.name.trim() || '이름'}`}
+                    title={`수식에서 #${v.name.trim() || '이름'} 으로 참조`}
                     onChange={(e) => setForm((f) => ({ ...f, vars: f.vars.map((x, j) => j === i ? { ...x, name: e.target.value } : x) }))} />
                   <select value={varTypeOf(v)} aria-label="값 유형"
                     onChange={(e) => setForm((f) => ({ ...f, vars: f.vars.map((x, j) => j === i ? { ...x, type: e.target.value as VarType } : x) }))}>
                     {VAR_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                   </select>
                   <input type="text" value={v.value}
-                    placeholder={varTypeOf(v) === '고정값' ? '숫자 (예: 20)' : varTypeOf(v) === '조건식' ? '예: #body.LDH >= 20' : '식 (예: #bodyH - #body.LDH)'}
+                    placeholder={varTypeOf(v) === '고정값' ? '숫자 (예: 20)' : varTypeOf(v) === '조건식' ? '예: #LDH >= 20' : '식 (예: #H - #LDH)'}
                     onChange={(e) => setForm((f) => ({ ...f, vars: f.vars.map((x, j) => j === i ? { ...x, value: e.target.value } : x) }))} />
                   <label className="visible-toggle" title="설계 화면(모델링 선택 시)에 이 변수 노출" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.72rem' }}>
                     <input type="checkbox" checked={!!v.expose}
@@ -3411,14 +3450,14 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
                   {form.vars.map((v, i) => (
                     <div key={i} className="opsize-row" style={{ gridTemplateColumns: '1fr 92px 1.6fr 52px 28px' }}>
                       <input type="text" placeholder="이름 (예: LDH, W)" value={v.name}
-                    title={`수식에서 #${v.name.trim() || '이름'} 으로 참조 · 부착 상품(도어)에서는 #body.${v.name.trim() || '이름'}`}
+                    title={`수식에서 #${v.name.trim() || '이름'} 으로 참조`}
                         onChange={(e) => setForm((f) => ({ ...f, vars: f.vars.map((x, j) => j === i ? { ...x, name: e.target.value } : x) }))} />
                       <select value={varTypeOf(v)} aria-label="값 유형"
                         onChange={(e) => setForm((f) => ({ ...f, vars: f.vars.map((x, j) => j === i ? { ...x, type: e.target.value as VarType } : x) }))}>
                         {VAR_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                       </select>
                       <input type="text" value={v.value}
-                        placeholder={varTypeOf(v) === '고정값' ? '숫자 (예: 20)' : varTypeOf(v) === '조건식' ? '예: #body.LDH >= 20' : '식 (예: #bodyH - #body.LDH)'}
+                        placeholder={varTypeOf(v) === '고정값' ? '숫자 (예: 20)' : varTypeOf(v) === '조건식' ? '예: #LDH >= 20' : '식 (예: #H - #LDH)'}
                         onChange={(e) => setForm((f) => ({ ...f, vars: f.vars.map((x, j) => j === i ? { ...x, value: e.target.value } : x) }))} />
                       <label className="visible-toggle" title="설계 화면(모델링 선택 시)에 이 변수 노출" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.72rem' }}>
                         <input type="checkbox" checked={!!v.expose}
