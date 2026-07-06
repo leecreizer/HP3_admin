@@ -909,8 +909,7 @@ function saveProductsState(s: ProductsSnapshot) {
     console.error('[Products] 저장 실패', err);
     window.alert(
       '⚠ 상품 데이터 저장에 실패했습니다 (브라우저 저장공간 부족 가능).
-' +
-      '설정 > 백업 내보내기로 데이터를 보관한 뒤, 사용하지 않는 상품/이미지를 정리해 주세요.',
+설정 > 백업 내보내기로 데이터를 보관한 뒤, 사용하지 않는 상품/이미지를 정리해 주세요.',
     );
   }
 }
