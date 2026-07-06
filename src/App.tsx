@@ -107,9 +107,9 @@ export default function App() {
     ?? config.roles.find((r) => r.id === config.currentRoleId);
   const allowedMenus = new Set<MenuKey>(currentRole ? currentRole.menus : config.mainMenu.map((m) => m.key));
   allowedMenus.add('dashboard'); // 홈 대시보드는 항상 접근 가능
-  // 외부 공개 배포(GitHub Pages)에서는 설계 미리보기 비노출 — 웹플래너는 비공개 정책이라
-  // 공개 어드민에서 캔버스 연결이 불가하므로 메뉴 자체를 차단한다.
-  if (window.location.hostname.endsWith('github.io')) allowedMenus.delete('design');
+  // 외부 공개 배포(GitHub Pages) 여부 — 웹플래너 비공개 정책으로 설계 미리보기 '접속'만 차단.
+  // 메뉴는 그대로 노출하고, 진입 시 안내 페이지를 보여준다.
+  const isPublicDeploy = window.location.hostname.endsWith('github.io');
 
   const base = active.split('/')[0];
 
@@ -198,7 +198,20 @@ export default function App() {
       );
       break;
     case 'design':
-      content = <Design users={contentUsers} currentUserId={null} myGroupIds={myGroupIds} isAdmin={isAdminUser} userName={currentUserName} />;
+      content = isPublicDeploy ? (
+        // 외부 공개 환경 — 설계 캔버스(웹플래너) 미제공. 접속만 차단(메뉴는 유지)
+        <main className="main">
+          <div className="page-head"><h1>설계 미리보기</h1></div>
+          <section className="panel">
+            <p className="hint" style={{ margin: 0 }}>
+              외부 공개 환경에서는 설계 미리보기를 사용할 수 없습니다.<br />
+              사내 네트워크 또는 로컬 실행(<b>start-local.bat</b>)에서 이용해 주세요.
+            </p>
+          </section>
+        </main>
+      ) : (
+        <Design users={contentUsers} currentUserId={null} myGroupIds={myGroupIds} isAdmin={isAdminUser} userName={currentUserName} />
+      );
       break;
     case 'settings':
       content = <Settings config={config} onChange={setConfig} dirty={configDirty} onSave={() => saveConfigNow()} />;
