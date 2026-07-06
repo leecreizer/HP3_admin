@@ -52,6 +52,8 @@ type LibProduct = ReturnType<typeof loadProducts>[number] & {
   /** 모델(마감) 표시 컬러 — 웹플래너 박스 렌더 색 */
   color?: string;
   price?: number;
+  quoteGroup?: string;
+  attrType?: string;
   formula?: { w?: string; d?: string; h?: string };
   vars?: { name: string; value: string; type?: VarType; expose?: boolean }[];
   condition?: string;
@@ -287,13 +289,31 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
     };
   };
 
-  /** 상품의 기본 정보를 수식 변수로 펼침 — #lift(배치높이), #price(가격), #minW·#maxW·#gapW…(운영 사이즈).
-   *  prefix를 주면 몸통 참조용 별칭(#bodyLift, #bodyMinW …)으로 등록한다. */
-  const builtinVars = (p: LibProduct, dims: { w: number; d: number; h: number; lift: number }, prefix = ''): Record<string, number> => {
+  /** 상품의 기본 정보·운영정보 전 필드를 수식 변수로 펼침.
+   *  숫자: #lift #price #minW·#maxW·#gapW… / 문자: #name #productCode #productKind #contentCode 등(조건식 == 비교용).
+   *  prefix를 주면 몸통 참조용 별칭(#bodyLift, #bodyProductCode …)으로 등록한다. */
+  const builtinVars = (p: LibProduct, dims: { w: number; d: number; h: number; lift: number }, prefix = ''): Record<string, number | string> => {
     const key = (n: string) => prefix ? `${prefix}${n[0].toUpperCase()}${n.slice(1)}` : n;
-    const out: Record<string, number> = {
+    const out: Record<string, number | string> = {
       [key('lift')]: dims.lift,
       [key('price')]: Number(p.price) || 0,
+      [key('nonStandard')]: p.nonStandard ? 1 : 0,
+      // 문자 필드 — 조건식에서 == '값' 비교 (예: #productKind == '여닫이도어')
+      [key('name')]: p.name ?? '',
+      [key('brand')]: p.brand ?? '',
+      [key('quoteGroup')]: p.quoteGroup ?? '',
+      [key('productGroup')]: p.productGroup ?? '',
+      [key('productKind')]: p.productKind ?? '',
+      [key('modelKind')]: p.modelKind ?? '',
+      [key('contentCode')]: p.contentCode ?? '',
+      [key('productCode')]: p.productCode ?? '',
+      [key('modelCode')]: p.modelCode ?? '',
+      [key('itemCode')]: p.itemCode ?? '',
+      [key('permission')]: p.permission ?? '',
+      [key('placement')]: p.placement ?? '',
+      [key('attrType')]: p.attrType ?? '',
+      [key('dp')]: p.dp ?? '',
+      [key('pos')]: p.pos ?? '',
     };
     const op = p.opSize ?? {};
     for (const k of ['minW', 'maxW', 'gapW', 'minD', 'maxD', 'gapD', 'minH', 'maxH', 'gapH'] as const) {
@@ -410,12 +430,12 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
     });
     if (matched.length === 0) { setAttachMsg(`⚠ "${label}"에 DP "${dpLabel}" 도어가 없습니다.`); return; }
     const bd = effDims(sel);
-    const toNum = (v: number | boolean | null): number | null => (typeof v === 'number' ? v : v === true ? 1 : v === false ? 0 : null);
+    const toNum = (v: number | boolean | string | null): number | null => (typeof v === 'number' ? v : v === true ? 1 : v === false ? 0 : null);
     // 몸통(호스트) 사용자 변수 — 몸통 자신의 치수 컨텍스트(#W/#D/#H=몸통값)로 순차 평가한 뒤
     // 도어 수식에서 #body.변수명 으로 참조할 수 있게 주입한다. (조건식 유형 제외, 노출 변수는 오버라이드 우선)
-    const bodyVars: Record<string, number> = builtinVars(sel, bd, 'body');
+    const bodyVars: Record<string, number | string> = builtinVars(sel, bd, 'body');
     {
-      const bctx: Record<string, number> = { W: bd.w, D: bd.d, H: bd.h, w: bd.w, d: bd.d, h: bd.h, ...builtinVars(sel, bd) };
+      const bctx: Record<string, number | string> = { W: bd.w, D: bd.d, H: bd.h, w: bd.w, d: bd.d, h: bd.h, ...builtinVars(sel, bd) };
       for (const bv of sel.vars ?? []) {
         if (!bv.name?.trim() || varTypeOf(bv) === '조건식') continue;
         const name = bv.name.trim();
@@ -517,7 +537,7 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
     }
     for (const { dr, side } of jobs) {
       // 변수 맵: 도어 자기값(#W/#D/#H, #w/#d/#h) + 몸통(#bodyW/#bodyD/#bodyH) + 몸통 사용자 변수(#body.이름) + 사용자 정의 변수
-      const vmap: Record<string, number> = {
+      const vmap: Record<string, number | string> = {
         W: dr.w ?? 0, D: dr.d ?? 0, H: dr.h ?? 0, w: dr.w ?? 0, d: dr.d ?? 0, h: dr.h ?? 0,
         ...builtinVars(dr, { w: dr.w ?? 0, d: dr.d ?? 0, h: dr.h ?? 0, lift: dr.placeHeight ?? 0 }),
         bodyW: bd.w, bodyD: bd.d, bodyH: bd.h,
@@ -930,7 +950,7 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
                      그 아래에 해당 부위의 교체 묶음·폴더 단위 노출 그룹이 나열된다.
                      그룹이 없는 부위(탭)는 숨김. 구성 슬롯 조건 규칙이 있으면 해석 결과 그룹에 배지 표시. */
                   const hostDims = effDims(sel);
-                  const vmap: Record<string, number> = {
+                  const vmap: Record<string, number | string> = {
                     W: Number(sel.w) || 0, D: Number(sel.d) || 0, H: Number(sel.h) || 0,
                     ...builtinVars(sel, hostDims),
                   };
