@@ -859,8 +859,11 @@ function loadProductsState(): Partial<ProductsSnapshot> {
       // 업로드 이미지(jpeg/png)와 생성 썸네일('hp3gen' 마커)은 유지, 없거나 옛 SVG 라벨이면 기본 회색+아이콘으로 교체
       data.products = data.products.map((p) =>
         (p.thumbUrl && (!p.thumbUrl.startsWith('data:image/svg') || p.thumbUrl.includes('hp3gen'))) ? p : { ...p, thumbUrl: DEFAULT_THUMB });
-      // 수납 직속 상품 → 종류별 최종 폴더 이관 (수납은 분류 폴더)
+      // 수납 직속 상품 → 종류별 최종 폴더 이관 (수납은 분류 폴더).
+      // ⚠ 시드(updatedBy='시스템') 상품만 — 사용자가 이동/수정한 상품의 폴더를
+      //   매 로드마다 되돌리던 문제('저장해도 원복')의 원인이라 제외한다.
       data.products = data.products.map((p) => {
+        if (p.updatedBy !== '시스템') return p;
         const leaf = storageLeafFolder(p);
         return leaf ? { ...p, folderId: leaf } : p;
       });
@@ -1653,7 +1656,9 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
 
   const moveChecked = (folderId: string) => {
     if (!folderId) return;
-    const next = products.map((p) => (checked.has(p.contentCode) ? { ...p, folderId } : p));
+    const today = new Date().toISOString().slice(0, 10);
+    // updatedBy 스탬프 필수 — '시스템' 그대로면 로드 시 시드 동기화가 폴더를 원복시킨다
+    const next = products.map((p) => (checked.has(p.contentCode) ? { ...p, folderId, updatedAt: today, updatedBy: currentUser } : p));
     setProducts(next);
     persistWith({ products: next });
     setChecked(new Set());
