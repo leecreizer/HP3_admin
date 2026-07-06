@@ -244,6 +244,24 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
         const md = d as { code?: string; dpTypes?: string[] };
         if (md.code && Array.isArray(md.dpTypes)) modelDpRef.current[md.code] = md.dpTypes;
       }
+      // 웹플래너 리사이즈 핸들로 치수 변경 — 상품정보 패널 사이즈에 반영 (code=productCode)
+      if (d?.type === 'hp3:product-resized') {
+        const md = d as { code?: string; w?: number; d?: number; h?: number };
+        if (md.code) {
+          const prod = products.find((pp) => pp.productCode === md.code);
+          if (prod) {
+            setDimOverrides((prev) => ({
+              ...prev,
+              [prod.contentCode]: {
+                ...prev[prod.contentCode],
+                ...(typeof md.w === 'number' ? { w: md.w } : {}),
+                ...(typeof md.d === 'number' ? { d: md.d } : {}),
+                ...(typeof md.h === 'number' ? { h: md.h } : {}),
+              },
+            }));
+          }
+        }
+      }
       // webplaner가 모델 hotspot에서 계산한 도어 슬롯 — 부착 개수/크기 결정에 사용
       if (d?.type === 'hp3:model-doorslots') {
         const md = d as { code?: string; doorSlots?: { pos: 'L' | 'R'; w: number; h: number; center: [number, number, number] }[] };
