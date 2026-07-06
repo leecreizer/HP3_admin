@@ -107,6 +107,9 @@ export default function App() {
     ?? config.roles.find((r) => r.id === config.currentRoleId);
   const allowedMenus = new Set<MenuKey>(currentRole ? currentRole.menus : config.mainMenu.map((m) => m.key));
   allowedMenus.add('dashboard'); // 홈 대시보드는 항상 접근 가능
+  // 외부 공개 배포(GitHub Pages)에서는 설계 미리보기 비노출 — 웹플래너는 비공개 정책이라
+  // 공개 어드민에서 캔버스 연결이 불가하므로 메뉴 자체를 차단한다.
+  if (window.location.hostname.endsWith('github.io')) allowedMenus.delete('design');
 
   const base = active.split('/')[0];
 
