@@ -290,35 +290,59 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
   };
 
   /** 상품의 기본 정보·운영정보 전 필드를 수식 변수로 펼침.
-   *  숫자: #lift #price #minW·#maxW·#gapW… / 문자: #name #productCode #productKind #contentCode 등(조건식 == 비교용).
-   *  prefix를 주면 몸통 참조용 별칭(#bodyLift, #bodyProductCode …)으로 등록한다. */
-  const builtinVars = (p: LibProduct, dims: { w: number; d: number; h: number; lift: number }, prefix = ''): Record<string, number | string> => {
-    const key = (n: string) => prefix ? `${prefix}${n[0].toUpperCase()}${n.slice(1)}` : n;
-    const out: Record<string, number | string> = {
-      [key('lift')]: dims.lift,
-      [key('price')]: Number(p.price) || 0,
-      [key('nonStandard')]: p.nonStandard ? 1 : 0,
-      // 문자 필드 — 조건식에서 == '값' 비교 (예: #productKind == '여닫이도어')
-      [key('name')]: p.name ?? '',
-      [key('brand')]: p.brand ?? '',
-      [key('quoteGroup')]: p.quoteGroup ?? '',
-      [key('productGroup')]: p.productGroup ?? '',
-      [key('productKind')]: p.productKind ?? '',
-      [key('modelKind')]: p.modelKind ?? '',
-      [key('contentCode')]: p.contentCode ?? '',
-      [key('productCode')]: p.productCode ?? '',
-      [key('modelCode')]: p.modelCode ?? '',
-      [key('itemCode')]: p.itemCode ?? '',
-      [key('permission')]: p.permission ?? '',
-      [key('placement')]: p.placement ?? '',
-      [key('attrType')]: p.attrType ?? '',
-      [key('dp')]: p.dp ?? '',
-      [key('pos')]: p.pos ?? '',
+   *  자기값: #W #D #H #lift #price #minW… #name #productCode … (접두어 없음)
+   *  scope='up'이면 상위(부모=부착된 몸통/조립체) 참조 별칭으로 등록:
+   *    신규 통일 표기 #up.W #up.lift #up.minW … (+ 레거시 #bodyW #body.* 하위호환) */
+  const builtinVars = (p: LibProduct, dims: { w: number; d: number; h: number; lift: number }, scope: '' | 'up' = ''): Record<string, number | string> => {
+    const out: Record<string, number | string> = {};
+    // 자기값이면 그대로, 상위(up)면 '#up.이름' + 레거시 '#body이름' 두 벌 등록
+    const put = (n: string, v: number | string) => {
+      if (!scope) { out[n] = v; return; }
+      out[`up.${n}`] = v;
+      out[`body${n[0].toUpperCase()}${n.slice(1)}`] = v; // 레거시 하위호환(#bodyW 등)
     };
+    put('lift', dims.lift);
+    put('price', Number(p.price) || 0);
+    put('nonStandard', p.nonStandard ? 1 : 0);
+    // 문자 필드 — 조건식에서 == '값' 비교 (예: #productKind == '여닫이도어')
+    put('name', p.name ?? ''); put('brand', p.brand ?? '');
+    put('quoteGroup', p.quoteGroup ?? ''); put('productGroup', p.productGroup ?? '');
+    put('productKind', p.productKind ?? ''); put('modelKind', p.modelKind ?? '');
+    put('contentCode', p.contentCode ?? ''); put('productCode', p.productCode ?? '');
+    put('modelCode', p.modelCode ?? ''); put('itemCode', p.itemCode ?? '');
+    put('permission', p.permission ?? ''); put('placement', p.placement ?? '');
+    put('attrType', p.attrType ?? ''); put('dp', p.dp ?? ''); put('pos', p.pos ?? '');
     const op = p.opSize ?? {};
     for (const k of ['minW', 'maxW', 'gapW', 'minD', 'maxD', 'gapD', 'minH', 'maxH', 'gapH'] as const) {
       const v = (op as Record<string, number | undefined>)[k];
-      if (v != null) out[key(k)] = v;
+      if (v != null) put(k, v);
+    }
+    return out;
+  };
+
+  /** 하위(자식) 참조 — 상위 상품의 구성 슬롯(부위)별 그룹 멤버를 집계해 #down.{부위}.{속성} 로 노출.
+   *  count(멤버 수) + 대표 상품(기본 부위 상품 또는 첫 상품)의 W/D/H·min/max. */
+  const childVars = (host: LibProduct): Record<string, number | string> => {
+    const out: Record<string, number | string> = {};
+    for (const s of host.modelingSlots ?? []) {
+      const gid = s.groupId;
+      if (!gid) continue;
+      const cat = swapState.groups.find((g) => g.id === gid)?.kind ?? s.slot;
+      if (!cat) continue;
+      const codes = memberMap[gid] ?? [];
+      const prods = codes.map((c) => products.find((p) => p.contentCode === c)).filter(Boolean) as LibProduct[];
+      const rep = prods.find((p) => p.contentCode === s.defaultModelingId) ?? prods[0];
+      out[`down.${cat}.count`] = prods.length;
+      if (rep) {
+        out[`down.${cat}.W`] = rep.w ?? 0;
+        out[`down.${cat}.D`] = rep.d ?? 0;
+        out[`down.${cat}.H`] = rep.h ?? 0;
+        out[`down.${cat}.productCode`] = rep.productCode ?? '';
+        out[`down.${cat}.modelKind`] = rep.modelKind ?? '';
+      }
+      // 그룹 내 치수 범위(배치 판정용)
+      const ws = prods.map((p) => p.w ?? 0).filter((n) => n > 0);
+      if (ws.length) { out[`down.${cat}.minW`] = Math.min(...ws); out[`down.${cat}.maxW`] = Math.max(...ws); }
     }
     return out;
   };
@@ -431,11 +455,11 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
     if (matched.length === 0) { setAttachMsg(`⚠ "${label}"에 DP "${dpLabel}" 도어가 없습니다.`); return; }
     const bd = effDims(sel);
     const toNum = (v: number | boolean | string | null): number | null => (typeof v === 'number' ? v : v === true ? 1 : v === false ? 0 : null);
-    // 몸통(호스트) 사용자 변수 — 몸통 자신의 치수 컨텍스트(#W/#D/#H=몸통값)로 순차 평가한 뒤
-    // 도어 수식에서 #body.변수명 으로 참조할 수 있게 주입한다. (조건식 유형 제외, 노출 변수는 오버라이드 우선)
-    const bodyVars: Record<string, number | string> = builtinVars(sel, bd, 'body');
+    // 상위(부모=몸통) 참조 — 몸통 자신의 치수 컨텍스트(#W/#D/#H=몸통값 + 하위 #down.*)로 순차 평가한 뒤
+    // 부착 상품(도어) 수식에서 #up.변수명(레거시 #body.변수명)으로 참조할 수 있게 주입.
+    const bodyVars: Record<string, number | string> = builtinVars(sel, bd, 'up');
     {
-      const bctx: Record<string, number | string> = { W: bd.w, D: bd.d, H: bd.h, w: bd.w, d: bd.d, h: bd.h, ...builtinVars(sel, bd) };
+      const bctx: Record<string, number | string> = { W: bd.w, D: bd.d, H: bd.h, w: bd.w, d: bd.d, h: bd.h, ...builtinVars(sel, bd), ...childVars(sel) };
       for (const bv of sel.vars ?? []) {
         if (!bv.name?.trim() || varTypeOf(bv) === '조건식') continue;
         const name = bv.name.trim();
@@ -443,7 +467,8 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
         const r = ov ?? (bv.value?.trim() ? toNum(evalFormula(bv.value, bctx)) : null);
         const val = r ?? (Number(bv.value) || 0);
         bctx[name] = val;
-        bodyVars[`body.${name}`] = val;
+        bodyVars[`up.${name}`] = val;    // 신규 통일 표기
+        bodyVars[`body.${name}`] = val;  // 레거시 하위호환
       }
     }
     type DoorVariant = { size: number; code?: string; name: string; masterW?: number; masterH?: number; masterD?: number; modelUrl?: string; color?: string };
@@ -952,7 +977,7 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
                   const hostDims = effDims(sel);
                   const vmap: Record<string, number | string> = {
                     W: Number(sel.w) || 0, D: Number(sel.d) || 0, H: Number(sel.h) || 0,
-                    ...builtinVars(sel, hostDims),
+                    ...builtinVars(sel, hostDims), ...childVars(sel),
                   };
                   (sel.vars ?? []).forEach((v) => {
                     if (!v.name?.trim() || varTypeOf(v) === '조건식') return;

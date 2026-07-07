@@ -78,7 +78,7 @@ const FORMULA_FNS: Record<string, (...a: number[]) => number> = {
 type FormulaVal = number | boolean | string;
 export function evalFormula(expr: string, vars: Record<string, number | string>): number | boolean | string | null {
   if (!expr || !expr.trim()) return null;
-  // 변수명: 영문/한글 시작, 점(.) 경로 허용 — 예) #body.LDH. 문자 리터럴: '값' 또는 "값"
+  // 변수명: 영문/한글 시작, 점(.) 경로 허용 — 예) #up.LDH. 문자 리터럴: '값' 또는 "값"
   const tokens = expr.match(/'[^']*'|"[^"]*"|>=|<=|==|!=|&&|\|\||[<>+\-*/(),!]|#?[A-Za-z_가-힣][\w가-힣]*(?:\.[A-Za-z_가-힣][\w가-힣]*)*|\d*\.?\d+/g);
   if (!tokens) return null;
   let i = 0; let bad = false;
@@ -482,14 +482,14 @@ const FIELD_HINTS: Record<string, FieldHint> = {
   price: { v: '#price', d: '가격(원). 수식·조건식에서 사용 (예: #price > 100000)' },
   attrType: { v: '#attrType', d: "컨텐츠 성격. 문자값 — 예: #attrType == '모델링'" },
   nonStandard: { v: '#nonStandard', d: '규격유무 — 비규격=1, 규격=0 (예: #nonStandard == 1)' },
-  size: { v: '#W #D #H', d: '자기 치수(mm) — 수식·조건식에서 참조' },
-  w: { v: '#W', d: '자기 폭(mm) (예: #W/2 - 9)' },
-  d: { v: '#D', d: '자기 깊이(mm)' },
-  h: { v: '#H', d: '자기 높이(mm) (예: #H - #LDH)' },
+  size: { v: '#W #D #H', d: '자기 치수(mm). 상위 참조 #up.W, 하위 참조 #down.{부위}.W' },
+  w: { v: '#W', d: '자기 폭(mm) (예: #up.W/2 - #up.패널두께). 상위=#up.W' },
+  d: { v: '#D', d: '자기 깊이(mm). 상위=#up.D' },
+  h: { v: '#H', d: '자기 높이(mm) (예: #up.H - #up.LDH). 상위=#up.H' },
   placement: { v: '#placement', d: "배치 기준면. 문자값 — 예: #placement == '벽'" },
-  placeHeight: { v: '#lift', d: '배치 높이(mm, 바닥에서 띄움)' },
+  placeHeight: { v: '#lift', d: '배치 높이(mm, 바닥에서 띄움). 상위=#up.lift' },
   opSize: { v: '#minW #maxW #gapW · #minD #maxD #gapD · #minH #maxH #gapH', d: '값을 설정한 축만 참조 가능 (예: #maxH - 50). 규격+GAP>1: 단계 선택 / 비규격: 자유 입력' },
-  vars: { v: '#이름', d: "사용자 변수. 이름 W/D/H '수식' = 내보내기 치수, '조건식' = 모두 TRUE일 때만 배치, 노출☑ = 설계 화면 표시·조정. 내장 변수: #W #D #H #lift #price #minW~#gapH" },
+  vars: { v: '#이름', d: "사용자 변수. 이름 W/D/H '수식'=내보내기 치수, '조건식'=모두 TRUE일 때만 배치, 노출☑=설계 화면 조정.  ▸참조 3종:  자기 #이름  ·  상위(부착된 몸통) #up.이름 #up.W  ·  하위(구성 부위) #down.{부위}.count #down.{부위}.W" },
 };
 
 /** ⍰ 도움말 아이콘 — 클릭 시 변수명 뱃지 + 활용법 팝오버 표시 (호버 인지 어려움 보완) */
@@ -616,11 +616,11 @@ function generateSeedProducts(): Product[] {
   return out;
 }
 
-/** ── #body.변수명(몸통 사용자 변수 참조) 확인용 샘플 ──
+/** ── 상위(#up.*) 참조 확인용 샘플 ──
  *  몸통 1(변수 LDH=20, 패널두께=18) + 도어 3(L/R 수식 참조, X는 조건 미충족 데모).
- *  설계 미리보기: 수납 폴더에서 "샘플 몸통" 배치 → 스타일 설정 탭 → [샘플 도어(#body 데모)] 클릭.
- *  기대 결과: 도어 W = #bodyW/2 - #body.패널두께 = 582, H = #bodyH - #body.LDH = 1980,
- *            X도어는 조건(#body.LDH >= 999) 미충족으로 제외 토스트에 표기. */
+ *  설계 미리보기: 수납 폴더에서 "샘플 몸통" 배치 → 스타일 설정 탭 → [샘플 도어(#up 데모)] 클릭.
+ *  기대 결과: 도어 W = #up.W/2 - #up.패널두께 = 582, H = #up.H - #up.LDH = 1980,
+ *            X도어는 조건(#up.LDH >= 999) 미충족으로 제외 토스트에 표기. */
 const SAMPLE_COMMON = {
   brand: '한샘', visible: true, permission: '전체', filterValues: [] as string[],
   thumb: '' as const, thumbUrl: DEFAULT_THUMB, updatedAt: '2026-07-03', updatedBy: '시스템',
@@ -628,7 +628,7 @@ const SAMPLE_COMMON = {
 export const SAMPLE_BODYVAR_PRODUCTS: Product[] = [
   {
     ...SAMPLE_COMMON,
-    contentCode: 'SMP-BODY-001', name: '샘플 몸통 — #body 변수 데모',
+    contentCode: 'SMP-BODY-001', name: '샘플 몸통 — 상위참조(#up) 데모',
     productGroup: '수납', quoteGroup: '붙박이장', productCode: 'SMP10001',
     thumbUrl: genThumb('body', '샘플 몸통', '#c9a063'), color: '#c9a063',
     w: 1200, d: 600, h: 2000, dp: 'SMP',
@@ -642,41 +642,41 @@ export const SAMPLE_BODYVAR_PRODUCTS: Product[] = [
   },
   {
     ...SAMPLE_COMMON,
-    contentCode: 'SMP-DOOR-L01', name: '샘플 도어 L — W=#bodyW/2-#body.패널두께',
+    contentCode: 'SMP-DOOR-L01', name: '샘플 도어 L — W=#up.W/2-#up.패널두께',
     productGroup: '도어', quoteGroup: '도어', productCode: 'SMP20001',
     thumbUrl: genThumb('door', '샘플 도어 L'),
     w: 600, d: 20, h: 2000, dp: 'SMP', pos: 'L',
     vars: [
-      { name: 'W', value: '#bodyW/2 - #body.패널두께', type: '수식' },
-      { name: 'H', value: '#bodyH - #body.LDH', type: '수식' },
-      { name: '배치가능', value: '#body.LDH >= 20', type: '조건식' },
+      { name: 'W', value: '#up.W/2 - #up.패널두께', type: '수식' },
+      { name: 'H', value: '#up.H - #up.LDH', type: '수식' },
+      { name: '배치가능', value: '#up.LDH >= 20', type: '조건식' },
     ],
     placement: '벽', placeHeight: 0, attrType: '모델링', modelingType: '배치형',
     productKind: '여닫이도어', modelKind: '', folderId: 'fi-door',
   },
   {
     ...SAMPLE_COMMON,
-    contentCode: 'SMP-DOOR-R01', name: '샘플 도어 R — H=#bodyH-#body.LDH',
+    contentCode: 'SMP-DOOR-R01', name: '샘플 도어 R — H=#up.H-#up.LDH',
     productGroup: '도어', quoteGroup: '도어', productCode: 'SMP20002',
     thumbUrl: genThumb('door', '샘플 도어 R'),
     w: 600, d: 20, h: 2000, dp: 'SMP', pos: 'R',
     vars: [
-      { name: 'W', value: '#bodyW/2 - #body.패널두께', type: '수식' },
-      { name: 'H', value: '#bodyH - #body.LDH', type: '수식' },
-      { name: '배치가능', value: '#body.LDH >= 20', type: '조건식' },
+      { name: 'W', value: '#up.W/2 - #up.패널두께', type: '수식' },
+      { name: 'H', value: '#up.H - #up.LDH', type: '수식' },
+      { name: '배치가능', value: '#up.LDH >= 20', type: '조건식' },
     ],
     placement: '벽', placeHeight: 0, attrType: '모델링', modelingType: '배치형',
     productKind: '여닫이도어', modelKind: '', folderId: 'fi-door',
   },
   {
     ...SAMPLE_COMMON,
-    contentCode: 'SMP-DOOR-X01', name: '샘플 도어 X — 조건 미충족 데모(#body.LDH >= 999)',
+    contentCode: 'SMP-DOOR-X01', name: '샘플 도어 X — 조건 미충족 데모(#up.LDH >= 999)',
     productGroup: '도어', quoteGroup: '도어', productCode: 'SMP20003',
     thumbUrl: genThumb('door', '샘플 도어 X'),
     w: 600, d: 20, h: 2000, dp: 'SMP', pos: 'X',
     vars: [
-      { name: 'H', value: '#bodyH - #body.LDH', type: '수식' },
-      { name: '배치가능', value: '#body.LDH >= 999', type: '조건식' },
+      { name: 'H', value: '#up.H - #up.LDH', type: '수식' },
+      { name: '배치가능', value: '#up.LDH >= 999', type: '조건식' },
     ],
     placement: '벽', placeHeight: 0, attrType: '모델링', modelingType: '배치형',
     productKind: '여닫이도어', modelKind: '', folderId: 'fi-door',
@@ -721,30 +721,30 @@ export const SAMPLE_BODYVAR_PRODUCTS: Product[] = [
   // ── 수납 노출 폴더 도어 샘플 — DP/POS/수식 정보 포함 ──
   {
     ...SAMPLE_COMMON,
-    contentCode: 'SMP-DOOR-N01', name: '샘플 여닫이도어 L — 노출 (DP SMP · H=#bodyH-#body.LDH)',
+    contentCode: 'SMP-DOOR-N01', name: '샘플 여닫이도어 L — 노출 (DP SMP · H=#up.H-#up.LDH)',
     productGroup: '도어', quoteGroup: '도어', productCode: 'SMP50001',
     thumbUrl: genThumb('door', '여닫이도어 L'),
     w: 600, d: 20, h: 2400, dp: 'SMP', pos: 'L', nonStandard: true,
     opSize: { minW: 10, maxW: 600, gapW: 1, minD: 10, maxD: 20, gapD: 1, minH: 10, maxH: 9999, gapH: 1 },
     vars: [
-      { name: 'W', value: '#bodyW/2 - #body.패널두께', type: '수식' },
-      { name: 'H', value: '#bodyH - #body.LDH', type: '수식' },
-      { name: '배치가능', value: '#body.LDH >= 20', type: '조건식' },
+      { name: 'W', value: '#up.W/2 - #up.패널두께', type: '수식' },
+      { name: 'H', value: '#up.H - #up.LDH', type: '수식' },
+      { name: '배치가능', value: '#up.LDH >= 20', type: '조건식' },
     ],
     placement: '벽', placeHeight: 0, attrType: '모델링', modelingType: '배치형',
     productKind: '여닫이도어', modelKind: '', folderId: 'f-storage-door',
   },
   {
     ...SAMPLE_COMMON,
-    contentCode: 'SMP-DOOR-N02', name: '샘플 여닫이도어 R — 노출 (DP SMP · W=#bodyW/2-#body.패널두께)',
+    contentCode: 'SMP-DOOR-N02', name: '샘플 여닫이도어 R — 노출 (DP SMP · W=#up.W/2-#up.패널두께)',
     productGroup: '도어', quoteGroup: '도어', productCode: 'SMP50002',
     thumbUrl: genThumb('door', '여닫이도어 R'),
     w: 600, d: 20, h: 2400, dp: 'SMP', pos: 'R', nonStandard: true,
     opSize: { minW: 10, maxW: 600, gapW: 1, minD: 10, maxD: 20, gapD: 1, minH: 10, maxH: 9999, gapH: 1 },
     vars: [
-      { name: 'W', value: '#bodyW/2 - #body.패널두께', type: '수식' },
-      { name: 'H', value: '#bodyH - #body.LDH', type: '수식' },
-      { name: '배치가능', value: '#body.LDH >= 20', type: '조건식' },
+      { name: 'W', value: '#up.W/2 - #up.패널두께', type: '수식' },
+      { name: 'H', value: '#up.H - #up.LDH', type: '수식' },
+      { name: '배치가능', value: '#up.LDH >= 20', type: '조건식' },
     ],
     placement: '벽', placeHeight: 0, attrType: '모델링', modelingType: '배치형',
     productKind: '여닫이도어', modelKind: '', folderId: 'f-storage-door',
@@ -764,7 +764,7 @@ export const SAMPLE_BODYVAR_PRODUCTS: Product[] = [
     { name: '미드나잇네이비', code: 'MNV', fo: 'fo-black', hex: '#33405c' },
     { name: '매트블랙', code: 'MBK', fo: 'fo-black', hex: '#43474d' },
   ] as const).flatMap((c, ci): Product[] => [
-    // 여닫이도어 L/R — DP 'SMP', #body 수식·조건 포함
+    // 여닫이도어 L/R — DP 'SMP', 상위(#up) 수식·조건 포함
     ...(['L', 'R'] as const).map((pos, pi): Product => ({
       ...SAMPLE_COMMON,
       contentCode: `SMP-DOOR-${c.code}-${pos}`,
@@ -774,9 +774,9 @@ export const SAMPLE_BODYVAR_PRODUCTS: Product[] = [
       w: 600, d: 20, h: 2400, dp: 'SMP', pos, nonStandard: true,
       opSize: { minW: 10, maxW: 600, gapW: 1, minD: 10, maxD: 20, gapD: 1, minH: 10, maxH: 9999, gapH: 1 },
       vars: [
-        { name: 'W', value: '#bodyW/2 - #body.패널두께', type: '수식' },
-        { name: 'H', value: '#bodyH - #body.LDH', type: '수식' },
-        { name: '배치가능', value: '#body.LDH >= 20', type: '조건식' },
+        { name: 'W', value: '#up.W/2 - #up.패널두께', type: '수식' },
+        { name: 'H', value: '#up.H - #up.LDH', type: '수식' },
+        { name: '배치가능', value: '#up.LDH >= 20', type: '조건식' },
       ],
       filterValues: [c.fo],
       placement: '벽', placeHeight: 0, attrType: '모델링', modelingType: '배치형',
@@ -867,7 +867,7 @@ function loadProductsState(): Partial<ProductsSnapshot> {
         const leaf = storageLeafFolder(p);
         return leaf ? { ...p, folderId: leaf } : p;
       });
-      // #body 변수 데모 샘플 — 저장본에 없으면 추가, 사용자가 수정하지 않은 것(updatedBy='시스템')은 최신 시드로 동기화
+      // 상위참조 데모 샘플 — 저장본에 없으면 추가, 사용자가 수정하지 않은 것(updatedBy='시스템')은 최신 시드로 동기화
       for (const sp of SAMPLE_BODYVAR_PRODUCTS) {
         const idx = data.products.findIndex((p) => p.contentCode === sp.contentCode);
         if (idx < 0) data.products.unshift(sp);
