@@ -204,7 +204,11 @@ type Product = {
   /** 사용자 정의 변수 — 수식에서 #name 으로 참조.
    *  type: 고정값(숫자) / 수식(계산식 — 이름이 W·D·H면 내보내기 치수로 사용) / 조건식(모두 TRUE일 때만 자동배치).
    *  type 미지정(구버전)은 값이 숫자면 고정값, 아니면 수식으로 취급. */
-  vars?: { name: string; value: string; type?: VarType; expose?: boolean }[];
+  vars?: { name: string; label?: string; value: string; type?: VarType; expose?: boolean; options?: string; exposeWhen?: string }[];
+  /** 배치가능 조건식 — 상위(#up.*)·하위(#down.*)·자기 변수로 판정. FALSE면 설계 화면에 '설치불가' 사유 표시. */
+  installWhen?: string;
+  /** 설치불가 시 표시 사유(없으면 기본 문구) */
+  installMsg?: string;
   /** (구버전) 조건식 — '조건식' 유형 변수로 대체. 기존 데이터 호환용으로만 유지 */
   condition?: string;
   placement: '바닥' | '벽' | '천장';
@@ -455,13 +459,19 @@ export const DEFAULT_THUMB = `data:image/svg+xml,${encodeURIComponent(
   `</svg>`,
 )}`;
 
-/** 변수 값 유형 — 고정값(숫자) / 수식(계산식) / 조건식(TRUE·FALSE 판정) */
-export type VarType = '고정값' | '수식' | '조건식';
-export const VAR_TYPES: VarType[] = ['고정값', '수식', '조건식'];
+/** 변수 값 유형
+ *  고정값(숫자) / 수식(계산식) / 조건식(TRUE·FALSE) / 선택(옵션 목록에서 하나) */
+export type VarType = '고정값' | '수식' | '조건식' | '선택';
+export const VAR_TYPES: VarType[] = ['고정값', '수식', '조건식', '선택'];
 /** 구버전(type 미지정) 변수의 유형 판별 — 숫자면 고정값, 아니면 수식 */
 export function varTypeOf(v: { value: string; type?: VarType }): VarType {
   if (v.type) return v.type;
   return v.value.trim() !== '' && !Number.isNaN(Number(v.value)) ? '고정값' : '수식';
+}
+/** 선택 유형 옵션 파싱 — 값 칸(또는 options)에 쉼표로 구분해 입력한 문자열 → 배열
+ *  예) 값 칸에 "L, R, 양쪽" → ['L','R','양쪽'] */
+export function varOptions(v: { options?: string; value?: string }): string[] {
+  return (v.options ?? v.value ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 }
 
 /** 기본 정보·운영정보 필드 도움말 — ⍰ 클릭 시 자기 변수명(#참조명) 뱃지 + 활용법 안내.
@@ -489,7 +499,8 @@ const FIELD_HINTS: Record<string, FieldHint> = {
   placement: { v: '#placement', d: "배치 기준면. 문자값 — 예: #placement == '벽'" },
   placeHeight: { v: '#lift', d: '배치 높이(mm, 바닥에서 띄움). 상위=#up.lift' },
   opSize: { v: '#minW #maxW #gapW · #minD #maxD #gapD · #minH #maxH #gapH', d: '값을 설정한 축만 참조 가능 (예: #maxH - 50). 규격+GAP>1: 단계 선택 / 비규격: 자유 입력' },
-  vars: { v: '#이름', d: "사용자 변수. 이름 W/D/H '수식'=내보내기 치수, '조건식'=모두 TRUE일 때만 배치, 노출☑=설계 화면 조정.  ▸참조 3종:  자기 #이름  ·  상위(부착된 몸통) #up.이름 #up.W  ·  하위(구성 부위) #down.{부위}.count #down.{부위}.W" },
+  vars: { v: '#이름', d: "사용자 변수. 유형: 고정값·수식(W/D/H=내보내기 치수)·조건식(TRUE시 배치)·선택(옵션 목록). 노출☑=설계 조정, 노출 조건식으로 조건부 표시.  ▸참조 3종:  자기 #이름  ·  상위 #up.이름 #up.W  ·  하위 #down.{부위}.count #down.{부위}.W" },
+  installWhen: { v: '#up.* #down.* 사용', d: "배치가능 조건식 — TRUE여야 설치. 상위 몸통(#up.W 등)·하위 부위(#down.도어.count)·자기 값·운영사이즈(#minW) 참조. 미충족 시 설계 화면에 '설치불가'+사유 표시" },
 };
 
 /** ⍰ 도움말 아이콘 — 클릭 시 변수명 뱃지 + 활용법 팝오버 표시 (호버 인지 어려움 보완) */
@@ -646,6 +657,8 @@ export const SAMPLE_BODYVAR_PRODUCTS: Product[] = [
     productGroup: '도어', quoteGroup: '도어', productCode: 'SMP20001',
     thumbUrl: genThumb('door', '샘플 도어 L'),
     w: 600, d: 20, h: 2000, dp: 'SMP', pos: 'L',
+    installWhen: '#up.W >= 1000',
+    installMsg: '몸통 폭 1000mm 이상에서만 설치 가능',
     vars: [
       { name: 'W', value: '#up.W/2 - #up.패널두께', type: '수식' },
       { name: 'H', value: '#up.H - #up.LDH', type: '수식' },
@@ -954,8 +967,10 @@ type ProductForm = {
   pos: string;
   nonStandard: boolean;
   formula: { w: string; d: string; h: string };
-  vars: { name: string; value: string; type?: VarType; expose?: boolean }[];
+  vars: { name: string; label?: string; value: string; type?: VarType; expose?: boolean; options?: string; exposeWhen?: string }[];
   condition: string;
+  installWhen: string;
+  installMsg: string;
   placement: '바닥' | '벽' | '천장';
   placeHeight: string;
   modelingType: '배치형' | '설계형';
@@ -979,7 +994,7 @@ const EMPTY_OPSIZE = { minW: '', maxW: '', gapW: '', minD: '', maxD: '', gapD: '
 const EMPTY_PRODUCT_FORM: ProductForm = {
   editNote: '',
   attrType: '모델링', name: '', brand: '한샘', productGroup: '', quoteGroup: '', contentCode: '',
-  productCode: '', modelCode: '', itemCode: '', price: '', modelUrl: '', modelGroupId: '', permission: '전체', w: '', d: '', h: '', opSize: { ...EMPTY_OPSIZE }, dp: '', pos: '', nonStandard: false, formula: { w: '', d: '', h: '' }, vars: [], condition: '', placement: '바닥', placeHeight: '0',
+  productCode: '', modelCode: '', itemCode: '', price: '', modelUrl: '', modelGroupId: '', permission: '전체', w: '', d: '', h: '', opSize: { ...EMPTY_OPSIZE }, dp: '', pos: '', nonStandard: false, formula: { w: '', d: '', h: '' }, vars: [], condition: '', installWhen: '', installMsg: '', placement: '바닥', placeHeight: '0',
   modelingType: '배치형', productKind: '', modelKind: '', folderId: 'f-model', filterValues: [], opValues: {},
   modelingSlots: [], styleIds: [], specUrls: [], mallUrls: [], thumbUrl: undefined, assets: [],
 };
@@ -1778,6 +1793,8 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
         formula: formToFormula(form.formula),
         vars: form.vars.filter((v) => v.name.trim()),
         condition: form.condition.trim() || undefined,
+        installWhen: form.installWhen.trim() || undefined,
+        installMsg: form.installMsg.trim() || undefined,
         placement: form.placement,
         placeHeight: Number(form.placeHeight) || 0,
         attrType: form.attrType,
@@ -1836,6 +1853,8 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
     formula: { w: p.formula?.w ?? '', d: p.formula?.d ?? '', h: p.formula?.h ?? '' },
     vars: p.vars ? p.vars.map((v) => ({ ...v })) : [],
     condition: p.condition ?? '',
+    installWhen: p.installWhen ?? '',
+    installMsg: p.installMsg ?? '',
     w: String(p.w || ''),
     d: String(p.d || ''),
     h: String(p.h || ''),
@@ -2048,6 +2067,8 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
               formula: formToFormula(form.formula),
               vars: form.vars.filter((v) => v.name.trim()),
               condition: form.condition.trim() || undefined,
+              installWhen: form.installWhen.trim() || undefined,
+              installMsg: form.installMsg.trim() || undefined,
               placement: form.placement,
               placeHeight: Number(form.placeHeight) || 0,
               attrType: form.attrType,
@@ -2319,6 +2340,70 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
   };
 
   /** 구성/교체 — 부위 상품 교체 그룹 연결 (조립형 상품의 슬롯 구성) */
+  /** 변수 정의 행 — 이름/유형/값(또는 선택 옵션)/노출/삭제 + 노출 조건식(A: 옵션 노출 제어) */
+  const renderVarRows = () => {
+    const setVar = (i: number, patch: Partial<ProductForm['vars'][number]>) =>
+      setForm((f) => ({ ...f, vars: f.vars.map((x, j) => (j === i ? { ...x, ...patch } : x)) }));
+    return (
+      <div className="form-grid">
+        {form.vars.length === 0 && <p className="hint">필요하면 변수를 추가하세요. 예) 이름 <b>LDH</b>·<b>고정값</b>·<b>20</b> → <b>#LDH</b> · 도어 치수는 <b>W/H</b> 수식 · 옵션은 <b>선택</b> 유형.</p>}
+        {form.vars.map((v, i) => {
+          const t = varTypeOf(v);
+          const valPh = t === '고정값' ? '숫자 (예: 20)' : t === '조건식' ? '예: #up.W >= #minW' : t === '선택' ? '옵션 (쉼표: L,R,양쪽)' : '식 (예: #up.H - #up.LDH)';
+          return (
+            <div key={i}>
+              <div className="opsize-row" style={{ gridTemplateColumns: '1fr 92px 1.6fr 52px 28px' }}>
+                <input type="text" placeholder="이름 (예: LDH, W)" value={v.name}
+                  title={`수식에서 #${v.name.trim() || '이름'} 으로 참조`}
+                  onChange={(e) => setVar(i, { name: e.target.value })} />
+                <select value={t} aria-label="값 유형" onChange={(e) => setVar(i, { type: e.target.value as VarType })}>
+                  {VAR_TYPES.map((x) => <option key={x} value={x}>{x}</option>)}
+                </select>
+                <input type="text" value={v.value} placeholder={valPh}
+                  onChange={(e) => setVar(i, { value: e.target.value })} />
+                <label className="visible-toggle" title="설계 화면에 이 변수 노출" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.72rem' }}>
+                  <input type="checkbox" checked={!!v.expose} onChange={(e) => setVar(i, { expose: e.target.checked })} />노출
+                </label>
+                <button className="order-btn" title="변수 삭제" onClick={() => setForm((f) => ({ ...f, vars: f.vars.filter((_, j) => j !== i) }))}><TrashIcon size={12} /></button>
+              </div>
+              {/* 노출☑일 때: 노출명칭(설계 화면 표시 이름) + 노출 조건식(비우면 항상 노출) */}
+              {v.expose && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '3px 0 6px 4px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-3)' }}>노출명칭</span>
+                  <input type="text" className="inline-input" style={{ width: 140 }} value={v.label ?? ''}
+                    placeholder={`비우면 '${v.name.trim() || '변수명'}'`}
+                    onChange={(e) => setVar(i, { label: e.target.value })} />
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-3)' }}>노출 조건</span>
+                  <input type="text" className="inline-input" style={{ flex: 1, minWidth: 160 }} value={v.exposeWhen ?? ''}
+                    placeholder="비우면 항상 노출 (예: #도어형태 == '슬라이딩')"
+                    onChange={(e) => setVar(i, { exposeWhen: e.target.value })} />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  /** 배치가능 조건 + 설치불가 사유 입력 (B) */
+  const renderInstallCond = () => (
+    <div className="form-grid">
+      <label className="form-field span-2">
+        <span>배치가능 조건식 <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(비우면 항상 배치 가능)</small></span>
+        <input className="inline-input full" type="text" value={form.installWhen}
+          placeholder="예: #up.W >= 600 AND #up.H >= 1200 (상위 몸통이 이 범위여야 설치 가능)"
+          onChange={(e) => setForm((f) => ({ ...f, installWhen: e.target.value }))} />
+      </label>
+      <label className="form-field span-2">
+        <span>설치불가 사유 <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(미충족 시 설계 화면 표시 문구)</small></span>
+        <input className="inline-input full" type="text" value={form.installMsg}
+          placeholder="예: 몸통 폭 600 이상에서만 설치 가능합니다"
+          onChange={(e) => setForm((f) => ({ ...f, installMsg: e.target.value }))} />
+      </label>
+    </div>
+  );
+
   const renderModelingSlots = () => {
     const setSlots = (next: ProductForm['modelingSlots']) => setForm((f) => ({ ...f, modelingSlots: next }));
     const swapMembers = expandMembers(swapState, folders, products as never);
@@ -2820,32 +2905,18 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
             {/* 사용자 정의 변수 — 유형(고정값/수식/조건식) + 설계 노출 여부 */}
             <div className="panel-head" style={{ marginTop: 14 }}>
               <h2 style={{ fontSize: '0.92rem' }}>변수 정의<HelpTip text={FIELD_HINTS.vars} /></h2>
-              <span className="sel-info" style={{ marginLeft: 12 }}>#이름 참조 · 이름 W/D/H '수식' = 내보내기 치수 · '조건식'은 모두 TRUE일 때만 배치 · 노출☑ = 설계 화면에 표시</span>
+              <span className="sel-info" style={{ marginLeft: 12 }}>#이름 참조 · '수식'(W/D/H=내보내기 치수) · '조건식'(모두 TRUE시 배치) · '선택'(옵션 목록) · 노출☑ = 설계 표시</span>
               <button className="btn-mini" style={{ marginLeft: 'auto' }}
                 onClick={() => setForm((f) => ({ ...f, vars: [...f.vars, { name: '', value: '', type: '고정값' as VarType }] }))}>+ 변수</button>
             </div>
-            <div className="form-grid">
-              {form.vars.length === 0 && <p className="hint">필요하면 변수를 추가하세요. 예) 이름 <b>LDH</b>, 유형 <b>고정값</b>, 값 <b>20</b> → 수식에서 <b>#LDH</b> · 도어 치수는 이름 <b>W</b>/<b>H</b>의 수식 변수로.</p>}
-              {form.vars.map((v, i) => (
-                <div key={i} className="opsize-row" style={{ gridTemplateColumns: '1fr 92px 1.6fr 52px 28px' }}>
-                  <input type="text" placeholder="이름 (예: LDH, W)" value={v.name}
-                    title={`수식에서 #${v.name.trim() || '이름'} 으로 참조`}
-                    onChange={(e) => setForm((f) => ({ ...f, vars: f.vars.map((x, j) => j === i ? { ...x, name: e.target.value } : x) }))} />
-                  <select value={varTypeOf(v)} aria-label="값 유형"
-                    onChange={(e) => setForm((f) => ({ ...f, vars: f.vars.map((x, j) => j === i ? { ...x, type: e.target.value as VarType } : x) }))}>
-                    {VAR_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                  <input type="text" value={v.value}
-                    placeholder={varTypeOf(v) === '고정값' ? '숫자 (예: 20)' : varTypeOf(v) === '조건식' ? '예: #LDH >= 20' : '식 (예: #H - #LDH)'}
-                    onChange={(e) => setForm((f) => ({ ...f, vars: f.vars.map((x, j) => j === i ? { ...x, value: e.target.value } : x) }))} />
-                  <label className="visible-toggle" title="설계 화면(모델링 선택 시)에 이 변수 노출" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.72rem' }}>
-                    <input type="checkbox" checked={!!v.expose}
-                      onChange={(e) => setForm((f) => ({ ...f, vars: f.vars.map((x, j) => j === i ? { ...x, expose: e.target.checked } : x) }))} />노출
-                  </label>
-                  <button className="order-btn" title="변수 삭제" onClick={() => setForm((f) => ({ ...f, vars: f.vars.filter((_, j) => j !== i) }))}><TrashIcon size={12} /></button>
-                </div>
-              ))}
+            {renderVarRows()}
+
+            {/* 배치가능 조건 — 상위(#up.*)·하위(#down.*)·자기 변수로 판정. FALSE면 설계 화면에 설치불가 표시 */}
+            <div className="panel-head" style={{ marginTop: 14 }}>
+              <h2 style={{ fontSize: '0.92rem' }}>배치가능 조건<HelpTip text={FIELD_HINTS.installWhen} /></h2>
+              <span className="sel-info" style={{ marginLeft: 12 }}>충족해야 설치 가능 — 미충족 시 설계에 '설치불가' 표시</span>
             </div>
+            {renderInstallCond()}
 
             <div className="panel-head" style={{ marginTop: 18 }}>
               <h2 style={{ fontSize: '0.92rem' }}>운영 항목</h2>
@@ -3442,32 +3513,17 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
 
                 <div className="panel-head" style={{ marginTop: 14 }}>
                   <h2 style={{ fontSize: '0.92rem' }}>변수 정의<HelpTip text={FIELD_HINTS.vars} /></h2>
-                  <span className="sel-info" style={{ marginLeft: 12 }}>#이름 참조 · 이름 W/D/H '수식' = 내보내기 치수 · '조건식'은 모두 TRUE일 때만 배치 · 노출☑ = 설계 화면에 표시</span>
+                  <span className="sel-info" style={{ marginLeft: 12 }}>#이름 참조 · '수식'(W/D/H=내보내기) · '조건식'(TRUE시 배치) · '선택'(옵션) · 노출☑ = 설계 표시</span>
                   <button className="btn-mini" style={{ marginLeft: 'auto' }}
                     onClick={() => setForm((f) => ({ ...f, vars: [...f.vars, { name: '', value: '', type: '고정값' as VarType }] }))}>+ 변수</button>
                 </div>
-                <div className="form-grid">
-                  {form.vars.length === 0 && <p className="hint">필요하면 변수를 추가하세요. 예) 이름 <b>LDH</b>, 유형 <b>고정값</b>, 값 <b>20</b> → 수식에서 <b>#LDH</b> · 도어 치수는 이름 <b>W</b>/<b>H</b>의 수식 변수로.</p>}
-                  {form.vars.map((v, i) => (
-                    <div key={i} className="opsize-row" style={{ gridTemplateColumns: '1fr 92px 1.6fr 52px 28px' }}>
-                      <input type="text" placeholder="이름 (예: LDH, W)" value={v.name}
-                    title={`수식에서 #${v.name.trim() || '이름'} 으로 참조`}
-                        onChange={(e) => setForm((f) => ({ ...f, vars: f.vars.map((x, j) => j === i ? { ...x, name: e.target.value } : x) }))} />
-                      <select value={varTypeOf(v)} aria-label="값 유형"
-                        onChange={(e) => setForm((f) => ({ ...f, vars: f.vars.map((x, j) => j === i ? { ...x, type: e.target.value as VarType } : x) }))}>
-                        {VAR_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                      </select>
-                      <input type="text" value={v.value}
-                        placeholder={varTypeOf(v) === '고정값' ? '숫자 (예: 20)' : varTypeOf(v) === '조건식' ? '예: #LDH >= 20' : '식 (예: #H - #LDH)'}
-                        onChange={(e) => setForm((f) => ({ ...f, vars: f.vars.map((x, j) => j === i ? { ...x, value: e.target.value } : x) }))} />
-                      <label className="visible-toggle" title="설계 화면(모델링 선택 시)에 이 변수 노출" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.72rem' }}>
-                        <input type="checkbox" checked={!!v.expose}
-                          onChange={(e) => setForm((f) => ({ ...f, vars: f.vars.map((x, j) => j === i ? { ...x, expose: e.target.checked } : x) }))} />노출
-                      </label>
-                      <button className="order-btn" title="변수 삭제" onClick={() => setForm((f) => ({ ...f, vars: f.vars.filter((_, j) => j !== i) }))}><TrashIcon size={12} /></button>
-                    </div>
-                  ))}
+                {renderVarRows()}
+
+                <div className="panel-head" style={{ marginTop: 14 }}>
+                  <h2 style={{ fontSize: '0.92rem' }}>배치가능 조건<HelpTip text={FIELD_HINTS.installWhen} /></h2>
+                  <span className="sel-info" style={{ marginLeft: 12 }}>충족해야 설치 가능 — 미충족 시 설계에 '설치불가' 표시</span>
                 </div>
+                {renderInstallCond()}
 
                 <div className="panel-head" style={{ marginTop: 18 }}>
                   <h2 style={{ fontSize: '0.92rem' }}>운영 항목</h2>

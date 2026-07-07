@@ -877,6 +877,8 @@ td.num { font-family: var(--num); font-weight: 500; }
 .bi-swap-folder { display: flex; align-items: center; gap: 6px; width: 100%; padding: 8px 4px; border: none; border-bottom: 1px solid var(--line); background: transparent; font: inherit; font-size: 0.78rem; font-weight: 600; color: var(--text-2); cursor: pointer; }
 .bi-swap-folder:hover { color: var(--ink); }
 .bi-swap-folder.on { color: var(--ink); }
+.bi-swap-folder.blocked { opacity: 0.62; background: rgba(192, 57, 43, 0.05); cursor: not-allowed; }
+.bi-swap-folder.blocked:hover { color: #c0392b; }
 .bi-swap-folder .bi-cgroup-kind { margin: 0 4px; }
 .bi-swap-folder .bi-swap-fname { flex: 1; text-align: left; }
 .bi-swap-folder .bi-swap-cnt { margin-left: auto; font-size: 0.7rem; color: var(--text-3); font-weight: 500; }

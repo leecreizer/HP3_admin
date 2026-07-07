@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { loadFolders, loadProducts, folderSubtree, loadFilterGroups, loadSwapState, expandMembers, folderRepThumb } from '../data/groups';
-import { opSizeOptions, evalFormula, varTypeOf, type OpSize, type VarType } from './Products';
+import { opSizeOptions, evalFormula, varTypeOf, varOptions, type OpSize, type VarType } from './Products';
 import { getAssets } from '../data/assetStore';
 
 /**
@@ -55,8 +55,10 @@ type LibProduct = ReturnType<typeof loadProducts>[number] & {
   quoteGroup?: string;
   attrType?: string;
   formula?: { w?: string; d?: string; h?: string };
-  vars?: { name: string; value: string; type?: VarType; expose?: boolean }[];
+  vars?: { name: string; label?: string; value: string; type?: VarType; expose?: boolean; options?: string; exposeWhen?: string }[];
   condition?: string;
+  installWhen?: string;
+  installMsg?: string;
 };
 
 type DesignUser = { id: string; name: string; email: string; groupIds: string[] };
@@ -206,8 +208,8 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
   const [swapFilters, setSwapFilters] = useState<Set<string>>(new Set());
   const toggleSwapFilter = (id: string) => setSwapFilters((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const [priceOv, setPriceOv] = useState<Record<string, string>>({});
-  /** 노출 변수 값 오버라이드 — contentCode → 변수명 → 값. 설계 화면에서 조정한 값이 수식 평가에 우선 적용 */
-  const [varOv, setVarOv] = useState<Record<string, Record<string, number>>>({});
+  /** 노출 변수 값 오버라이드 — contentCode → 변수명 → 값(숫자 또는 선택 문자열). 설계 화면 조정값이 수식 평가에 우선 */
+  const [varOv, setVarOv] = useState<Record<string, Record<string, number | string>>>({});
   const [placedCount, setPlacedCount] = useState(0);
   /** webplaner가 보낸 배치 목록 — 견적보기에서 사용 */
   type PlacedItem = { id: string; code?: string; name: string; w: number; d: number; h: number; lift: number };
@@ -584,7 +586,7 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
         const low = name.toLowerCase();
         if (low === 'w' || low === 'd' || low === 'h') {
           vmap[low] = val; vmap[low.toUpperCase()] = val; // 자기 치수 별칭(#W/#w) 동기화
-          if (t === '수식') dimVar[low as 'w' | 'd' | 'h'] = r;
+          if (t === '수식') dimVar[low as 'w' | 'd' | 'h'] = typeof r === 'number' ? r : null;
         }
       }
       // 조건식 — 모두 TRUE일 때만 배치 (구버전 condition 필드도 함께 검사)
@@ -915,31 +917,56 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
                       </div>
                     );
                   })}
-                  {/* 노출 변수 — 상품 편집에서 '노출' 체크한 변수만 표시. 값 조정 시 수식·조건 평가에 우선 적용 */}
-                  {(sel.vars ?? []).filter((v) => v.expose && v.name?.trim()).map((v) => {
-                    const name = v.name.trim();
-                    const t = varTypeOf(v);
-                    const isCond = t === '조건식';
-                    const ov = varOv[sel.contentCode]?.[name];
-                    const hint = `변수 ${name} (${t}) · 등록값: ${v.value || '—'}`;
-                    return (
-                      <div className="bi-field" key={`var-${name}`}>
-                        <label>{name}<span className="bi-range-tag" title={hint}> ⓘ</span></label>
-                        <div className="bi-input" title={hint}>
-                          {isCond ? (
-                            <input type="text" value={v.value} readOnly />
-                          ) : (
-                            <input type="number" value={ov ?? (Number(v.value) || 0)}
-                              onChange={(e) => {
-                                const n = Number(e.target.value);
-                                setVarOv((s) => ({ ...s, [sel.contentCode]: { ...s[sel.contentCode], [name]: Number.isNaN(n) ? 0 : n } }));
-                              }} />
-                          )}
-                          {!isCond && <span className="bi-unit">mm</span>}
+                  {/* 노출 변수 — '노출' 체크 + 노출조건(exposeWhen) 충족 변수만 표시. 값 조정 시 수식·조건 평가에 우선 적용.
+                      선택(옵션) 유형은 드롭다운, 고정/수식은 숫자, 조건식은 읽기전용. (A: 조건부 옵션 노출 / C: 선택 유형) */}
+                  {(() => {
+                    const dims = effDims(sel);
+                    const ctx: Record<string, number | string> = {
+                      W: dims.w, D: dims.d, H: dims.h, ...builtinVars(sel, dims), ...childVars(sel),
+                    };
+                    (sel.vars ?? []).forEach((v) => {
+                      if (!v.name?.trim() || varTypeOf(v) === '조건식') return;
+                      const ov = varOv[sel.contentCode]?.[v.name.trim()];
+                      if (ov != null) { ctx[v.name.trim()] = ov; return; }
+                      const n = v.value?.trim() ? evalFormula(v.value, ctx) : null;
+                      if (n != null) ctx[v.name.trim()] = n as number | string;
+                    });
+                    const visibleVars = (sel.vars ?? []).filter((v) => {
+                      if (!v.expose || !v.name?.trim()) return false;
+                      if (!v.exposeWhen?.trim()) return true;
+                      const r = evalFormula(v.exposeWhen, ctx);
+                      return r === true || r === 1;
+                    });
+                    return visibleVars.map((v) => {
+                      const name = v.name.trim();
+                      const t = varTypeOf(v);
+                      const disp = v.label?.trim() || name; // 노출명칭 우선
+                      const ov = varOv[sel.contentCode]?.[name];
+                      const hint = `변수 #${name} (${t}) · 등록값: ${v.value || '—'}`;
+                      return (
+                        <div className="bi-field" key={`var-${name}`}>
+                          <label>{disp}<span className="bi-range-tag" title={hint}> ⓘ</span></label>
+                          <div className="bi-input" title={hint}>
+                            {t === '조건식' ? (
+                              <input type="text" value={v.value} readOnly />
+                            ) : t === '선택' ? (
+                              <select value={(ov as string) ?? varOptions(v)[0] ?? ''}
+                                onChange={(e) => setVarOv((s) => ({ ...s, [sel.contentCode]: { ...s[sel.contentCode], [name]: e.target.value } }))}>
+                                {varOptions(v).map((o) => <option key={o} value={o}>{o}</option>)}
+                              </select>
+                            ) : (
+                              <input type="number" value={(ov as number) ?? (Number(v.value) || 0)}
+                                onChange={(e) => {
+                                  const n = Number(e.target.value);
+                                  setVarOv((s) => ({ ...s, [sel.contentCode]: { ...s[sel.contentCode], [name]: Number.isNaN(n) ? 0 : n } }));
+                                }} />
+                            )}
+                            {t !== '조건식' && t !== '선택' && <span className="bi-unit">mm</span>}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    });
+                  })()}
                   <div className="bi-field">
                     <label>스펙파일</label>
                     {(sel.specUrls ?? []).filter((u) => u.url?.trim()).length > 0 ? (
@@ -997,6 +1024,26 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
                     if (gid) slotCond.set(gid, cond);
                   }
                   const openGroupFlyout = (gid: string) => { setSwapGroupId(gid); setSwapFolderId(null); setSwapOpen(true); };
+                  // B: 부속 상품의 배치가능 조건(installWhen)을 상위(=현재 선택 몸통 sel) 기준으로 평가
+                  const upCtx = { ...builtinVars(sel, effDims(sel), 'up'), ...childVars(sel) };
+                  const canInstall = (child: LibProduct): boolean => {
+                    if (!child.installWhen?.trim()) return true;
+                    const cd = effDims(child);
+                    const ctx: Record<string, number | string> = { W: cd.w, D: cd.d, H: cd.h, ...builtinVars(child, cd), ...upCtx };
+                    (child.vars ?? []).forEach((v) => {
+                      if (!v.name?.trim() || varTypeOf(v) === '조건식') return;
+                      const n = v.value?.trim() ? evalFormula(v.value, ctx) : null;
+                      if (n != null) ctx[v.name.trim()] = n as number | string;
+                    });
+                    const r = evalFormula(child.installWhen, ctx);
+                    return r === true || r === 1;
+                  };
+                  const groupInstall = (gid: string) => {
+                    const members = (memberMap[gid] ?? []).map((c) => products.find((p) => p.contentCode === c)).filter(Boolean) as LibProduct[];
+                    const ok = members.filter(canInstall);
+                    const blockedMsg = members.find((m) => m.installWhen?.trim() && !canInstall(m))?.installMsg;
+                    return { total: members.length, ok: ok.length, blocked: members.length - ok.length, blockedMsg };
+                  };
                   const sections = swapState.categories.map((cat) => {
                     const groups = swapState.groups.filter((g) => g.kind === cat && (memberMap[g.id]?.length ?? 0) > 0);
                     if (groups.length === 0) return null;
@@ -1008,15 +1055,19 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
                           const codes = memberMap[g.id] ?? [];
                           const active = slotCond.has(g.id);
                           const cond = slotCond.get(g.id);
+                          const inst = groupInstall(g.id);
+                          const allBlocked = inst.total > 0 && inst.ok === 0; // 전부 설치불가
                           return (
-                            <button key={g.id} className="bi-swap-folder"
-                              title="클릭 시 왼쪽에 이 그룹의 상품 리스트가 열립니다"
-                              onClick={() => openGroupFlyout(g.id)}>
+                            <button key={g.id} className={`bi-swap-folder${allBlocked ? ' blocked' : ''}`}
+                              title={allBlocked ? (inst.blockedMsg || '현재 몸통 조건에서 설치 불가') : '클릭 시 왼쪽에 이 그룹의 상품 리스트가 열립니다'}
+                              onClick={() => { if (allBlocked) { setAttachMsg(`🚫 ${g.name}: ${inst.blockedMsg || '현재 몸통 조건에서 설치 불가'}`); return; } openGroupFlyout(g.id); }}>
                               <span className="bi-cgroup-kind">{g.type === 'grouping' ? '폴더 노출' : '교체 묶음'}</span>
                               <span className="bi-swap-fname">{g.name}
                                 {active && <small style={{ color: 'var(--text-3)', marginLeft: 6 }}>{cond ? `· 조건: ${cond}` : '· 구성 슬롯'}</small>}
+                                {allBlocked && <small style={{ color: '#c0392b', marginLeft: 6 }}>🚫 설치불가</small>}
+                                {!allBlocked && inst.blocked > 0 && <small style={{ color: 'var(--text-3)', marginLeft: 6 }}>· {inst.blocked}개 불가</small>}
                               </span>
-                              <span className="bi-swap-cnt">{codes.length}</span>
+                              <span className="bi-swap-cnt">{allBlocked ? '0/' + inst.total : codes.length}</span>
                             </button>
                           );
                         })}
