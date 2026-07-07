@@ -503,6 +503,35 @@ const FIELD_HINTS: Record<string, FieldHint> = {
   installWhen: { v: '#up.* #down.* 사용', d: "배치가능 조건식 — TRUE여야 설치. 상위 몸통(#up.W 등)·하위 부위(#down.도어.count)·자기 값·운영사이즈(#minW) 참조. 미충족 시 설계 화면에 '설치불가'+사유 표시" },
 };
 
+/** 선택 유형 변수의 옵션 편집 — 입력 후 [추가]로 하나씩 등록, 칩 × 로 삭제. options(쉼표 join)에 저장 */
+function VarOptionEditor({ value, onChange }: { value?: string; onChange: (s: string) => void }) {
+  const [inp, setInp] = useState('');
+  const opts = (value ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  const add = () => { const v = inp.trim(); if (!v || opts.includes(v)) { setInp(''); return; } onChange([...opts, v].join(',')); setInp(''); };
+  const del = (o: string) => onChange(opts.filter((x) => x !== o).join(','));
+  return (
+    <div style={{ margin: '3px 0 6px 4px' }}>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        <span style={{ fontSize: '0.7rem', color: 'var(--text-3)' }}>선택 값</span>
+        <input type="text" className="inline-input" style={{ width: 160 }} value={inp}
+          placeholder="선택할 값 입력 후 추가 (예: 좌경첩)"
+          onChange={(e) => setInp(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }} />
+        <button className="btn-mini" onClick={add}>+ 추가</button>
+      </div>
+      {opts.length > 0 && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 5 }}>
+          {opts.map((o) => (
+            <span key={o} className="kind-tag" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              {o}<button className="tag-x" aria-label={`${o} 삭제`} onClick={() => del(o)}>×</button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** ⍰ 도움말 아이콘 — 클릭 시 변수명 뱃지 + 활용법 팝오버 표시 (호버 인지 어려움 보완) */
 export function HelpTip({ text }: { text: FieldHint | string }) {
   const [open, setOpen] = useState(false);
@@ -2340,41 +2369,55 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
   };
 
   /** 구성/교체 — 부위 상품 교체 그룹 연결 (조립형 상품의 슬롯 구성) */
-  /** 변수 정의 행 — 이름/유형/값(또는 선택 옵션)/노출/삭제 + 노출 조건식(A: 옵션 노출 제어) */
+  /** 변수 정의 행 — 노출이름 · 변수명 · 유형 · 값 · 노출☑ · 삭제.
+   *  선택 유형이면 값 칸 대신 옵션 편집기(하나씩 추가/삭제), 노출☑이면 노출 조건식. */
   const renderVarRows = () => {
     const setVar = (i: number, patch: Partial<ProductForm['vars'][number]>) =>
       setForm((f) => ({ ...f, vars: f.vars.map((x, j) => (j === i ? { ...x, ...patch } : x)) }));
     return (
       <div className="form-grid">
-        {form.vars.length === 0 && <p className="hint">필요하면 변수를 추가하세요. 예) 이름 <b>LDH</b>·<b>고정값</b>·<b>20</b> → <b>#LDH</b> · 도어 치수는 <b>W/H</b> 수식 · 옵션은 <b>선택</b> 유형.</p>}
+        {form.vars.length === 0 && <p className="hint">필요하면 변수를 추가하세요. 예) 노출이름 <b>경첩 여유</b>·변수명 <b>LDH</b>·<b>고정값</b>·<b>20</b> → 수식에서 <b>#LDH</b>. 옵션은 <b>선택</b> 유형으로 값을 하나씩 등록.</p>}
+        {/* 헤더 */}
+        {form.vars.length > 0 && (
+          <div className="opsize-row" style={{ gridTemplateColumns: '1.1fr 1fr 92px 1.6fr 52px 28px', fontSize: '0.7rem', color: 'var(--text-3)', padding: '0 2px' }}>
+            <span>노출이름</span><span>변수명(#참조)</span><span>유형</span><span>값</span><span>노출</span><span></span>
+          </div>
+        )}
         {form.vars.map((v, i) => {
           const t = varTypeOf(v);
-          const valPh = t === '고정값' ? '숫자 (예: 20)' : t === '조건식' ? '예: #up.W >= #minW' : t === '선택' ? '옵션 (쉼표: L,R,양쪽)' : '식 (예: #up.H - #up.LDH)';
+          const valPh = t === '고정값' ? '숫자 (예: 20)' : t === '조건식' ? '예: #up.W >= #minW' : t === '선택' ? '아래에서 값 추가' : '식 (예: #up.H - #up.LDH)';
           return (
             <div key={i}>
-              <div className="opsize-row" style={{ gridTemplateColumns: '1fr 92px 1.6fr 52px 28px' }}>
-                <input type="text" placeholder="이름 (예: LDH, W)" value={v.name}
+              <div className="opsize-row" style={{ gridTemplateColumns: '1.1fr 1fr 92px 1.6fr 52px 28px' }}>
+                <input type="text" placeholder={`비우면 '${v.name.trim() || '변수명'}'`} value={v.label ?? ''}
+                  title="설계 화면에 표시될 이름 (비우면 변수명)"
+                  onChange={(e) => setVar(i, { label: e.target.value })} />
+                <input type="text" placeholder="변수명 (예: LDH)" value={v.name}
                   title={`수식에서 #${v.name.trim() || '이름'} 으로 참조`}
                   onChange={(e) => setVar(i, { name: e.target.value })} />
                 <select value={t} aria-label="값 유형" onChange={(e) => setVar(i, { type: e.target.value as VarType })}>
                   {VAR_TYPES.map((x) => <option key={x} value={x}>{x}</option>)}
                 </select>
-                <input type="text" value={v.value} placeholder={valPh}
-                  onChange={(e) => setVar(i, { value: e.target.value })} />
+                {t === '선택' ? (
+                  <input type="text" value={`옵션 ${varOptions(v).length}개`} readOnly title="아래에서 선택 값 추가·삭제" style={{ color: 'var(--text-3)' }} />
+                ) : (
+                  <input type="text" value={v.value} placeholder={valPh}
+                    onChange={(e) => setVar(i, { value: e.target.value })} />
+                )}
                 <label className="visible-toggle" title="설계 화면에 이 변수 노출" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.72rem' }}>
                   <input type="checkbox" checked={!!v.expose} onChange={(e) => setVar(i, { expose: e.target.checked })} />노출
                 </label>
                 <button className="order-btn" title="변수 삭제" onClick={() => setForm((f) => ({ ...f, vars: f.vars.filter((_, j) => j !== i) }))}><TrashIcon size={12} /></button>
               </div>
-              {/* 노출☑일 때: 노출명칭(설계 화면 표시 이름) + 노출 조건식(비우면 항상 노출) */}
+              {/* 선택 유형 — 옵션을 하나씩 추가/삭제 */}
+              {t === '선택' && (
+                <VarOptionEditor value={v.options} onChange={(s) => setVar(i, { options: s })} />
+              )}
+              {/* 노출☑ — 노출 조건식(비우면 항상 노출) */}
               {v.expose && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '3px 0 6px 4px', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: '0.7rem', color: 'var(--text-3)' }}>노출명칭</span>
-                  <input type="text" className="inline-input" style={{ width: 140 }} value={v.label ?? ''}
-                    placeholder={`비우면 '${v.name.trim() || '변수명'}'`}
-                    onChange={(e) => setVar(i, { label: e.target.value })} />
                   <span style={{ fontSize: '0.7rem', color: 'var(--text-3)' }}>노출 조건</span>
-                  <input type="text" className="inline-input" style={{ flex: 1, minWidth: 160 }} value={v.exposeWhen ?? ''}
+                  <input type="text" className="inline-input" style={{ flex: 1, minWidth: 200 }} value={v.exposeWhen ?? ''}
                     placeholder="비우면 항상 노출 (예: #도어형태 == '슬라이딩')"
                     onChange={(e) => setVar(i, { exposeWhen: e.target.value })} />
                 </div>
