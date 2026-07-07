@@ -254,6 +254,22 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
         if (md.code) {
           const prod = products.find((pp) => pp.productCode === md.code);
           if (prod) {
+            // 형제 변형(선택값) 라인이면 해당 사이즈 상품으로 교체 — 기본정보 select와 동일 동작.
+            const sibs = prod.modelCode && prod.itemCode
+              ? products.filter((q) => q.modelCode === prod.modelCode && q.itemCode === prod.itemCode)
+              : [];
+            if (sibs.length > 1) {
+              const t = sibs.find((q) => q.w === md.w && q.d === md.d && q.h === md.h)
+                ?? sibs.find((q) => (['w', 'd', 'h'] as const).some((k) => md[k] !== prod[k] && q[k] === md[k]));
+              if (t && t.productCode !== prod.productCode) {
+                setActiveCode(t.contentCode);
+                iframeRef.current?.contentWindow?.postMessage(
+                  { type: 'hp3:update-product', code: t.productCode, name: t.name, modelUrl: modelUrlOf(t as LibProduct), color: t.color, w: t.w ?? 0, d: t.d ?? 0, h: t.h ?? 0 },
+                  '*',
+                );
+                return;
+              }
+            }
             setDimOverrides((prev) => ({
               ...prev,
               [prod.contentCode]: {
@@ -348,25 +364,41 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
     }
     return out;
   };
+  /** 모델+품목 코드가 같은 형제 상품(사이즈 변형 라인) — 임의 상품 기준. */
+  const sibsOf = (p: LibProduct): LibProduct[] =>
+    p.modelCode && p.itemCode
+      ? (products.filter((q) => q.modelCode === p.modelCode && q.itemCode === p.itemCode) as LibProduct[])
+      : [];
+
   /** 웹플래너로 배치(또는 갱신) 요청 — 현재 유효 치수 전송 */
   const sendPlace = (p: LibProduct) => {
     const dm = effDims(p);
-    // 축별 가변 사이즈 범위 — 웹플래너 리사이즈 핸들(길이 변경 UI)용.
-    // MIN·MAX 설정 = 그 범위(GAP 스텝) / MIN만(또는 MIN=MAX) = 고정(핸들 없음) /
-    // 비워둠 = 자유 입력 → 넓은 범위로 보내 드래그 리사이즈 허용.
+    // 축별 가변 사이즈 범위 — 웹플래너 리사이즈 핸들(길이 변경 UI)용. 기본정보(속성설정)와 동일 규칙:
+    // ① 형제 변형 사이즈 여러개 = 그 값들만 선택(options, 커밋 시 상품 교체)
+    // ② 규격 GAP>1 = 단계 옵션(options) ③ 그 외 MIN·MAX = 범위 자유(GAP 스텝)
+    // ④ MIN만(또는 MIN=MAX) = 고정(핸들 없음) ⑤ 미설정 = 자유 입력(넓은 범위)
     const FREE = { min: 10, max: 10000, gap: 0 };
     const op = p.opSize;
-    const rng = (min?: number, max?: number, gap?: number) =>
-      min != null && max != null && max > min ? { min, max, gap: gap || 0 }
-      : min != null ? undefined // 고정값
-      : FREE; // 미설정 = 자유 입력
-    const sizeRange = op
-      ? {
-          ...(rng(op.minW, op.maxW, op.gapW) ? { w: rng(op.minW, op.maxW, op.gapW) } : {}),
-          ...(rng(op.minD, op.maxD, op.gapD) ? { d: rng(op.minD, op.maxD, op.gapD) } : {}),
-          ...(rng(op.minH, op.maxH, op.gapH) ? { h: rng(op.minH, op.maxH, op.gapH) } : {}),
-        }
-      : { w: FREE, d: FREE, h: FREE }; // 운영사이즈 미설정 상품 = 전 축 자유
+    const sibs = sibsOf(p);
+    const axisRange = (ax: 'W' | 'D' | 'H', k: 'w' | 'd' | 'h') => {
+      const sibVals = sibs.length > 1
+        ? [...new Set(sibs.map((q) => q[k]).filter((n): n is number => typeof n === 'number'))].sort((a, b) => a - b)
+        : [];
+      if (sibVals.length > 1) return { min: sibVals[0], max: sibVals[sibVals.length - 1], gap: 0, options: sibVals };
+      const min = op?.[`min${ax}` as keyof OpSize];
+      const max = op?.[`max${ax}` as keyof OpSize];
+      const gap = op?.[`gap${ax}` as keyof OpSize];
+      if (min != null && max != null && max > min) {
+        const opts = gap != null && gap > 1 && !p.nonStandard ? opSizeOptions(op, ax) : null;
+        return opts && opts.length > 1
+          ? { min: opts[0], max: opts[opts.length - 1], gap: 0, options: opts }
+          : { min, max, gap: gap || 0 };
+      }
+      if (min != null) return undefined; // 고정값
+      return FREE; // 미설정 = 자유 입력
+    };
+    const w = axisRange('W', 'w'), d0 = axisRange('D', 'd'), h = axisRange('H', 'h');
+    const sizeRange = { ...(w ? { w } : {}), ...(d0 ? { d: d0 } : {}), ...(h ? { h } : {}) };
     iframeRef.current?.contentWindow?.postMessage(
       { type: 'hp3:place-product', name: p.name, code: p.productCode, modelUrl: modelUrlOf(p), color: p.color, ...dm, sizeRange },
       '*',
