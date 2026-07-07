@@ -468,10 +468,17 @@ export function varTypeOf(v: { value: string; type?: VarType }): VarType {
   if (v.type) return v.type;
   return v.value.trim() !== '' && !Number.isNaN(Number(v.value)) ? '고정값' : '수식';
 }
-/** 선택 유형 옵션 파싱 — 값 칸(또는 options)에 쉼표로 구분해 입력한 문자열 → 배열
- *  예) 값 칸에 "L, R, 양쪽" → ['L','R','양쪽'] */
-export function varOptions(v: { options?: string; value?: string }): string[] {
-  return (v.options ?? v.value ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+/** 선택 유형 옵션 — 표시명(l)과 실제값(v) 분리. 설계 화면엔 표시명이 뜨고, 수식엔 실제값이 들어간다.
+ *  저장 포맷: JSON 배열 [{l,v}]. (구버전 "a,b,c" 쉼표 문자열은 표시명=값 동일로 파싱) */
+export type VarOption = { l: string; v: string };
+export function varOptions(src: { options?: string; value?: string }): VarOption[] {
+  const raw = src.options ?? src.value ?? '';
+  if (!raw.trim()) return [];
+  try {
+    const arr = JSON.parse(raw);
+    if (Array.isArray(arr)) return arr.map((o) => ({ l: String(o.l ?? o.v ?? ''), v: String(o.v ?? o.l ?? '') })).filter((o) => o.v || o.l);
+  } catch { /* 구버전 쉼표 문자열 폴백 */ }
+  return raw.split(',').map((s) => s.trim()).filter(Boolean).map((s) => ({ l: s, v: s }));
 }
 
 /** 기본 정보·운영정보 필드 도움말 — ⍰ 클릭 시 자기 변수명(#참조명) 뱃지 + 활용법 안내.
@@ -503,27 +510,39 @@ const FIELD_HINTS: Record<string, FieldHint> = {
   installWhen: { v: '#up.* #down.* 사용', d: "배치가능 조건식 — TRUE여야 설치. 상위 몸통(#up.W 등)·하위 부위(#down.도어.count)·자기 값·운영사이즈(#minW) 참조. 미충족 시 설계 화면에 '설치불가'+사유 표시" },
 };
 
-/** 선택 유형 변수의 옵션 편집 — 입력 후 [추가]로 하나씩 등록, 칩 × 로 삭제. options(쉼표 join)에 저장 */
+/** 선택 유형 변수의 옵션 편집 — 표시명·실제값을 각각 입력 후 [추가]로 등록, 칩 × 로 삭제.
+ *  실제값만 입력하면 표시명=실제값. options에 JSON([{l,v}])로 저장. */
 function VarOptionEditor({ value, onChange }: { value?: string; onChange: (s: string) => void }) {
-  const [inp, setInp] = useState('');
-  const opts = (value ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-  const add = () => { const v = inp.trim(); if (!v || opts.includes(v)) { setInp(''); return; } onChange([...opts, v].join(',')); setInp(''); };
-  const del = (o: string) => onChange(opts.filter((x) => x !== o).join(','));
+  const [label, setLabel] = useState('');
+  const [val, setVal] = useState('');
+  const opts = varOptions({ options: value });
+  const commit = (next: VarOption[]) => onChange(JSON.stringify(next));
+  const add = () => {
+    const v = val.trim(); const l = label.trim() || v;
+    if (!v || opts.some((o) => o.v === v)) { setLabel(''); setVal(''); return; }
+    commit([...opts, { l, v }]); setLabel(''); setVal('');
+  };
+  const del = (v: string) => commit(opts.filter((o) => o.v !== v));
   return (
     <div style={{ margin: '3px 0 6px 4px' }}>
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-        <span style={{ fontSize: '0.7rem', color: 'var(--text-3)' }}>선택 값</span>
-        <input type="text" className="inline-input" style={{ width: 160 }} value={inp}
-          placeholder="선택할 값 입력 후 추가 (예: 좌경첩)"
-          onChange={(e) => setInp(e.target.value)}
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: '0.7rem', color: 'var(--text-3)' }}>옵션</span>
+        <input type="text" className="inline-input" style={{ width: 130 }} value={label}
+          placeholder="표시명 (예: 좌경첩)" onChange={(e) => setLabel(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }} />
+        <span style={{ fontSize: '0.72rem', color: 'var(--text-3)' }}>→</span>
+        <input type="text" className="inline-input" style={{ width: 110 }} value={val}
+          placeholder="실제값 (예: L)" onChange={(e) => setVal(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }} />
         <button className="btn-mini" onClick={add}>+ 추가</button>
       </div>
       {opts.length > 0 && (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 5 }}>
           {opts.map((o) => (
-            <span key={o} className="kind-tag" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-              {o}<button className="tag-x" aria-label={`${o} 삭제`} onClick={() => del(o)}>×</button>
+            <span key={o.v} className="kind-tag" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+              title={`표시: ${o.l} · 값: ${o.v}`}>
+              {o.l}{o.l !== o.v && <small style={{ color: 'var(--text-3)' }}>({o.v})</small>}
+              <button className="tag-x" aria-label={`${o.l} 삭제`} onClick={() => del(o.v)}>×</button>
             </span>
           ))}
         </div>

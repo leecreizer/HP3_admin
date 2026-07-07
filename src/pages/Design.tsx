@@ -950,9 +950,9 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
                             {t === '조건식' ? (
                               <input type="text" value={v.value} readOnly />
                             ) : t === '선택' ? (
-                              <select value={(ov as string) ?? varOptions(v)[0] ?? ''}
+                              <select value={(ov as string) ?? varOptions(v)[0]?.v ?? ''}
                                 onChange={(e) => setVarOv((s) => ({ ...s, [sel.contentCode]: { ...s[sel.contentCode], [name]: e.target.value } }))}>
-                                {varOptions(v).map((o) => <option key={o} value={o}>{o}</option>)}
+                                {varOptions(v).map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
                               </select>
                             ) : (
                               <input type="number" value={(ov as number) ?? (Number(v.value) || 0)}
