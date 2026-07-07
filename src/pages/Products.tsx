@@ -227,7 +227,7 @@ type Product = {
   opValues?: Record<string, string>;
   /** 구성/교체 슬롯 — 모델링 교체 그룹 연결 (도어→도어그룹 등)
    *  rules: 조건식(evalFormula)→교체 묶음(groupId) 분기. 위에서부터 참인 첫 규칙의 그룹 사용, 없으면 기본 groupId */
-  modelingSlots?: { slot: string; groupId: string; defaultModelingId?: string; rules?: { condition: string; groupId: string }[] }[];
+  modelingSlots?: { slot: string; groupId: string; defaultModelingId?: string; rules?: { condition: string; groupId: string }[]; overrides?: { name: string; value: string }[] }[];
   /** 적용 가능 스타일 — 스타일 그룹 관리의 스타일 id 연결 (스타일 선택 시 부위 일괄 교체 대상) */
   styleIds?: string[];
   /** 스펙/몰 URL — 이름+주소 쌍 목록 */
@@ -1029,7 +1029,7 @@ type ProductForm = {
   /** 운영정보 조합별 입력값 */
   opValues: Record<string, string>;
   /** 구성/교체 슬롯 */
-  modelingSlots: { slot: string; groupId: string; defaultModelingId?: string; rules?: { condition: string; groupId: string }[] }[];
+  modelingSlots: { slot: string; groupId: string; defaultModelingId?: string; rules?: { condition: string; groupId: string }[]; overrides?: { name: string; value: string }[] }[];
   styleIds: string[];
   specUrls: { name: string; url: string }[];
   mallUrls: { name: string; url: string }[];
@@ -2388,6 +2388,38 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
   };
 
   /** 구성/교체 — 부위 상품 교체 그룹 연결 (조립형 상품의 슬롯 구성) */
+  /** 편집 중 상품(form)의 값으로 만든 수식 계산 컨텍스트 — 자기 치수·운영사이즈·먼저 정의된 변수.
+   *  (#up/#down은 부모·자식이 있어야 하므로 편집 화면에선 미리보기 불가로 구분) */
+  const formEvalCtx = (upto: number): Record<string, number | string> => {
+    const num = (s: string) => Number(s) || 0;
+    const ctx: Record<string, number | string> = {
+      W: num(form.w), D: num(form.d), H: num(form.h), lift: num(form.placeHeight),
+      price: num(form.price), nonStandard: form.nonStandard ? 1 : 0,
+      productKind: form.productKind, modelKind: form.modelKind, productGroup: form.productGroup,
+      placement: form.placement, dp: form.dp, pos: form.pos,
+    };
+    for (const k of ['minW', 'maxW', 'gapW', 'minD', 'maxD', 'gapD', 'minH', 'maxH', 'gapH'] as const) {
+      const val = (form.opSize as Record<string, string>)[k];
+      if (val?.trim()) ctx[k] = Number(val) || 0;
+    }
+    // 앞서(위쪽) 정의된 변수만 컨텍스트에 — 순환 참조 방지
+    form.vars.slice(0, upto).forEach((v) => {
+      if (!v.name?.trim() || varTypeOf(v) === '조건식') return;
+      const n = varTypeOf(v) === '고정값' ? Number(v.value) : (v.value?.trim() ? evalFormula(v.value, ctx) : null);
+      if (n != null && n !== false && typeof n !== 'boolean') ctx[v.name.trim()] = n as number | string;
+    });
+    return ctx;
+  };
+  /** 수식/조건식 결과 미리보기 — 오류/부모참조 필요/결과값 구분 */
+  const evalPreview = (expr: string, ctx: Record<string, number | string>, isCond: boolean): { cls: string; text: string } => {
+    if (!expr.trim()) return { cls: 'pv-none', text: '' };
+    if (/#(up|down)\./.test(expr)) return { cls: 'pv-ctx', text: '배치 시 계산 (부모/자식 값 필요)' };
+    const r = evalFormula(expr, ctx);
+    if (r == null) return { cls: 'pv-err', text: '⚠ 수식 오류 — 변수명·연산자 확인' };
+    if (isCond) return { cls: 'pv-ok', text: (r === true || r === 1) ? '결과: 참(TRUE)' : '결과: 거짓(FALSE)' };
+    return { cls: 'pv-ok', text: `= ${typeof r === 'number' ? Math.round(r * 100) / 100 : r}` };
+  };
+
   /** 변수 정의 행 — 노출이름 · 변수명 · 유형 · 값 · 노출☑ · 삭제.
    *  선택 유형이면 값 칸 대신 옵션 편집기(하나씩 추가/삭제), 노출☑이면 노출 조건식. */
   const renderVarRows = () => {
@@ -2428,6 +2460,11 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
                 </label>
                 <button className="order-btn" title="변수 삭제" onClick={() => setForm((f) => ({ ...f, vars: f.vars.filter((_, j) => j !== i) }))}><TrashIcon size={12} /></button>
               </div>
+              {/* 수식·조건식 — 현재값으로 계산한 결과/오류 미리보기 */}
+              {(t === '수식' || t === '조건식') && v.value?.trim() && (() => {
+                const pv = evalPreview(v.value, formEvalCtx(i), t === '조건식');
+                return pv.text ? <div className={`var-preview ${pv.cls}`}>{pv.text}</div> : null;
+              })()}
               {/* 선택 유형 — 옵션을 하나씩 추가/삭제 */}
               {t === '선택' && (
                 <VarOptionEditor value={v.options} onChange={(s) => setVar(i, { options: s })} />
@@ -2456,6 +2493,7 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
         <input className="inline-input full" type="text" value={form.installWhen}
           placeholder="예: #up.W >= 600 AND #up.H >= 1200 (상위 몸통이 이 범위여야 설치 가능)"
           onChange={(e) => setForm((f) => ({ ...f, installWhen: e.target.value }))} />
+        {form.installWhen.trim() && (() => { const pv = evalPreview(form.installWhen, formEvalCtx(form.vars.length), true); return pv.text ? <span className={`var-preview ${pv.cls}`}>{pv.text}</span> : null; })()}
       </label>
       <label className="form-field span-2">
         <span>설치불가 사유 <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(미충족 시 설계 화면 표시 문구)</small></span>
@@ -2488,6 +2526,10 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
           const rules = row?.rules ?? [];
           const setRules = (r: { condition: string; groupId: string }[]) => {
             if (si >= 0) setSlots(form.modelingSlots.map((s, j) => (j === si ? { ...s, rules: r } : s)));
+          };
+          const ovr = row?.overrides ?? [];
+          const setOvr = (o: { name: string; value: string }[]) => {
+            if (si >= 0) setSlots(form.modelingSlots.map((s, j) => (j === si ? { ...s, overrides: o } : s)));
           };
           return (
             <div className="mslot-block" key={cat}>
@@ -2528,6 +2570,24 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
                     </div>
                   ))}
                   <button className="link-mini" onClick={() => setRules([...rules, { condition: '', groupId: '' }])}>+ 조건 규칙</button>
+                </div>
+              )}
+              {/* 자식 변수 통제(오버라이드) — 부모(이 상품)가 이 부위에 붙는 자식의 변수를 강제 지정.
+                  값은 부모 컨텍스트(#W 등=부모값)로 평가되어 자식 변수에 최우선 주입된다. */}
+              {row && (
+                <div className="mslot-rules">
+                  {ovr.map((o, oi) => (
+                    <div className="mslot-rule" key={oi}>
+                      <span className="mslot-rule-tag">자식변수</span>
+                      <input className="inline-input" style={{ width: 120 }} placeholder="자식 변수명 (예: 힌지방향)" value={o.name}
+                        onChange={(e) => setOvr(ovr.map((x, k) => (k === oi ? { ...x, name: e.target.value } : x)))} />
+                      <span className="mslot-rule-arrow">=</span>
+                      <input className="inline-input" placeholder="값/식 (예: 'L' 또는 #W*0.02)" value={o.value}
+                        onChange={(e) => setOvr(ovr.map((x, k) => (k === oi ? { ...x, value: e.target.value } : x)))} />
+                      <button className="order-btn" title="지정 제거" onClick={() => setOvr(ovr.filter((_, k) => k !== oi))}><TrashIcon size={11} /></button>
+                    </div>
+                  ))}
+                  <button className="link-mini" onClick={() => setOvr([...ovr, { name: '', value: '' }])}>+ 자식 변수 통제</button>
                 </div>
               )}
             </div>

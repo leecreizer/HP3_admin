@@ -445,6 +445,11 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 }
 .help-pop-var em { color: #cbd5e1; font-style: normal; font-size: 0.7rem; }
 .help-pop-var small { color: #aeb8c8; font-size: 0.68rem; margin-left: 4px; }
+/* 수식/조건식 결과 미리보기 */
+.var-preview { display: block; font-size: 0.72rem; margin: 2px 0 6px 6px; font-family: var(--num, monospace); }
+.var-preview.pv-ok { color: #2e7d51; }
+.var-preview.pv-err { color: #c0392b; }
+.var-preview.pv-ctx { color: #8b93a1; }
 .help-pop {
   position: absolute; left: 0; top: 20px; z-index: 80; width: 260px;
   background: #2b3440; color: #f2f5f8;
