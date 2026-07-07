@@ -373,11 +373,9 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
   /** 웹플래너로 배치(또는 갱신) 요청 — 현재 유효 치수 전송 */
   const sendPlace = (p: LibProduct) => {
     const dm = effDims(p);
-    // 축별 가변 사이즈 범위 — 웹플래너 리사이즈 핸들(길이 변경 UI)용.
-    // 형제 변형(모델+품목 동일, 사이즈만 다름) 값이 여러개인 축 = 그 값들로만 스냅(options,
-    // 커밋 시 사이즈 상품 교체). 그 외는 기존 규칙: MIN·MAX 범위(GAP 스텝) / MIN만 = 고정 /
-    // 비워둠 = 자유 입력(넓은 범위).
-    const FREE = { min: 10, max: 10000, gap: 0 };
+    // 축별 가변 사이즈 범위 — 웹플래너 리사이즈 핸들(길이 변경 UI)용. 범위 미설정 축은 고정.
+    // 단, 형제 변형(모델+품목 동일, 사이즈만 다름) 값이 여러개인 축은 그 값들로만 스냅(options,
+    // 커밋 시 해당 사이즈 상품으로 교체).
     const op = p.opSize;
     const sibs = sibsOf(p);
     const axisRange = (ax: 'W' | 'D' | 'H', k: 'w' | 'd' | 'h') => {
@@ -388,9 +386,7 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
       const min = op?.[`min${ax}` as keyof OpSize];
       const max = op?.[`max${ax}` as keyof OpSize];
       const gap = op?.[`gap${ax}` as keyof OpSize];
-      if (min != null && max != null && max > min) return { min, max, gap: gap || 0 };
-      if (min != null) return undefined; // 고정값
-      return FREE; // 미설정 = 자유 입력
+      return min != null && max != null && max > min ? { min, max, gap: gap || 0 } : undefined;
     };
     const w = axisRange('W', 'w'), d0 = axisRange('D', 'd'), h = axisRange('H', 'h');
     const sizeRange = { ...(w ? { w } : {}), ...(d0 ? { d: d0 } : {}), ...(h ? { h } : {}) };
