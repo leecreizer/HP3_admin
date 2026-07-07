@@ -37,7 +37,7 @@ type LibProduct = ReturnType<typeof loadProducts>[number] & {
   filterValues?: string[];
   specUrls?: { name: string; url: string }[];
   mallUrls?: { name: string; url: string }[];
-  modelingSlots?: { slot: string; groupId: string; defaultModelingId?: string; rules?: { condition: string; groupId: string }[] }[];
+  modelingSlots?: { slot: string; groupId: string; defaultModelingId?: string; rules?: { condition: string; groupId: string }[]; overrides?: { name: string; value: string }[] }[];
   modelUrl?: string;
   assets?: { id: string; name: string; type: string; url?: string }[];
   opSize?: OpSize;
@@ -351,17 +351,22 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
   /** 웹플래너로 배치(또는 갱신) 요청 — 현재 유효 치수 전송 */
   const sendPlace = (p: LibProduct) => {
     const dm = effDims(p);
-    // 축별 가변 사이즈 범위 — 웹플래너 리사이즈 핸들(길이 변경 UI)용. 범위 미설정 축은 고정.
+    // 축별 가변 사이즈 범위 — 웹플래너 리사이즈 핸들(길이 변경 UI)용.
+    // MIN·MAX 설정 = 그 범위(GAP 스텝) / MIN만(또는 MIN=MAX) = 고정(핸들 없음) /
+    // 비워둠 = 자유 입력 → 넓은 범위로 보내 드래그 리사이즈 허용.
+    const FREE = { min: 10, max: 10000, gap: 0 };
     const op = p.opSize;
     const rng = (min?: number, max?: number, gap?: number) =>
-      min != null && max != null && max > min ? { min, max, gap: gap || 0 } : undefined;
+      min != null && max != null && max > min ? { min, max, gap: gap || 0 }
+      : min != null ? undefined // 고정값
+      : FREE; // 미설정 = 자유 입력
     const sizeRange = op
       ? {
           ...(rng(op.minW, op.maxW, op.gapW) ? { w: rng(op.minW, op.maxW, op.gapW) } : {}),
           ...(rng(op.minD, op.maxD, op.gapD) ? { d: rng(op.minD, op.maxD, op.gapD) } : {}),
           ...(rng(op.minH, op.maxH, op.gapH) ? { h: rng(op.minH, op.maxH, op.gapH) } : {}),
         }
-      : undefined;
+      : { w: FREE, d: FREE, h: FREE }; // 운영사이즈 미설정 상품 = 전 축 자유
     iframeRef.current?.contentWindow?.postMessage(
       { type: 'hp3:place-product', name: p.name, code: p.productCode, modelUrl: modelUrlOf(p), color: p.color, ...dm, sizeRange },
       '*',
@@ -440,7 +445,7 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
 
   const [attachMsg, setAttachMsg] = useState('');
   /** 도어 컨텐츠코드 묶음 → 몸통 DP 매칭 도어를 POS(좌/우)에 자동 배치 (그룹/폴더 공통) */
-  const attachDoorsFromCodes = (codes: string[], label: string, opts?: { selectBest?: boolean }) => {
+  const attachDoorsFromCodes = (codes: string[], label: string, opts?: { selectBest?: boolean; groupId?: string }) => {
     if (!sel) { setAttachMsg('⚠ 먼저 캔버스에서 몸통(베이스)을 배치·선택하세요.'); return; }
     // 몸통 DP 타입 — 모델(GLB)에서 읽은 것 우선, 없으면 상품 DP 속성 fallback.
     const modelDp = (sel.productCode ? modelDpRef.current[sel.productCode] : undefined) ?? [];
