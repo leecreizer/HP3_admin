@@ -373,10 +373,10 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
   /** 웹플래너로 배치(또는 갱신) 요청 — 현재 유효 치수 전송 */
   const sendPlace = (p: LibProduct) => {
     const dm = effDims(p);
-    // 축별 가변 사이즈 범위 — 웹플래너 리사이즈 핸들(길이 변경 UI)용. 기본정보(속성설정)와 동일 규칙:
-    // ① 형제 변형 사이즈 여러개 = 그 값들만 선택(options, 커밋 시 상품 교체)
-    // ② 규격 GAP>1 = 단계 옵션(options) ③ 그 외 MIN·MAX = 범위 자유(GAP 스텝)
-    // ④ MIN만(또는 MIN=MAX) = 고정(핸들 없음) ⑤ 미설정 = 자유 입력(넓은 범위)
+    // 축별 가변 사이즈 범위 — 웹플래너 리사이즈 핸들(길이 변경 UI)용.
+    // 형제 변형(모델+품목 동일, 사이즈만 다름) 값이 여러개인 축 = 그 값들로만 스냅(options,
+    // 커밋 시 사이즈 상품 교체). 그 외는 기존 규칙: MIN·MAX 범위(GAP 스텝) / MIN만 = 고정 /
+    // 비워둠 = 자유 입력(넓은 범위).
     const FREE = { min: 10, max: 10000, gap: 0 };
     const op = p.opSize;
     const sibs = sibsOf(p);
@@ -388,12 +388,7 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
       const min = op?.[`min${ax}` as keyof OpSize];
       const max = op?.[`max${ax}` as keyof OpSize];
       const gap = op?.[`gap${ax}` as keyof OpSize];
-      if (min != null && max != null && max > min) {
-        const opts = gap != null && gap > 1 && !p.nonStandard ? opSizeOptions(op, ax) : null;
-        return opts && opts.length > 1
-          ? { min: opts[0], max: opts[opts.length - 1], gap: 0, options: opts }
-          : { min, max, gap: gap || 0 };
-      }
+      if (min != null && max != null && max > min) return { min, max, gap: gap || 0 };
       if (min != null) return undefined; // 고정값
       return FREE; // 미설정 = 자유 입력
     };
