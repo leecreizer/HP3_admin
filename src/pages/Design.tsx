@@ -254,22 +254,6 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
         if (md.code) {
           const prod = products.find((pp) => pp.productCode === md.code);
           if (prod) {
-            // 형제 변형(선택값) 라인이면 해당 사이즈 상품으로 교체 — 기본정보 select와 동일 동작.
-            const sibs = prod.modelCode && prod.itemCode
-              ? products.filter((q) => q.modelCode === prod.modelCode && q.itemCode === prod.itemCode)
-              : [];
-            if (sibs.length > 1) {
-              const t = sibs.find((q) => q.w === md.w && q.d === md.d && q.h === md.h)
-                ?? sibs.find((q) => (['w', 'd', 'h'] as const).some((k) => md[k] !== prod[k] && q[k] === md[k]));
-              if (t && t.productCode !== prod.productCode) {
-                setActiveCode(t.contentCode);
-                iframeRef.current?.contentWindow?.postMessage(
-                  { type: 'hp3:update-product', code: t.productCode, name: t.name, modelUrl: modelUrlOf(t as LibProduct), color: t.color, w: t.w ?? 0, d: t.d ?? 0, h: t.h ?? 0 },
-                  '*',
-                );
-                return;
-              }
-            }
             setDimOverrides((prev) => ({
               ...prev,
               [prod.contentCode]: {
@@ -364,32 +348,20 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
     }
     return out;
   };
-  /** 모델+품목 코드가 같은 형제 상품(사이즈 변형 라인) — 임의 상품 기준. */
-  const sibsOf = (p: LibProduct): LibProduct[] =>
-    p.modelCode && p.itemCode
-      ? (products.filter((q) => q.modelCode === p.modelCode && q.itemCode === p.itemCode) as LibProduct[])
-      : [];
-
   /** 웹플래너로 배치(또는 갱신) 요청 — 현재 유효 치수 전송 */
   const sendPlace = (p: LibProduct) => {
     const dm = effDims(p);
     // 축별 가변 사이즈 범위 — 웹플래너 리사이즈 핸들(길이 변경 UI)용. 범위 미설정 축은 고정.
-    // 단, 형제 변형(모델+품목 동일, 사이즈만 다름) 값이 여러개인 축은 그 값들로만 스냅(options,
-    // 커밋 시 해당 사이즈 상품으로 교체).
     const op = p.opSize;
-    const sibs = sibsOf(p);
-    const axisRange = (ax: 'W' | 'D' | 'H', k: 'w' | 'd' | 'h') => {
-      const sibVals = sibs.length > 1
-        ? [...new Set(sibs.map((q) => q[k]).filter((n): n is number => typeof n === 'number'))].sort((a, b) => a - b)
-        : [];
-      if (sibVals.length > 1) return { min: sibVals[0], max: sibVals[sibVals.length - 1], gap: 0, options: sibVals };
-      const min = op?.[`min${ax}` as keyof OpSize];
-      const max = op?.[`max${ax}` as keyof OpSize];
-      const gap = op?.[`gap${ax}` as keyof OpSize];
-      return min != null && max != null && max > min ? { min, max, gap: gap || 0 } : undefined;
-    };
-    const w = axisRange('W', 'w'), d0 = axisRange('D', 'd'), h = axisRange('H', 'h');
-    const sizeRange = { ...(w ? { w } : {}), ...(d0 ? { d: d0 } : {}), ...(h ? { h } : {}) };
+    const rng = (min?: number, max?: number, gap?: number) =>
+      min != null && max != null && max > min ? { min, max, gap: gap || 0 } : undefined;
+    const sizeRange = op
+      ? {
+          ...(rng(op.minW, op.maxW, op.gapW) ? { w: rng(op.minW, op.maxW, op.gapW) } : {}),
+          ...(rng(op.minD, op.maxD, op.gapD) ? { d: rng(op.minD, op.maxD, op.gapD) } : {}),
+          ...(rng(op.minH, op.maxH, op.gapH) ? { h: rng(op.minH, op.maxH, op.gapH) } : {}),
+        }
+      : undefined;
     iframeRef.current?.contentWindow?.postMessage(
       { type: 'hp3:place-product', name: p.name, code: p.productCode, modelUrl: modelUrlOf(p), color: p.color, ...dm, sizeRange },
       '*',
