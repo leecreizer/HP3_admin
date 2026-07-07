@@ -79,7 +79,7 @@ type FormulaVal = number | boolean | string;
 export function evalFormula(expr: string, vars: Record<string, number | string>): number | boolean | string | null {
   if (!expr || !expr.trim()) return null;
   // 변수명: 영문/한글 시작, 점(.) 경로 허용 — 예) #up.LDH. 문자 리터럴: '값' 또는 "값"
-  const tokens = expr.match(/'[^']*'|"[^"]*"|>=|<=|==|!=|&&|\|\||[<>+\-*/(),!]|#?[A-Za-z_가-힣][\w가-힣]*(?:\.[A-Za-z_가-힣][\w가-힣]*)*|\d*\.?\d+/g);
+  const tokens = expr.match(/'[^']*'|"[^"]*"|>=|<=|==|!=|&&|\|\||[<>+\-*/(),!?:]|#?[A-Za-z_가-힣][\w가-힣]*(?:\.[A-Za-z_가-힣][\w가-힣]*)*|\d*\.?\d+/g);
   if (!tokens) return null;
   let i = 0; let bad = false;
   const peek = () => tokens[i];
@@ -91,6 +91,17 @@ export function evalFormula(expr: string, vars: Record<string, number | string>)
     return v;
   };
 
+  // 삼항 조건 — 조건 ? 참값 : 거짓값 (최상위 우선순위). 폴백 패턴: isValue(#up.여백) ? #up.여백 : 30
+  const parseTernary = (): FormulaVal => {
+    const c = parseOr();
+    if (peek() === '?') {
+      eat(); const a = parseTernary();
+      if (peek() === ':') eat(); else bad = true;
+      const b = parseTernary();
+      return num(c) ? a : b;
+    }
+    return c;
+  };
   const parseOr = (): FormulaVal => {
     let v = parseAnd();
     while (kw(peek(), 'or') || peek() === '||') { eat(); const r = parseAnd(); v = (!!num(v) || !!num(r)); }
@@ -136,7 +147,7 @@ export function evalFormula(expr: string, vars: Record<string, number | string>)
   const parsePrimary = (): FormulaVal => {
     const t = peek();
     if (t === undefined) { bad = true; return 0; }
-    if (t === '(') { eat(); const v = parseOr(); if (peek() === ')') eat(); else bad = true; return v; }
+    if (t === '(') { eat(); const v = parseTernary(); if (peek() === ')') eat(); else bad = true; return v; }
     eat();
     // 문자 리터럴 — '여닫이도어', "SMP10001"
     if (/^['"]/.test(t)) return t.slice(1, -1);
@@ -146,8 +157,19 @@ export function evalFormula(expr: string, vars: Record<string, number | string>)
       if (low === 'true') return true; if (low === 'false') return false;
       if (low === 'pi') return Math.PI;
       if (peek() === '(') { // 함수 호출
-        eat(); const args: number[] = [];
-        if (peek() !== ')') { args.push(num(parseOr())); while (peek() === ',') { eat(); args.push(num(parseOr())); } }
+        eat();
+        // isValue(x) — 변수 존재/유효 여부. 미정의 변수 접근 오류를 삼켜 0(없음)/1(있음)으로 판정
+        if (low === 'isvalue') {
+          const saved = bad; bad = false;
+          const arg: FormulaVal | undefined = peek() !== ')' ? parseTernary() : undefined;
+          while (peek() === ',') { eat(); parseTernary(); }
+          if (peek() === ')') eat(); else bad = true;
+          const defined = !bad && arg !== undefined && arg !== '';
+          bad = saved; // 전체 수식은 깨지 않음
+          return defined ? 1 : 0;
+        }
+        const args: number[] = [];
+        if (peek() !== ')') { args.push(num(parseTernary())); while (peek() === ',') { eat(); args.push(num(parseTernary())); } }
         if (peek() === ')') eat(); else bad = true;
         if (low === 'if') return args[0] ? args[1] : args[2];
         const fn = FORMULA_FNS[low]; if (!fn) { bad = true; return 0; }
@@ -158,7 +180,7 @@ export function evalFormula(expr: string, vars: Record<string, number | string>)
     }
     return Number(t);
   };
-  const result = parseOr();
+  const result = parseTernary();
   if (bad || i !== tokens.length) return null;
   if (typeof result === 'boolean' || typeof result === 'string') return result;
   return Number.isFinite(result) ? result : null;
