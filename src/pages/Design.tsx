@@ -57,8 +57,6 @@ type LibProduct = ReturnType<typeof loadProducts>[number] & {
   formula?: { w?: string; d?: string; h?: string };
   vars?: { name: string; label?: string; value: string; type?: VarType; expose?: boolean; options?: string; exposeWhen?: string }[];
   condition?: string;
-  installWhen?: string;
-  installMsg?: string;
 };
 
 type DesignUser = { id: string; name: string; email: string; groupIds: string[] };
@@ -1024,26 +1022,6 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
                     if (gid) slotCond.set(gid, cond);
                   }
                   const openGroupFlyout = (gid: string) => { setSwapGroupId(gid); setSwapFolderId(null); setSwapOpen(true); };
-                  // B: 부속 상품의 배치가능 조건(installWhen)을 상위(=현재 선택 몸통 sel) 기준으로 평가
-                  const upCtx = { ...builtinVars(sel, effDims(sel), 'up'), ...childVars(sel) };
-                  const canInstall = (child: LibProduct): boolean => {
-                    if (!child.installWhen?.trim()) return true;
-                    const cd = effDims(child);
-                    const ctx: Record<string, number | string> = { W: cd.w, D: cd.d, H: cd.h, ...builtinVars(child, cd), ...upCtx };
-                    (child.vars ?? []).forEach((v) => {
-                      if (!v.name?.trim() || varTypeOf(v) === '조건식') return;
-                      const n = v.value?.trim() ? evalFormula(v.value, ctx) : null;
-                      if (n != null) ctx[v.name.trim()] = n as number | string;
-                    });
-                    const r = evalFormula(child.installWhen, ctx);
-                    return r === true || r === 1;
-                  };
-                  const groupInstall = (gid: string) => {
-                    const members = (memberMap[gid] ?? []).map((c) => products.find((p) => p.contentCode === c)).filter(Boolean) as LibProduct[];
-                    const ok = members.filter(canInstall);
-                    const blockedMsg = members.find((m) => m.installWhen?.trim() && !canInstall(m))?.installMsg;
-                    return { total: members.length, ok: ok.length, blocked: members.length - ok.length, blockedMsg };
-                  };
                   const sections = swapState.categories.map((cat) => {
                     const groups = swapState.groups.filter((g) => g.kind === cat && (memberMap[g.id]?.length ?? 0) > 0);
                     if (groups.length === 0) return null;
@@ -1055,19 +1033,15 @@ export function Design({ users = [], currentUserId = null, isAdmin = false }: De
                           const codes = memberMap[g.id] ?? [];
                           const active = slotCond.has(g.id);
                           const cond = slotCond.get(g.id);
-                          const inst = groupInstall(g.id);
-                          const allBlocked = inst.total > 0 && inst.ok === 0; // 전부 설치불가
                           return (
-                            <button key={g.id} className={`bi-swap-folder${allBlocked ? ' blocked' : ''}`}
-                              title={allBlocked ? (inst.blockedMsg || '현재 몸통 조건에서 설치 불가') : '클릭 시 왼쪽에 이 그룹의 상품 리스트가 열립니다'}
-                              onClick={() => { if (allBlocked) { setAttachMsg(`🚫 ${g.name}: ${inst.blockedMsg || '현재 몸통 조건에서 설치 불가'}`); return; } openGroupFlyout(g.id); }}>
+                            <button key={g.id} className="bi-swap-folder"
+                              title="클릭 시 왼쪽에 이 그룹의 상품 리스트가 열립니다"
+                              onClick={() => openGroupFlyout(g.id)}>
                               <span className="bi-cgroup-kind">{g.type === 'grouping' ? '폴더 노출' : '교체 묶음'}</span>
                               <span className="bi-swap-fname">{g.name}
                                 {active && <small style={{ color: 'var(--text-3)', marginLeft: 6 }}>{cond ? `· 조건: ${cond}` : '· 구성 슬롯'}</small>}
-                                {allBlocked && <small style={{ color: '#c0392b', marginLeft: 6 }}>🚫 설치불가</small>}
-                                {!allBlocked && inst.blocked > 0 && <small style={{ color: 'var(--text-3)', marginLeft: 6 }}>· {inst.blocked}개 불가</small>}
                               </span>
-                              <span className="bi-swap-cnt">{allBlocked ? '0/' + inst.total : codes.length}</span>
+                              <span className="bi-swap-cnt">{codes.length}</span>
                             </button>
                           );
                         })}

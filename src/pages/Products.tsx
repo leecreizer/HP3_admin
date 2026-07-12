@@ -229,10 +229,6 @@ type Product = {
    *  type: 고정값(숫자) / 수식(계산식 — 이름이 W·D·H면 내보내기 치수로 사용) / 조건식(모두 TRUE일 때만 자동배치).
    *  type 미지정(구버전)은 값이 숫자면 고정값, 아니면 수식으로 취급. */
   vars?: { name: string; label?: string; value: string; type?: VarType; expose?: boolean; options?: string; exposeWhen?: string }[];
-  /** 배치가능 조건식 — 상위(#up.*)·하위(#down.*)·자기 변수로 판정. FALSE면 설계 화면에 '설치불가' 사유 표시. */
-  installWhen?: string;
-  /** 설치불가 시 표시 사유(없으면 기본 문구) */
-  installMsg?: string;
   /** (구버전) 조건식 — '조건식' 유형 변수로 대체. 기존 데이터 호환용으로만 유지 */
   condition?: string;
   placement: '바닥' | '벽' | '천장';
@@ -531,7 +527,6 @@ const FIELD_HINTS: Record<string, FieldHint> = {
   placeHeight: { v: '#lift', d: '배치 높이(mm, 바닥에서 띄움). 상위=#up.lift' },
   opSize: { v: '#minW #maxW #gapW · #minD #maxD #gapD · #minH #maxH #gapH', d: '값을 설정한 축만 참조 가능 (예: #maxH - 50). 규격+GAP>1: 단계 선택 / 비규격: 자유 입력' },
   vars: { v: '#이름', d: "사용자 변수. 유형: 고정값·수식(W/D/H=내보내기 치수)·조건식(TRUE시 배치)·선택(옵션 목록).  ▸참조 3종: 자기 #이름 · 상위 #up.이름 · 하위 #down.{부위}.count.  ▸폴백: isValue(#up.여백) ? #up.여백 : 30 (부모에 있으면 당기고 없으면 기본값)" },
-  installWhen: { v: '#up.* #down.* 사용', d: "배치가능 조건식 — TRUE여야 설치. 상위 몸통(#up.W 등)·하위 부위(#down.도어.count)·자기 값·운영사이즈(#minW) 참조. 미충족 시 설계 화면에 '설치불가'+사유 표시" },
 };
 
 /** 선택 유형 변수의 옵션 편집 — 표시명·실제값을 각각 입력 후 [추가]로 등록, 칩 × 로 삭제.
@@ -729,8 +724,6 @@ export const SAMPLE_BODYVAR_PRODUCTS: Product[] = [
     productGroup: '도어', quoteGroup: '도어', productCode: 'SMP20001',
     thumbUrl: genThumb('door', '샘플 도어 L'),
     w: 600, d: 20, h: 2000, dp: 'SMP', pos: 'L',
-    installWhen: '#up.W >= 1000',
-    installMsg: '몸통 폭 1000mm 이상에서만 설치 가능',
     vars: [
       { name: 'W', value: '#up.W/2 - #up.패널두께', type: '수식' },
       { name: 'H', value: '#up.H - #up.LDH', type: '수식' },
@@ -1041,8 +1034,6 @@ type ProductForm = {
   formula: { w: string; d: string; h: string };
   vars: { name: string; label?: string; value: string; type?: VarType; expose?: boolean; options?: string; exposeWhen?: string }[];
   condition: string;
-  installWhen: string;
-  installMsg: string;
   placement: '바닥' | '벽' | '천장';
   placeHeight: string;
   modelingType: '배치형' | '설계형';
@@ -1066,7 +1057,7 @@ const EMPTY_OPSIZE = { minW: '', maxW: '', gapW: '', minD: '', maxD: '', gapD: '
 const EMPTY_PRODUCT_FORM: ProductForm = {
   editNote: '',
   attrType: '모델링', name: '', brand: '한샘', productGroup: '', quoteGroup: '', contentCode: '',
-  productCode: '', modelCode: '', itemCode: '', price: '', modelUrl: '', modelGroupId: '', permission: '전체', w: '', d: '', h: '', opSize: { ...EMPTY_OPSIZE }, dp: '', pos: '', nonStandard: false, formula: { w: '', d: '', h: '' }, vars: [], condition: '', installWhen: '', installMsg: '', placement: '바닥', placeHeight: '0',
+  productCode: '', modelCode: '', itemCode: '', price: '', modelUrl: '', modelGroupId: '', permission: '전체', w: '', d: '', h: '', opSize: { ...EMPTY_OPSIZE }, dp: '', pos: '', nonStandard: false, formula: { w: '', d: '', h: '' }, vars: [], condition: '', placement: '바닥', placeHeight: '0',
   modelingType: '배치형', productKind: '', modelKind: '', folderId: 'f-model', filterValues: [], opValues: {},
   modelingSlots: [], styleIds: [], specUrls: [], mallUrls: [], thumbUrl: undefined, assets: [],
 };
@@ -1865,8 +1856,6 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
         formula: formToFormula(form.formula),
         vars: form.vars.filter((v) => v.name.trim()),
         condition: form.condition.trim() || undefined,
-        installWhen: form.installWhen.trim() || undefined,
-        installMsg: form.installMsg.trim() || undefined,
         placement: form.placement,
         placeHeight: Number(form.placeHeight) || 0,
         attrType: form.attrType,
@@ -1925,8 +1914,6 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
     formula: { w: p.formula?.w ?? '', d: p.formula?.d ?? '', h: p.formula?.h ?? '' },
     vars: p.vars ? p.vars.map((v) => ({ ...v })) : [],
     condition: p.condition ?? '',
-    installWhen: p.installWhen ?? '',
-    installMsg: p.installMsg ?? '',
     w: String(p.w || ''),
     d: String(p.d || ''),
     h: String(p.h || ''),
@@ -2139,8 +2126,6 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
               formula: formToFormula(form.formula),
               vars: form.vars.filter((v) => v.name.trim()),
               condition: form.condition.trim() || undefined,
-              installWhen: form.installWhen.trim() || undefined,
-              installMsg: form.installMsg.trim() || undefined,
               placement: form.placement,
               placeHeight: Number(form.placeHeight) || 0,
               attrType: form.attrType,
@@ -2509,25 +2494,6 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
       </div>
     );
   };
-
-  /** 배치가능 조건 + 설치불가 사유 입력 (B) */
-  const renderInstallCond = () => (
-    <div className="form-grid">
-      <label className="form-field span-2">
-        <span>배치가능 조건식 <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(비우면 항상 배치 가능)</small></span>
-        <input className="inline-input full" type="text" value={form.installWhen}
-          placeholder="예: #up.W >= 600 AND #up.H >= 1200 (상위 몸통이 이 범위여야 설치 가능)"
-          onChange={(e) => setForm((f) => ({ ...f, installWhen: e.target.value }))} />
-        {form.installWhen.trim() && (() => { const pv = evalPreview(form.installWhen, formEvalCtx(form.vars.length), true); return pv.text ? <span className={`var-preview ${pv.cls}`}>{pv.text}</span> : null; })()}
-      </label>
-      <label className="form-field span-2">
-        <span>설치불가 사유 <small style={{ fontWeight: 400, color: 'var(--text-3)' }}>(미충족 시 설계 화면 표시 문구)</small></span>
-        <input className="inline-input full" type="text" value={form.installMsg}
-          placeholder="예: 몸통 폭 600 이상에서만 설치 가능합니다"
-          onChange={(e) => setForm((f) => ({ ...f, installMsg: e.target.value }))} />
-      </label>
-    </div>
-  );
 
   const renderModelingSlots = () => {
     const setSlots = (next: ProductForm['modelingSlots']) => setForm((f) => ({ ...f, modelingSlots: next }));
@@ -3057,13 +3023,6 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
                 onClick={() => setForm((f) => ({ ...f, vars: [...f.vars, { name: '', value: '', type: '고정값' as VarType }] }))}>+ 변수</button>
             </div>
             {renderVarRows()}
-
-            {/* 배치가능 조건 — 상위(#up.*)·하위(#down.*)·자기 변수로 판정. FALSE면 설계 화면에 설치불가 표시 */}
-            <div className="panel-head" style={{ marginTop: 14 }}>
-              <h2 style={{ fontSize: '0.92rem' }}>배치가능 조건<HelpTip text={FIELD_HINTS.installWhen} /></h2>
-              <span className="sel-info" style={{ marginLeft: 12 }}>충족해야 설치 가능 — 미충족 시 설계에 '설치불가' 표시</span>
-            </div>
-            {renderInstallCond()}
 
             <div className="panel-head" style={{ marginTop: 18 }}>
               <h2 style={{ fontSize: '0.92rem' }}>운영 항목</h2>
@@ -3665,12 +3624,6 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
                     onClick={() => setForm((f) => ({ ...f, vars: [...f.vars, { name: '', value: '', type: '고정값' as VarType }] }))}>+ 변수</button>
                 </div>
                 {renderVarRows()}
-
-                <div className="panel-head" style={{ marginTop: 14 }}>
-                  <h2 style={{ fontSize: '0.92rem' }}>배치가능 조건<HelpTip text={FIELD_HINTS.installWhen} /></h2>
-                  <span className="sel-info" style={{ marginLeft: 12 }}>충족해야 설치 가능 — 미충족 시 설계에 '설치불가' 표시</span>
-                </div>
-                {renderInstallCond()}
 
                 <div className="panel-head" style={{ marginTop: 18 }}>
                   <h2 style={{ fontSize: '0.92rem' }}>운영 항목</h2>
