@@ -243,8 +243,6 @@ type Product = {
   modelKind: string;
   /** 필터 분류 — 선택된 옵션 id 목록 */
   filterValues?: string[];
-  /** 운영정보 조합별 입력값 */
-  opValues?: Record<string, string>;
   /** 구성/교체 슬롯 — 모델링 교체 그룹 연결 (도어→도어그룹 등)
    *  rules: 조건식(evalFormula)→교체 묶음(groupId) 분기. 위에서부터 참인 첫 규칙의 그룹 사용, 없으면 기본 groupId */
   modelingSlots?: { slot: string; groupId: string; defaultModelingId?: string; rules?: { condition: string; groupId: string }[]; overrides?: { name: string; value: string }[] }[];
@@ -324,15 +322,6 @@ const INITIAL_MODELS: Record<string, string[]> = {
   수납: ['시그니처', '유로503'],
   바스: ['샘'],
   마감재: ['유로503'],
-};
-
-/**
- * 컨텐츠 운영정보 — 상품군+상품구분 조합별로 노출할 항목 정의.
- * 키: `${상품군}|${상품구분}` (구분 무관이면 `${상품군}`). 조합 매핑은 추후 사용자가 정리해 채운다.
- */
-type OperationField = { key: string; label: string; placeholder?: string };
-const OPERATION_SPEC: Record<string, OperationField[]> = {
-  // 예) '부엌|싱크볼': [{ key: 'bowlCount', label: '볼 개수' }],
 };
 
 /** 필터: 제목 그룹 + 선택 항목(옵션) 2단 구조 */
@@ -1041,8 +1030,6 @@ type ProductForm = {
   modelKind: string;
   folderId: string;
   filterValues: string[];
-  /** 운영정보 조합별 입력값 */
-  opValues: Record<string, string>;
   /** 구성/교체 슬롯 */
   modelingSlots: { slot: string; groupId: string; defaultModelingId?: string; rules?: { condition: string; groupId: string }[]; overrides?: { name: string; value: string }[] }[];
   styleIds: string[];
@@ -1058,7 +1045,7 @@ const EMPTY_PRODUCT_FORM: ProductForm = {
   editNote: '',
   attrType: '모델링', name: '', brand: '한샘', productGroup: '', quoteGroup: '', contentCode: '',
   productCode: '', modelCode: '', itemCode: '', price: '', modelUrl: '', modelGroupId: '', permission: '전체', w: '', d: '', h: '', opSize: { ...EMPTY_OPSIZE }, dp: '', pos: '', nonStandard: false, formula: { w: '', d: '', h: '' }, vars: [], condition: '', placement: '바닥', placeHeight: '0',
-  modelingType: '배치형', productKind: '', modelKind: '', folderId: 'f-model', filterValues: [], opValues: {},
+  modelingType: '배치형', productKind: '', modelKind: '', folderId: 'f-model', filterValues: [],
   modelingSlots: [], styleIds: [], specUrls: [], mallUrls: [], thumbUrl: undefined, assets: [],
 };
 
@@ -1863,7 +1850,6 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
         productKind: form.productKind.trim(),
         modelKind: form.modelKind.trim(),
         filterValues: form.filterValues,
-        opValues: form.opValues,
         modelingSlots: form.modelingSlots,
         styleIds: form.styleIds,
         specUrls: form.specUrls.filter((u) => u.name.trim() || u.url.trim()),
@@ -1923,7 +1909,6 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
     modelKind: p.modelKind,
     folderId: p.folderId,
     filterValues: p.filterValues ?? [],
-    opValues: p.opValues ?? {},
     modelingSlots: p.modelingSlots ?? [],
     styleIds: p.styleIds ?? [],
     specUrls: p.specUrls ?? [],
@@ -2133,7 +2118,6 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
               productKind: form.productKind.trim(),
               modelKind: form.modelKind.trim(),
               filterValues: form.filterValues,
-              opValues: form.opValues,
               modelingSlots: form.modelingSlots,
               styleIds: form.styleIds,
               specUrls: form.specUrls.filter((u) => u.name.trim() || u.url.trim()),
@@ -2337,35 +2321,6 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
   );
 
   /** 상품군 + 상품 분류 조합별 운영정보 항목 (조합 매핑은 추후 정의) */
-  const renderOperationInfo = () => {
-    const spec = OPERATION_SPEC[`${form.productGroup}|${form.productKind}`] ?? OPERATION_SPEC[form.productGroup];
-    if (!spec || spec.length === 0) {
-      return (
-        <p className="hint">
-          {form.productGroup && form.productKind
-            ? `‘${form.productGroup} · ${form.productKind}’ 조합의 운영 항목은 아직 정의되지 않았습니다.`
-            : '상품군과 상품 구분을 선택하면 해당 조합의 운영 항목이 표시됩니다.'}
-          {' '}(조합별 항목 정의 예정)
-        </p>
-      );
-    }
-    return (
-      <div className="form-grid two-col">
-        {spec.map((field) => (
-          <label key={field.key} className="form-field">
-            <span>{field.label}</span>
-            <input
-              className="inline-input full"
-              value={form.opValues[field.key] ?? ''}
-              placeholder={field.placeholder}
-              onChange={(e) => setForm((f) => ({ ...f, opValues: { ...f.opValues, [field.key]: e.target.value } }))}
-            />
-          </label>
-        ))}
-      </div>
-    );
-  };
-
   /** 운영 사이즈 — 축별 MIN/MAX/GAP. 범위·간격이 있으면 기본정보에서 단계 선택 가능 */
   const renderOpSize = () => {
     const setOp = (k: keyof ProductForm['opSize'], v: string) => setForm((f) => ({ ...f, opSize: { ...f.opSize, [k]: v } }));
@@ -3024,11 +2979,6 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
             </div>
             {renderVarRows()}
 
-            <div className="panel-head" style={{ marginTop: 18 }}>
-              <h2 style={{ fontSize: '0.92rem' }}>운영 항목</h2>
-            </div>
-            {renderOperationInfo()}
-
             {/* 구성/교체 — 모델링 교체 그룹 연결 */}
             <div className="panel-head" style={{ marginTop: 18 }}>
               <h2 style={{ fontSize: '0.92rem' }}>구성/교체 (모델링 그룹)</h2>
@@ -3624,11 +3574,6 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
                     onClick={() => setForm((f) => ({ ...f, vars: [...f.vars, { name: '', value: '', type: '고정값' as VarType }] }))}>+ 변수</button>
                 </div>
                 {renderVarRows()}
-
-                <div className="panel-head" style={{ marginTop: 18 }}>
-                  <h2 style={{ fontSize: '0.92rem' }}>운영 항목</h2>
-                </div>
-                {renderOperationInfo()}
 
                 <div className="panel-head" style={{ marginTop: 18 }}>
                   <h2 style={{ fontSize: '0.92rem' }}>구성/교체 (모델링 그룹)</h2>
