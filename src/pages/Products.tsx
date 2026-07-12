@@ -92,15 +92,17 @@ export function evalFormula(expr: string, vars: Record<string, number | string>)
   };
 
   // 삼항 조건 — 조건 ? 참값 : 거짓값 (최상위 우선순위). 폴백 패턴: isValue(#up.여백) ? #up.여백 : 30
+  // 양쪽 가지를 다 파싱하되(토큰 소비), 선택되지 않은 가지의 오류(미정의 변수 등)는 무시한다.
   const parseTernary = (): FormulaVal => {
     const c = parseOr();
-    if (peek() === '?') {
-      eat(); const a = parseTernary();
-      if (peek() === ':') eat(); else bad = true;
-      const b = parseTernary();
-      return num(c) ? a : b;
-    }
-    return c;
+    if (peek() !== '?') return c;
+    eat();
+    const take = !!num(c);
+    const bBeforeA = bad; const a = parseTernary(); const aBad = bad && !bBeforeA; bad = bBeforeA;
+    if (peek() === ':') eat(); else bad = true;
+    const bBeforeB = bad; const b = parseTernary(); const bBad = bad && !bBeforeB; bad = bBeforeB;
+    if (take) { if (aBad) bad = true; return a; }
+    if (bBad) bad = true; return b;
   };
   const parseOr = (): FormulaVal => {
     let v = parseAnd();
@@ -528,7 +530,7 @@ const FIELD_HINTS: Record<string, FieldHint> = {
   placement: { v: '#placement', d: "배치 기준면. 문자값 — 예: #placement == '벽'" },
   placeHeight: { v: '#lift', d: '배치 높이(mm, 바닥에서 띄움). 상위=#up.lift' },
   opSize: { v: '#minW #maxW #gapW · #minD #maxD #gapD · #minH #maxH #gapH', d: '값을 설정한 축만 참조 가능 (예: #maxH - 50). 규격+GAP>1: 단계 선택 / 비규격: 자유 입력' },
-  vars: { v: '#이름', d: "사용자 변수. 유형: 고정값·수식(W/D/H=내보내기 치수)·조건식(TRUE시 배치)·선택(옵션 목록). 노출☑=설계 조정, 노출 조건식으로 조건부 표시.  ▸참조 3종:  자기 #이름  ·  상위 #up.이름 #up.W  ·  하위 #down.{부위}.count #down.{부위}.W" },
+  vars: { v: '#이름', d: "사용자 변수. 유형: 고정값·수식(W/D/H=내보내기 치수)·조건식(TRUE시 배치)·선택(옵션 목록).  ▸참조 3종: 자기 #이름 · 상위 #up.이름 · 하위 #down.{부위}.count.  ▸폴백: isValue(#up.여백) ? #up.여백 : 30 (부모에 있으면 당기고 없으면 기본값)" },
   installWhen: { v: '#up.* #down.* 사용', d: "배치가능 조건식 — TRUE여야 설치. 상위 몸통(#up.W 등)·하위 부위(#down.도어.count)·자기 값·운영사이즈(#minW) 참조. 미충족 시 설계 화면에 '설치불가'+사유 표시" },
 };
 
@@ -2435,8 +2437,9 @@ export function Products({ groups, panel = 'list', onClosePanel, currentUser = '
   /** 수식/조건식 결과 미리보기 — 오류/부모참조 필요/결과값 구분 */
   const evalPreview = (expr: string, ctx: Record<string, number | string>, isCond: boolean): { cls: string; text: string } => {
     if (!expr.trim()) return { cls: 'pv-none', text: '' };
-    if (/#(up|down)\./.test(expr)) return { cls: 'pv-ctx', text: '배치 시 계산 (부모/자식 값 필요)' };
     const r = evalFormula(expr, ctx);
+    // #up/#down 참조가 있는데 계산 실패 → 부모/자식 값이 있어야 확정(오류 아님)
+    if (r == null && /#(up|down)\./.test(expr)) return { cls: 'pv-ctx', text: '배치 시 계산 (부모/자식 값 필요)' };
     if (r == null) return { cls: 'pv-err', text: '⚠ 수식 오류 — 변수명·연산자 확인' };
     if (isCond) return { cls: 'pv-ok', text: (r === true || r === 1) ? '결과: 참(TRUE)' : '결과: 거짓(FALSE)' };
     return { cls: 'pv-ok', text: `= ${typeof r === 'number' ? Math.round(r * 100) / 100 : r}` };
