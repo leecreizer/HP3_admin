@@ -188,6 +188,13 @@ export function SketchCanvas({ profile, onChange }: { profile: Profile; onChange
         onPointerCancel={endDrag}
       >
         <polygon points={poly} fill="rgba(120,160,220,0.25)" stroke="#3a6" strokeWidth={2} />
+        {inEdge != null && n > 1 && (() => {
+          // 선택 정점으로 들어오는 변을 강조(직선/곡선 모두)
+          const from = verts[inEdge]; const to = verts[(inEdge + 1) % n]; const e = edges[inEdge];
+          const seg: Vec2[] = e && e.type === 'arc' ? [from, ...sampleArc(from, to, e.radius, e.ccw)] : [from, to];
+          return <polyline points={seg.map(toPx).map(([x, y]) => `${x},${y}`).join(' ')}
+            fill="none" stroke="#e06" strokeWidth={3} />;
+        })()}
         {verts.map((p, i) => {
           const [x, y] = toPx(p);
           return (
@@ -219,10 +226,15 @@ export function SketchCanvas({ profile, onChange }: { profile: Profile; onChange
                   onChange={() => setEdge(inEdge, { type: 'line' })} /> 직선</label>
                 <label><input type="radio" name="edgetype" checked={isArc}
                   onChange={() => {
-                    // 기본 R = 두 끝점 거리(충분히 완만한 호)
-                    const a = verts[(inEdge)]; const b = verts[(inEdge + 1) % n];
+                    const a = verts[inEdge]; const b = verts[(inEdge + 1) % n];
                     const d = Math.hypot(b[0] - a[0], b[1] - a[1]);
-                    setEdge(inEdge, { type: 'arc', radius: Math.max(SNAP, Math.round(d)), ccw: false });
+                    // 기본 방향: 도형 바깥으로 볼록해지도록 중심(centroid) 기준 자동 선택
+                    const gx = verts.reduce((s, p) => s + p[0], 0) / n;
+                    const gy = verts.reduce((s, p) => s + p[1], 0) / n;
+                    const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+                    const nx = -(b[1] - a[1]) / d, ny = (b[0] - a[0]) / d; // 현 수직
+                    const outward = (gx - mx) * nx + (gy - my) * ny > 0; // 중심이 있는 쪽 = 볼록 반대편
+                    setEdge(inEdge, { type: 'arc', radius: Math.max(SNAP, Math.round(d)), ccw: outward });
                   }} /> 곡선</label>
                 {isArc && inEdgeSpec?.type === 'arc' && (
                   <>
