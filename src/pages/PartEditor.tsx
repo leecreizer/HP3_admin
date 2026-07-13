@@ -53,10 +53,16 @@ export function PartEditor() {
             <SketchCanvas profile={cur.profile} onChange={(profile) => patch({ profile })} />
           </div>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: '0.85rem' }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: '0.85rem', flexWrap: 'wrap' }}>
               <span>두께(mm)</span>
               <input type="number" value={cur.extrude.depth} style={{ width: 80 }}
                 onChange={(e) => patch({ extrude: { ...cur.extrude, depth: Number(e.target.value) } })} />
+              <span>작업 평면</span>
+              <select value={cur.plane ?? 'XY'} onChange={(e) => patch({ plane: e.target.value as Part['plane'] })}>
+                <option value="XY">정면 XY (앞쪽으로 압출)</option>
+                <option value="XZ">평면 XZ (위로 압출)</option>
+                <option value="YZ">측면 YZ (옆으로 압출)</option>
+              </select>
               <span>색상</span>
               <input type="color" value={cur.material?.color ?? '#d8c5a8'}
                 onChange={(e) => patch({ material: { ...cur.material, color: e.target.value } })} />
@@ -66,7 +72,7 @@ export function PartEditor() {
             </div>
             <div style={{ flex: 1, minHeight: 560 }}>
               {errs.length === 0
-                ? <ExtrudePreview profile={cur.profile} depth={cur.extrude.depth} color={cur.material?.color} />
+                ? <ExtrudePreview profile={cur.profile} depth={cur.extrude.depth} color={cur.material?.color} plane={cur.plane ?? 'XY'} />
                 : <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: '#c33' }}>{errs.join(' / ')}</div>}
             </div>
           </div>

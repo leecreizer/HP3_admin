@@ -19,11 +19,16 @@ export interface Profile {
   contours: Contour[];
 }
 
+/** 2D 단면이 놓이는 작업 평면. 압출은 이 평면의 수직축으로 진행. */
+export type WorkPlane = 'XY' | 'XZ' | 'YZ';
+
 export interface Part {
   id: string;
   name: string;
   profile: Profile;
   method: 'extrude';
+  /** 작업 평면(기본 XY=정면). 없으면 XY로 간주. */
+  plane?: WorkPlane;
   extrude: { depth: number; bevel?: { size: number; thickness: number } };
   material?: { color: string; name?: string };
   bbox: { w: number; h: number; d: number };
