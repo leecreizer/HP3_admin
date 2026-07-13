@@ -131,8 +131,11 @@ export function Sidebar({ active, collapsed, config, allowedMenus, onSelect, onT
         {visibleMenu.map((item) => {
           // 메뉴별 하위메뉴 — 설정(좌측 메뉴 선택 → 하위메뉴 관리)에서 이름·표시·순서 구성
           const subs = (config.subMenus[item.key] ?? []).filter((s) => s.visible);
-          // 부모 활성/펼침 판정 — 하위메뉴들의 base 키 포함 여부
-          const bases = [item.key, ...(config.subMenus[item.key] ?? []).map((s) => baseKey(s.key))];
+          // 부모 활성/펼침 판정 — 하위메뉴(및 중첩 children)들의 base 키 포함 여부
+          const bases = [
+            item.key,
+            ...(config.subMenus[item.key] ?? []).flatMap((s) => [baseKey(s.key), ...(s.children ?? []).map((c) => baseKey(c.key))]),
+          ];
           const baseActive = bases.includes(baseKey(active));
           return (
             <div key={item.key} className="rail-group">
@@ -162,17 +165,37 @@ export function Sidebar({ active, collapsed, config, allowedMenus, onSelect, onT
               />
               {subs && subs.length > 0 && baseActive && !collapsed && (
                 <div className="rail-subs">
-                  {subs.map((sub) => (
-                    <Fragment key={sub.key}>
+                  {subs.map((sub) => {
+                    const kids = (sub.children ?? []).filter((c) => c.visible);
+                    if (kids.length > 0) {
+                      // 중첩 그룹: 라벨(비내비게이션) + 들여쓴 하위 항목
+                      return (
+                        <Fragment key={sub.key}>
+                          <div className="rail-sub-group">{sub.label}</div>
+                          {kids.map((kid) => (
+                            <button
+                              key={kid.key}
+                              className={`rail-sub rail-sub-child${active === kid.key ? ' active' : ''}`}
+                              aria-current={active === kid.key ? 'page' : undefined}
+                              onClick={() => onSelect(kid.key)}
+                            >
+                              {kid.label}
+                            </button>
+                          ))}
+                        </Fragment>
+                      );
+                    }
+                    return (
                       <button
+                        key={sub.key}
                         className={`rail-sub${active === sub.key ? ' active' : ''}`}
                         aria-current={active === sub.key ? 'page' : undefined}
                         onClick={() => onSelect(sub.key)}
                       >
                         {sub.label}
                       </button>
-                    </Fragment>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

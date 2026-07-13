@@ -18,6 +18,8 @@ export type MenuConfig = {
   key: MenuKey;
   label: string;
   visible: boolean;
+  /** 하위메뉴 안의 중첩 그룹(시스템 고정). 예: 컨텐츠 관리 > 에디터 > 파츠 모델러 */
+  children?: MenuConfig[];
 };
 
 export type TopbarConfig = {
@@ -94,7 +96,9 @@ export const DEFAULT_SUBMENUS: Record<string, MenuConfig[]> = {
   content: [
     { key: 'products', label: '상품 관리', visible: true },
     ...DEFAULT_PRODUCT_SUBMENUS,
-    { key: 'parts', label: '파츠 모델러', visible: true },
+    { key: 'content/editor', label: '에디터', visible: true, children: [
+      { key: 'parts', label: '파츠 모델러', visible: true },
+    ] },
   ],
   drawings: [
     { key: 'floorplans', label: '사용자 도면 관리', visible: true },
@@ -158,7 +162,11 @@ export function loadConfig(): AdminConfig {
         .filter((s) => defs.some((d) => d.key === s.key))
         .map((s) => ({ ...s, label: defs.find((d) => d.key === s.key)!.label }));
       const missingList = defs.filter((d) => !savedList.some((s) => s.key === d.key));
-      mergedSubMenus[parent] = [...savedList, ...missingList];
+      // children(중첩 그룹)은 시스템 고정 — 항상 최신 기본값으로 부착
+      mergedSubMenus[parent] = [...savedList, ...missingList].map((s) => {
+        const d = defs.find((x) => x.key === s.key);
+        return d?.children ? { ...s, children: d.children } : s;
+      });
     }
     // 등급 — 저장본 유지, 없으면 기본값. 기본 등급(builtin)은 항상 병합 보장
     const savedRoles = saved.roles ?? [];
