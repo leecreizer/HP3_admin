@@ -42,8 +42,13 @@ export function SketchCanvas({ profile, onChange }: { profile: Profile; onChange
   const sx = (W - PAD * 2) / Math.max(1, maxX - minX);
   const sy = (H - PAD * 2) / Math.max(1, maxY - minY);
   const s = Math.min(sx, sy);
-  const toPx = (p: Vec2): [number, number] => [PAD + (p[0] - minX) * s, H - PAD - (p[1] - minY) * s];
-  const toMm = (px: number, py: number): Vec2 => [snap((px - PAD) / s + minX), snap((H - PAD - py) / s + minY)];
+
+  const [frozen, setFrozen] = useState<{ minX: number; minY: number; s: number } | null>(null);
+  const tMinX = frozen ? frozen.minX : minX;
+  const tMinY = frozen ? frozen.minY : minY;
+  const tS = frozen ? frozen.s : s;
+  const toPx = (p: Vec2): [number, number] => [PAD + (p[0] - tMinX) * tS, H - PAD - (p[1] - tMinY) * tS];
+  const toMm = (px: number, py: number): Vec2 => [snap((px - PAD) / tS + tMinX), snap((H - PAD - py) / tS + tMinY)];
 
   const [drag, setDrag] = useState<number | null>(null);
   const onMove = (e: React.MouseEvent<SVGSVGElement>) => {
@@ -78,7 +83,9 @@ export function SketchCanvas({ profile, onChange }: { profile: Profile; onChange
       <svg
         width="100%" height={H} viewBox={`0 0 ${W} ${H}`}
         style={{ background: '#f5f5f2', border: '1px solid #ccc', flex: 1 }}
-        onMouseMove={onMove} onMouseUp={() => setDrag(null)} onMouseLeave={() => setDrag(null)}
+        onMouseMove={onMove}
+        onMouseUp={() => { setDrag(null); setFrozen(null); }}
+        onMouseLeave={() => { setDrag(null); setFrozen(null); }}
       >
         <polygon points={poly} fill="rgba(120,160,220,0.25)" stroke="#3a6" strokeWidth={2} />
         {pts.map((p, i) => {
@@ -87,7 +94,7 @@ export function SketchCanvas({ profile, onChange }: { profile: Profile; onChange
             <circle
               key={i} cx={x} cy={y} r={7}
               fill={sel === i ? '#e06' : '#36c'}
-              onMouseDown={() => { setSel(i); setDrag(i); }}
+              onMouseDown={() => { setSel(i); setDrag(i); setFrozen({ minX, minY, s }); }}
               style={{ cursor: 'grab' }}
             />
           );
