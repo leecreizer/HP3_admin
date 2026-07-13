@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { ExtrudeGeometry } from 'three';
@@ -12,6 +12,7 @@ function Mesh({ profile, depth, color }: { profile: Profile; depth: number; colo
     g.center();
     return g;
   }, [profile, depth]);
+  useEffect(() => () => geom.dispose(), [geom]);
   return (
     <mesh geometry={geom} scale={0.001 /* mm→m */}>
       <meshStandardMaterial color={color} />
