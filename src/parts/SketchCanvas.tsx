@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Profile, Vec2, Segment } from './types';
 import { sampleArc } from './partGeometry';
 
@@ -62,6 +62,9 @@ export function SketchCanvas({ profile, onChange }: { profile: Profile; onChange
 
   const svgRef = useRef<SVGSVGElement>(null);
   const [drag, setDrag] = useState<number | null>(null);
+  // 화면 이동/줌을 위한 뷰포트(viewBox). 기본은 0,0,W,H (맞춤 상태).
+  const [view, setView] = useState<{ x: number; y: number; w: number; h: number }>({ x: 0, y: 0, w: W, h: H });
+  const panRef = useRef<{ lastX: number; lastY: number } | null>(null);
 
   const clientToLocal = (clientX: number, clientY: number): Vec2 | null => {
     const ctm = svgRef.current?.getScreenCTM();
@@ -70,27 +73,69 @@ export function SketchCanvas({ profile, onChange }: { profile: Profile; onChange
     return [p.x, p.y];
   };
 
+  // 휠 줌: 커서 지점을 고정한 채 확대/축소. React onWheel은 passive라 네이티브로 등록.
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = svg.getBoundingClientRect();
+      const mx = (e.clientX - rect.left) / rect.width;
+      const my = (e.clientY - rect.top) / rect.height;
+      setView((v) => {
+        const f = e.deltaY < 0 ? 0.9 : 1 / 0.9;
+        const nw = Math.min(W * 4, Math.max(W * 0.1, v.w * f));
+        const nh = nw * (H / W);
+        const px = v.x + mx * v.w, py = v.y + my * v.h; // 커서 아래 viewBox 좌표
+        return { x: px - mx * nw, y: py - my * nh, w: nw, h: nh };
+      });
+    };
+    svg.addEventListener('wheel', onWheel, { passive: false });
+    return () => svg.removeEventListener('wheel', onWheel);
+  }, []);
+
   const startDrag = (i: number, e: React.PointerEvent) => {
+    e.stopPropagation(); // 정점 드래그 시 팬 시작 방지
     setSel(i);
     setDrag(i);
     setFrozen({ minX: minX0, minY: minY0, s: s0 });
     svgRef.current?.setPointerCapture(e.pointerId);
   };
+  // 빈 공간 포인터다운 → 화면 이동(팬) 시작
+  const startPan = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (drag != null) return;
+    panRef.current = { lastX: e.clientX, lastY: e.clientY };
+    svgRef.current?.setPointerCapture(e.pointerId);
+  };
   const onMove = (e: React.PointerEvent<SVGSVGElement>) => {
-    if (drag == null) return;
-    const local = clientToLocal(e.clientX, e.clientY);
-    if (!local) return;
-    const m = toMm(local[0], local[1]);
-    onChange(build(profile, verts.map((p, i) => (i === drag ? m : p)), edges));
+    if (drag != null) {
+      const local = clientToLocal(e.clientX, e.clientY);
+      if (!local) return;
+      const m = toMm(local[0], local[1]);
+      onChange(build(profile, verts.map((p, i) => (i === drag ? m : p)), edges));
+      return;
+    }
+    if (panRef.current) {
+      const rect = svgRef.current!.getBoundingClientRect();
+      const dxPx = e.clientX - panRef.current.lastX;
+      const dyPx = e.clientY - panRef.current.lastY;
+      panRef.current = { lastX: e.clientX, lastY: e.clientY };
+      setView((v) => ({ ...v, x: v.x - dxPx * (v.w / rect.width), y: v.y - dyPx * (v.h / rect.height) }));
+    }
   };
   const endDrag = (e: React.PointerEvent<SVGSVGElement>) => {
     if (drag != null) {
       onChange(build(profile, verts.map((p, i) => (i === drag ? snapPt(p) : p)), edges));
       svgRef.current?.releasePointerCapture(e.pointerId);
     }
+    if (panRef.current) {
+      panRef.current = null;
+      svgRef.current?.releasePointerCapture(e.pointerId);
+    }
     setDrag(null);
     setFrozen(null);
   };
+  const resetView = () => setView({ x: 0, y: 0, w: W, h: H });
 
   const addPoint = () => {
     // 선택 정점의 다음 변(없으면 닫힘 변)을 절반으로 나눠 점 추가. 나뉜 두 변은 직선.
@@ -135,8 +180,9 @@ export function SketchCanvas({ profile, onChange }: { profile: Profile; onChange
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, height: '100%' }}>
       <svg
         ref={svgRef}
-        width="100%" height={H} viewBox={`0 0 ${W} ${H}`}
-        style={{ background: '#f5f5f2', border: '1px solid #ccc', flex: 1, touchAction: 'none' }}
+        width="100%" height={H} viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
+        style={{ background: '#f5f5f2', border: '1px solid #ccc', flex: 1, touchAction: 'none', cursor: panRef.current ? 'grabbing' : 'default' }}
+        onPointerDown={startPan}
         onPointerMove={onMove}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
@@ -157,6 +203,7 @@ export function SketchCanvas({ profile, onChange }: { profile: Profile; onChange
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: '0.85rem', flexWrap: 'wrap' }}>
         <button onClick={addPoint}>+ 점 추가</button>
         <button onClick={delPoint} disabled={sel == null || n <= 3}>점 삭제</button>
+        <button onClick={resetView} title="화면 맞춤">⤢ 맞춤</button>
         {sel != null && (
           <>
             <span>선택점 X(mm)</span>
