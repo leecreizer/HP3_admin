@@ -8,6 +8,7 @@ import { Brands } from './pages/Brands';
 import { Dashboard } from './pages/Dashboard';
 import { Floorplans } from './pages/Floorplans';
 import { Products } from './pages/Products';
+import { PartEditor } from './pages/PartEditor';
 import { Design } from './pages/Design';
 import { RoleManager } from './pages/RoleManager';
 import { ModelingLibrary } from './pages/ModelingLibrary';
@@ -193,6 +194,9 @@ export default function App() {
           currentUser={currentUserName}
         />
       );
+      break;
+    case 'parts':
+      content = <PartEditor />;
       break;
     case 'design':
       content = <Design users={contentUsers} currentUserId={null} myGroupIds={myGroupIds} isAdmin={isAdminUser} userName={currentUserName} />;
