@@ -144,11 +144,16 @@ button { font: inherit; cursor: pointer; border: none; background: none; color: 
 .rail-sub.active::before { background: var(--persimmon, var(--ink)); }
 /* 중첩 그룹(예: 에디터) 라벨 + 들여쓴 하위 항목 */
 .rail-sub-group {
-  padding: 7px 11px 3px 42px; font-size: 0.72rem; font-weight: 700;
-  color: var(--text-3); text-transform: none; letter-spacing: 0.02em;
+  padding: 8px 11px 2px 42px; font-size: 0.7rem; font-weight: 600;
+  color: var(--text-3); letter-spacing: 0.02em; opacity: 0.85;
 }
-.rail-sub-child { padding-left: 58px; }
-.rail-sub-child::before { left: 42px; }
+/* 하위-하위 항목은 그룹 아래로 더 들여쓰고 세로 가이드선으로 소속 표시 */
+.rail-sub-child { padding-left: 62px; }
+.rail-sub-child::before { left: 46px; }
+.rail-sub-child::after {
+  content: ""; position: absolute; left: 34px; top: -2px; bottom: 50%;
+  width: 1px; background: var(--line, #ddd);
+}
 /* 폴더 ⋯ 메뉴 */
 .tree-item { position: relative; }
 .tree-act.folder-menu-btn { font-size: 1rem; font-weight: 700; letter-spacing: 1px; line-height: 1; }
