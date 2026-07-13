@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { loadParts, saveParts, upsertPart, deletePart, newPart } from './partStore';
+import { loadParts, upsertPart, deletePart, newPart } from './partStore';
 
 beforeEach(() => {
   const store: Record<string, string> = {};
