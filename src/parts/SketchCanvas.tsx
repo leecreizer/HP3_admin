@@ -53,8 +53,11 @@ export function SketchCanvas({ profile, onChange }: { profile: Profile; onChange
   const [drag, setDrag] = useState<number | null>(null);
   const onMove = (e: React.MouseEvent<SVGSVGElement>) => {
     if (drag == null) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const m = toMm(e.clientX - rect.left, e.clientY - rect.top);
+    // 화면 픽셀 → SVG viewBox 좌표(width 100%·레터박싱 보정). 그 후 viewBox → mm.
+    const ctm = e.currentTarget.getScreenCTM();
+    if (!ctm) return;
+    const local = new DOMPoint(e.clientX, e.clientY).matrixTransform(ctm.inverse());
+    const m = toMm(local.x, local.y);
     const next = pts.map((p, i) => (i === drag ? m : p));
     onChange(rebuild(profile, next));
   };
