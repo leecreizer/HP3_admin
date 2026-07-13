@@ -1,14 +1,16 @@
 export type Vec2 = [number, number];
 
-export type Segment =
-  | { type: 'line'; to: Vec2 }
-  | { type: 'arc'; to: Vec2; radius: number; ccw?: boolean };
+/** 단면의 꼭지점. r>0이면 그 모서리를 반지름 R로 라운드(필렛)한다. */
+export interface Corner {
+  pt: Vec2;
+  /** 모서리 필렛 반지름(mm). 없거나 0이면 각진 모서리. */
+  r?: number;
+}
 
 export interface Contour {
   closed: boolean;
-  /** 시작점. 이후 segments가 이 점에서 이어진다. */
-  start: Vec2;
-  segments: Segment[];
+  /** 꼭지점 목록(순서대로 다각형). 필렛은 buildShape에서 전개된다. */
+  corners: Corner[];
 }
 
 export interface Profile {

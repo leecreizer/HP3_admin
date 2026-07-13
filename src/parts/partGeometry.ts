@@ -1,56 +1,72 @@
 import { Shape, Path } from 'three';
 import type { Profile, Contour, Vec2 } from './types';
 
-/** 컨투어의 모든 정점(시작점 + 각 세그먼트 도착점). arc도 근사 위해 도착점 사용. */
-function contourPoints(c: Contour): Vec2[] {
-  return [c.start, ...c.segments.map((s) => s.to)];
-}
+const sub = (a: Vec2, b: Vec2): Vec2 => [a[0] - b[0], a[1] - b[1]];
+const len = (v: Vec2): number => Math.hypot(v[0], v[1]);
 
 /**
- * 두 점(from→to)과 반지름 R로 정확한 원호 중심을 구해 최소호(minor arc) 위의 점들을 반환한다.
- * 반환 점은 from 다음 점부터 to까지(from 제외, to 포함), 전부 정확히 반지름 R 위에 있다.
- * ccw는 호가 볼록해지는 방향(진행방향 좌/우)을 뒤집는다.
- * R이 두 끝점 거리의 절반보다 작으면 기하학적으로 불가하므로 반원으로 클램프.
- * SVG 미리보기와 3D 지오메트리가 동일한 곡선을 쓰도록 공용화.
+ * 한 꼭지점 V(이웃 prev·next)를 반지름 r로 필렛(라운드)한 경계점들을 반환한다.
+ * r이 없거나 0, 또는 기하학적으로 불가하면 [V](각진 모서리) 반환.
+ * 반환: [T1, ...호 샘플..., T2] — 두 인접 변에 접하는 접점 사이의 원호.
+ * r이 인접 변 절반을 넘으면 접점 거리(t)를 절반으로 클램프하고 그에 맞춰 반지름을 낮춘다.
  */
-export function sampleArc(from: Vec2, to: Vec2, radius: number, ccw?: boolean): Vec2[] {
-  const [x0, y0] = from;
-  const [x1, y1] = to;
-  const dx = x1 - x0, dy = y1 - y0;
-  const d = Math.hypot(dx, dy);
-  if (d < 1e-6) return [to];
-  const half = d / 2;
-  const r = Math.max(radius, half); // R이 너무 작으면 반원으로 클램프
-  const h = Math.sqrt(Math.max(0, r * r - half * half)); // 중선~중심 거리
-  const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
-  const nx = -dy / d, ny = dx / d; // 현에 수직인 단위벡터(진행방향 좌측)
-  const sign = ccw ? 1 : -1;
-  const cx = mx + nx * h * sign, cy = my + ny * h * sign;
-  const a0 = Math.atan2(y0 - cy, x0 - cx);
-  const a1 = Math.atan2(y1 - cy, x1 - cx);
-  let delta = a1 - a0; // 최소호 방향으로 정규화 (-PI, PI]
-  while (delta <= -Math.PI) delta += 2 * Math.PI;
-  while (delta > Math.PI) delta -= 2 * Math.PI;
-  const steps = Math.max(8, Math.ceil(Math.abs(delta) / (Math.PI / 48)));
-  const out: Vec2[] = [];
+export function filletCorner(prev: Vec2, V: Vec2, next: Vec2, r?: number): Vec2[] {
+  if (!r || r <= 0) return [V];
+  const v1 = sub(prev, V), v2 = sub(next, V);
+  const l1 = len(v1), l2 = len(v2);
+  if (l1 < 1e-6 || l2 < 1e-6) return [V];
+  const u1: Vec2 = [v1[0] / l1, v1[1] / l1];
+  const u2: Vec2 = [v2[0] / l2, v2[1] / l2];
+  let dot = u1[0] * u2[0] + u1[1] * u2[1];
+  dot = Math.max(-1, Math.min(1, dot));
+  const phi = Math.acos(dot); // 꼭지점 내각(두 변 방향 사이 각)
+  if (phi < 1e-3 || Math.PI - phi < 1e-3) return [V]; // 일직선/역행 → 필렛 불가
+  const half = phi / 2;
+  let t = r / Math.tan(half); // V로부터 접점까지 거리
+  let rr = r;
+  const maxT = Math.min(l1, l2) / 2; // 인접 변 절반 넘지 않게 클램프
+  if (t > maxT) { t = maxT; rr = t * Math.tan(half); }
+  const T1: Vec2 = [V[0] + u1[0] * t, V[1] + u1[1] * t];
+  const T2: Vec2 = [V[0] + u2[0] * t, V[1] + u2[1] * t];
+  const bis: Vec2 = [u1[0] + u2[0], u1[1] + u2[1]];
+  const bl = len(bis);
+  if (bl < 1e-6) return [V];
+  const ub: Vec2 = [bis[0] / bl, bis[1] / bl];
+  const C: Vec2 = [V[0] + ub[0] * (rr / Math.sin(half)), V[1] + ub[1] * (rr / Math.sin(half))];
+  const a1 = Math.atan2(T1[1] - C[1], T1[0] - C[0]);
+  const a2 = Math.atan2(T2[1] - C[1], T2[0] - C[0]);
+  let d = a2 - a1; // 최소호 방향으로 정규화
+  while (d <= -Math.PI) d += 2 * Math.PI;
+  while (d > Math.PI) d -= 2 * Math.PI;
+  const steps = Math.max(4, Math.ceil(Math.abs(d) / (Math.PI / 48)));
+  const out: Vec2[] = [T1];
   for (let k = 1; k <= steps; k++) {
-    const a = a0 + (delta * k) / steps;
-    out.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+    const a = a1 + (d * k) / steps;
+    out.push([C[0] + rr * Math.cos(a), C[1] + rr * Math.sin(a)]);
+  }
+  return out;
+}
+
+/** 꼭지점+필렛을 전개해 닫힌 다각형의 조밀한 경계점 목록을 만든다(3D·미리보기 공용). */
+export function outlinePoints(c: Contour): Vec2[] {
+  const cs = c.corners;
+  const n = cs.length;
+  if (n === 0) return [];
+  const out: Vec2[] = [];
+  for (let i = 0; i < n; i++) {
+    const prev = cs[(i - 1 + n) % n].pt;
+    const V = cs[i].pt;
+    const next = cs[(i + 1) % n].pt;
+    out.push(...filletCorner(prev, V, next, cs[i].r));
   }
   return out;
 }
 
 function applyContour(target: Shape | Path, c: Contour): void {
-  target.moveTo(c.start[0], c.start[1]);
-  let cur: Vec2 = c.start;
-  for (const seg of c.segments) {
-    if (seg.type === 'line') {
-      target.lineTo(seg.to[0], seg.to[1]);
-    } else {
-      for (const [px, py] of sampleArc(cur, seg.to, seg.radius, seg.ccw)) target.lineTo(px, py);
-    }
-    cur = seg.to;
-  }
+  const pts = outlinePoints(c);
+  if (pts.length === 0) return;
+  target.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length; i++) target.lineTo(pts[i][0], pts[i][1]);
   if (c.closed) target.closePath();
 }
 
@@ -67,7 +83,9 @@ export function buildShape(profile: Profile): Shape {
 }
 
 export function computeBBox(profile: Profile, depth: number): { w: number; h: number; d: number } {
-  const pts = contourPoints(profile.contours[0]);
+  // 필렛 전개 후 경계점 기준(라운드 모서리까지 정확히 반영)
+  const pts = outlinePoints(profile.contours[0] ?? { closed: true, corners: [] });
+  if (pts.length === 0) return { w: 0, h: 0, d: Math.round(depth) };
   const xs = pts.map((p) => p[0]);
   const ys = pts.map((p) => p[1]);
   return {
@@ -81,19 +99,7 @@ export function validateProfile(profile: Profile): string[] {
   const errs: string[] = [];
   const outer = profile.contours[0];
   if (!outer) { errs.push('외곽 단면이 없습니다.'); return errs; }
-  const ptCount = 1 + outer.segments.length;
-  if (ptCount < 3) errs.push('외곽 단면은 점이 3개 이상이어야 합니다.');
+  if (outer.corners.length < 3) errs.push('외곽 단면은 꼭지점이 3개 이상이어야 합니다.');
   if (!outer.closed) errs.push('외곽 단면이 닫히지 않았습니다.');
-  // 원호 R값 검증: R은 두 끝점 거리의 절반 이상이어야 함
-  let cur: Vec2 = outer.start;
-  outer.segments.forEach((seg) => {
-    if (seg.type === 'arc') {
-      const d = Math.hypot(seg.to[0] - cur[0], seg.to[1] - cur[1]);
-      if (seg.radius < d / 2) {
-        errs.push(`원호 R값이 너무 작습니다(최소 ${Math.ceil(d / 2)}mm 필요).`);
-      }
-    }
-    cur = seg.to;
-  });
   return errs;
 }

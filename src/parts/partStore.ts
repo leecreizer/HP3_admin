@@ -3,10 +3,32 @@ import { computeBBox } from './partGeometry';
 
 const KEY = 'hp3-parts';
 
+/** 구버전(변/segment 기반) 프로필을 꼭지점(corners) 모델로 마이그레이션. */
+function migrate(part: Part): Part {
+  const cts = part.profile?.contours;
+  if (!Array.isArray(cts)) return part;
+  let changed = false;
+  const contours = cts.map((c) => {
+    const legacy = c as unknown as { start?: [number, number]; segments?: { to: [number, number] }[]; corners?: unknown };
+    if (!c.corners && legacy.start && Array.isArray(legacy.segments)) {
+      changed = true;
+      const pts = [legacy.start, ...legacy.segments.map((s) => s.to)];
+      // 닫힘 중복점 제거
+      if (pts.length > 1) {
+        const last = pts[pts.length - 1];
+        if (last[0] === legacy.start[0] && last[1] === legacy.start[1]) pts.pop();
+      }
+      return { closed: true, corners: pts.map((pt) => ({ pt })) };
+    }
+    return c;
+  });
+  return changed ? { ...part, profile: { ...part.profile, contours } } : part;
+}
+
 export function loadParts(): Part[] {
   try {
     const r = JSON.parse(localStorage.getItem(KEY) ?? 'null');
-    return Array.isArray(r) ? (r as Part[]) : [];
+    return Array.isArray(r) ? (r as Part[]).map(migrate) : [];
   } catch { return []; }
 }
 
@@ -34,12 +56,11 @@ function rectProfile(w: number, h: number): Profile {
     units: 'mm',
     contours: [{
       closed: true,
-      start: [0, 0],
-      segments: [
-        { type: 'line', to: [w, 0] },
-        { type: 'line', to: [w, h] },
-        { type: 'line', to: [0, h] },
-        { type: 'line', to: [0, 0] },
+      corners: [
+        { pt: [0, 0] },
+        { pt: [w, 0] },
+        { pt: [w, h] },
+        { pt: [0, h] },
       ],
     }],
   };

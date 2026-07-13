@@ -1,46 +1,24 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Profile, Vec2, Segment } from './types';
-import { sampleArc } from './partGeometry';
+import type { Profile, Vec2, Corner } from './types';
+import { outlinePoints } from './partGeometry';
 
 const SNAP = 10; // mm — 놓을 때 격자 스냅 간격
 const snap = (v: number) => Math.round(v / SNAP) * SNAP;
 const snapPt = (p: Vec2): Vec2 => [snap(p[0]), snap(p[1])];
 
-/** 변(edge) 서술 — 정점 i → 정점 (i+1)%n 을 잇는 구간의 종류. */
-type Edge = { type: 'line' } | { type: 'arc'; radius: number; ccw: boolean };
-
-/** 외곽 컨투어를 정점(verts) + 변(edges)로 분해. edges[i]는 verts[i]→verts[(i+1)%n]. */
-function parseOuter(profile: Profile): { verts: Vec2[]; edges: Edge[] } {
-  const c = profile.contours[0];
-  if (!c || c.segments.length === 0) return { verts: [], edges: [] };
-  const segs = c.segments;
-  const n = segs.length; // closed: 마지막 세그먼트의 to === start
-  const verts: Vec2[] = [c.start, ...segs.slice(0, n - 1).map((s) => s.to)];
-  const edges: Edge[] = segs.map((s) =>
-    s.type === 'arc' ? { type: 'arc', radius: s.radius, ccw: !!s.ccw } : { type: 'line' },
-  );
-  return { verts, edges };
+function corners(profile: Profile): Corner[] {
+  return profile.contours[0]?.corners ?? [];
 }
-
-/** 정점+변 → 외곽 컨투어(항상 closed). */
-function build(profile: Profile, verts: Vec2[], edges: Edge[]): Profile {
-  const n = verts.length;
-  const segments: Segment[] = verts.map((_, i) => {
-    const to = verts[(i + 1) % n];
-    const e = edges[i] ?? { type: 'line' };
-    return e.type === 'arc'
-      ? { type: 'arc', to, radius: e.radius, ccw: e.ccw }
-      : { type: 'line', to };
-  });
-  return { ...profile, contours: [{ closed: true, start: verts[0], segments }, ...profile.contours.slice(1)] };
+/** 꼭지점 목록으로 외곽 컨투어 재구성. */
+function build(profile: Profile, cs: Corner[]): Profile {
+  return { ...profile, contours: [{ closed: true, corners: cs }, ...profile.contours.slice(1)] };
 }
 
 export function SketchCanvas({ profile, onChange }: { profile: Profile; onChange: (p: Profile) => void }) {
-  const { verts, edges } = parseOuter(profile);
-  const n = verts.length;
+  const cs = corners(profile);
+  const n = cs.length;
+  const verts = cs.map((c) => c.pt);
   const [sel, setSel] = useState<number | null>(null);
-  // 선택 정점으로 "들어오는" 변(이전 정점 → 선택 정점). 이 변에 곡선/R을 적용.
-  const inEdge = sel == null ? null : (sel - 1 + n) % n;
 
   const W = 800, H = 600, PAD = 40;
   const xs = verts.map((p) => p[0]); const ys = verts.map((p) => p[1]);
@@ -62,7 +40,6 @@ export function SketchCanvas({ profile, onChange }: { profile: Profile; onChange
 
   const svgRef = useRef<SVGSVGElement>(null);
   const [drag, setDrag] = useState<number | null>(null);
-  // 화면 이동/줌을 위한 뷰포트(viewBox). 기본은 0,0,W,H (맞춤 상태).
   const [view, setView] = useState<{ x: number; y: number; w: number; h: number }>({ x: 0, y: 0, w: W, h: H });
   const panRef = useRef<{ lastX: number; lastY: number } | null>(null);
 
@@ -73,7 +50,7 @@ export function SketchCanvas({ profile, onChange }: { profile: Profile; onChange
     return [p.x, p.y];
   };
 
-  // 휠 줌: 커서 지점을 고정한 채 확대/축소. React onWheel은 passive라 네이티브로 등록.
+  // 휠 줌: 커서 지점 고정. React onWheel은 passive라 네이티브로 등록.
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg) return;
@@ -86,7 +63,7 @@ export function SketchCanvas({ profile, onChange }: { profile: Profile; onChange
         const f = e.deltaY < 0 ? 0.9 : 1 / 0.9;
         const nw = Math.min(W * 4, Math.max(W * 0.1, v.w * f));
         const nh = nw * (H / W);
-        const px = v.x + mx * v.w, py = v.y + my * v.h; // 커서 아래 viewBox 좌표
+        const px = v.x + mx * v.w, py = v.y + my * v.h;
         return { x: px - mx * nw, y: py - my * nh, w: nw, h: nh };
       });
     };
@@ -94,14 +71,16 @@ export function SketchCanvas({ profile, onChange }: { profile: Profile; onChange
     return () => svg.removeEventListener('wheel', onWheel);
   }, []);
 
+  const setCorner = (i: number, patch: Partial<Corner>) =>
+    onChange(build(profile, cs.map((c, k) => (k === i ? { ...c, ...patch } : c))));
+
   const startDrag = (i: number, e: React.PointerEvent) => {
-    e.stopPropagation(); // 정점 드래그 시 팬 시작 방지
+    e.stopPropagation();
     setSel(i);
     setDrag(i);
     setFrozen({ minX: minX0, minY: minY0, s: s0 });
     svgRef.current?.setPointerCapture(e.pointerId);
   };
-  // 빈 공간 포인터다운 → 화면 이동(팬) 시작
   const startPan = (e: React.PointerEvent<SVGSVGElement>) => {
     if (drag != null) return;
     panRef.current = { lastX: e.clientX, lastY: e.clientY };
@@ -111,8 +90,7 @@ export function SketchCanvas({ profile, onChange }: { profile: Profile; onChange
     if (drag != null) {
       const local = clientToLocal(e.clientX, e.clientY);
       if (!local) return;
-      const m = toMm(local[0], local[1]);
-      onChange(build(profile, verts.map((p, i) => (i === drag ? m : p)), edges));
+      setCorner(drag, { pt: toMm(local[0], local[1]) });
       return;
     }
     if (panRef.current) {
@@ -125,7 +103,7 @@ export function SketchCanvas({ profile, onChange }: { profile: Profile; onChange
   };
   const endDrag = (e: React.PointerEvent<SVGSVGElement>) => {
     if (drag != null) {
-      onChange(build(profile, verts.map((p, i) => (i === drag ? snapPt(p) : p)), edges));
+      setCorner(drag, { pt: snapPt(verts[drag]) });
       svgRef.current?.releasePointerCapture(e.pointerId);
     }
     if (panRef.current) {
@@ -138,69 +116,50 @@ export function SketchCanvas({ profile, onChange }: { profile: Profile; onChange
   const resetView = () => setView({ x: 0, y: 0, w: W, h: H });
 
   const addPoint = () => {
-    // 선택 정점의 다음 변(없으면 닫힘 변)을 절반으로 나눠 점 추가. 나뉜 두 변은 직선.
+    // 선택 꼭지점 다음(없으면 마지막) 변 중간에 꼭지점 추가
     const e = sel ?? n - 1;
     const a = verts[e]; const b = verts[(e + 1) % n];
     const mid: Vec2 = [snap((a[0] + b[0]) / 2), snap((a[1] + b[1]) / 2)];
-    const nv = [...verts]; nv.splice(e + 1, 0, mid);
-    const ne = [...edges]; ne.splice(e, 1, { type: 'line' }, { type: 'line' });
-    onChange(build(profile, nv, ne));
+    const nc = [...cs]; nc.splice(e + 1, 0, { pt: mid });
+    onChange(build(profile, nc));
   };
   const delPoint = () => {
     if (sel == null || n <= 3) return;
-    const nv = verts.filter((_, i) => i !== sel);
-    const ne = edges.filter((_, i) => i !== sel); // 선택 정점의 나가는 변 제거, 들어오는 변이 이어짐
-    onChange(build(profile, nv, ne));
+    onChange(build(profile, cs.filter((_, i) => i !== sel)));
     setSel(null);
   };
   const editCoord = (axis: 0 | 1, v: number) => {
     if (sel == null) return;
-    onChange(build(profile, verts.map((p, i) => (i === sel ? (axis === 0 ? [v, p[1]] : [p[0], v]) as Vec2 : p)), edges));
-  };
-  const setEdge = (idx: number, e: Edge) => {
-    onChange(build(profile, verts, edges.map((old, i) => (i === idx ? e : old))));
+    const p = verts[sel];
+    setCorner(sel, { pt: axis === 0 ? [v, p[1]] : [p[0], v] });
   };
 
-  // 미리보기 폴리곤: 각 변을 직선/원호로 전개한 뒤 px 변환(3D와 동일한 sampleArc 사용).
-  const polyMm: Vec2[] = [];
-  if (n > 0) {
-    polyMm.push(verts[0]);
-    for (let i = 0; i < n; i++) {
-      const from = verts[i]; const to = verts[(i + 1) % n]; const e = edges[i];
-      if (e && e.type === 'arc') polyMm.push(...sampleArc(from, to, e.radius, e.ccw));
-      else polyMm.push(to);
-    }
-  }
-  const poly = polyMm.map(toPx).map(([x, y]) => `${x},${y}`).join(' ');
+  // 미리보기 경계: 필렛 전개(3D와 동일한 outlinePoints)
+  const outline = n > 0 ? outlinePoints({ closed: true, corners: cs }) : [];
+  const poly = outline.map(toPx).map(([x, y]) => `${x},${y}`).join(' ');
 
-  const inEdgeSpec = inEdge != null ? edges[inEdge] : null;
-  const isArc = inEdgeSpec?.type === 'arc';
+  const selR = sel != null ? (cs[sel].r ?? 0) : 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, height: '100%' }}>
       <svg
         ref={svgRef}
         width="100%" height={H} viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
-        style={{ background: '#f5f5f2', border: '1px solid #ccc', flex: 1, touchAction: 'none', cursor: panRef.current ? 'grabbing' : 'default' }}
+        style={{ background: '#f5f5f2', border: '1px solid #ccc', flex: 1, touchAction: 'none' }}
         onPointerDown={startPan}
         onPointerMove={onMove}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
       >
         <polygon points={poly} fill="rgba(120,160,220,0.25)" stroke="#3a6" strokeWidth={2} />
-        {inEdge != null && n > 1 && (() => {
-          // 선택 정점으로 들어오는 변을 강조(직선/곡선 모두)
-          const from = verts[inEdge]; const to = verts[(inEdge + 1) % n]; const e = edges[inEdge];
-          const seg: Vec2[] = e && e.type === 'arc' ? [from, ...sampleArc(from, to, e.radius, e.ccw)] : [from, to];
-          return <polyline points={seg.map(toPx).map(([x, y]) => `${x},${y}`).join(' ')}
-            fill="none" stroke="#e06" strokeWidth={3} />;
-        })()}
         {verts.map((p, i) => {
           const [x, y] = toPx(p);
+          const rounded = (cs[i].r ?? 0) > 0;
           return (
             <circle
               key={i} cx={x} cy={y} r={7}
-              fill={sel === i ? '#e06' : '#36c'}
+              fill={sel === i ? '#e06' : rounded ? '#2a8' : '#36c'}
+              stroke={rounded ? '#0a5' : 'none'} strokeWidth={rounded ? 2 : 0}
               onPointerDown={(e) => startDrag(i, e)}
               style={{ cursor: 'grab' }}
             />
@@ -219,33 +178,12 @@ export function SketchCanvas({ profile, onChange }: { profile: Profile; onChange
             <span>Y(mm)</span>
             <input type="number" value={verts[sel][1]} style={{ width: 70 }}
               onChange={(e) => editCoord(1, Number(e.target.value))} />
-            {inEdge != null && (
-              <>
-                <span style={{ borderLeft: '1px solid #ddd', paddingLeft: 8 }}>이 점으로 오는 변</span>
-                <label><input type="radio" name="edgetype" checked={!isArc}
-                  onChange={() => setEdge(inEdge, { type: 'line' })} /> 직선</label>
-                <label><input type="radio" name="edgetype" checked={isArc}
-                  onChange={() => {
-                    const a = verts[inEdge]; const b = verts[(inEdge + 1) % n];
-                    const d = Math.hypot(b[0] - a[0], b[1] - a[1]);
-                    // 기본 방향: 도형 바깥으로 볼록해지도록 중심(centroid) 기준 자동 선택
-                    const gx = verts.reduce((s, p) => s + p[0], 0) / n;
-                    const gy = verts.reduce((s, p) => s + p[1], 0) / n;
-                    const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
-                    const nx = -(b[1] - a[1]) / d, ny = (b[0] - a[0]) / d; // 현 수직
-                    const outward = (gx - mx) * nx + (gy - my) * ny > 0; // 중심이 있는 쪽 = 볼록 반대편
-                    setEdge(inEdge, { type: 'arc', radius: Math.max(SNAP, Math.round(d)), ccw: outward });
-                  }} /> 곡선</label>
-                {isArc && inEdgeSpec?.type === 'arc' && (
-                  <>
-                    <span>R(mm)</span>
-                    <input type="number" value={inEdgeSpec.radius} style={{ width: 80 }}
-                      onChange={(e) => setEdge(inEdge, { type: 'arc', radius: Number(e.target.value), ccw: inEdgeSpec.ccw })} />
-                    <button onClick={() => setEdge(inEdge, { type: 'arc', radius: inEdgeSpec.radius, ccw: !inEdgeSpec.ccw })}>방향 ⟲</button>
-                  </>
-                )}
-              </>
-            )}
+            <span style={{ borderLeft: '1px solid #ddd', paddingLeft: 8 }}>모서리 R(mm)</span>
+            <input type="number" min={0} value={selR} style={{ width: 80 }}
+              onChange={(e) => setCorner(sel, { r: Math.max(0, Number(e.target.value)) })} />
+            {selR > 0
+              ? <button onClick={() => setCorner(sel, { r: 0 })}>각지게</button>
+              : <span style={{ color: '#888' }}>0 = 각진 모서리</span>}
           </>
         )}
         <span style={{ marginLeft: 'auto', color: '#888' }}>스냅 {SNAP}mm</span>
