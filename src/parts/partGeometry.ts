@@ -95,6 +95,27 @@ export function computeBBox(profile: Profile, depth: number): { w: number; h: nu
   };
 }
 
+/** 단면 외곽을 축소해 SVG 썸네일(data URL)로 만든다. 라이브러리 카드용. */
+export function profileThumb(profile: Profile, color = '#d8c5a8', size = 72): string {
+  const pts = outlinePoints(profile.contours[0] ?? { closed: true, corners: [] });
+  if (pts.length < 3) return '';
+  const xs = pts.map((p) => p[0]); const ys = pts.map((p) => p[1]);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const w = Math.max(1, maxX - minX), h = Math.max(1, maxY - minY);
+  const PAD = 6;
+  const sc = Math.min((size - PAD * 2) / w, (size - PAD * 2) / h);
+  const ox = (size - w * sc) / 2, oy = (size - h * sc) / 2;
+  // SVG y축은 아래로 증가 → maxY 기준으로 뒤집어 그린다
+  const poly = pts
+    .map(([x, y]) => `${(ox + (x - minX) * sc).toFixed(1)},${(oy + (maxY - y) * sc).toFixed(1)}`)
+    .join(' ');
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">`
+    + `<rect width="${size}" height="${size}" fill="#f5f5f2"/>`
+    + `<polygon points="${poly}" fill="${color}" stroke="#3a6" stroke-width="1"/></svg>`;
+  return 'data:image/svg+xml,' + encodeURIComponent(svg);
+}
+
 export function validateProfile(profile: Profile): string[] {
   const errs: string[] = [];
   const outer = profile.contours[0];

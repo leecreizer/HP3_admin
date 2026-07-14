@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { SketchCanvas } from '../parts/SketchCanvas';
 import { ExtrudePreview } from '../parts/ExtrudePreview';
 import { loadParts, upsertPart, deletePart, newPart } from '../parts/partStore';
-import { computeBBox, validateProfile } from '../parts/partGeometry';
+import { computeBBox, validateProfile, profileThumb } from '../parts/partGeometry';
 import type { Part } from '../parts/types';
 
 export function PartEditor() {
@@ -17,10 +17,16 @@ export function PartEditor() {
   const onSave = () => {
     const errs = validateProfile(cur.profile);
     if (errs.length) { setMsg('저장 불가: ' + errs.join(' ')); return; }
-    const saved = { ...cur, bbox: computeBBox(cur.profile, cur.extrude.depth) };
+    const name = cur.name.trim() || '새 파츠';
+    const saved: Part = {
+      ...cur,
+      name,
+      bbox: computeBBox(cur.profile, cur.extrude.depth),
+      thumb: profileThumb(cur.profile, cur.material?.color ?? '#d8c5a8'),
+    };
     setParts(upsertPart(saved));
     setCur(saved);
-    setMsg('저장됨');
+    setMsg(`저장됨 · 라이브러리 ${loadParts().length}개`);
   };
   const onDup = () => {
     const copy = { ...newPart(cur.name + ' 복제'), profile: cur.profile, extrude: cur.extrude, material: cur.material };
@@ -41,10 +47,7 @@ export function PartEditor() {
           <button onClick={onSave}>저장</button>
           <button onClick={onDup}>복제</button>
           {msg && <span style={{ color: errs.length ? '#c33' : '#292', fontSize: '0.85rem' }}>{msg}</span>}
-          <select onChange={(e) => e.target.value && onSelect(e.target.value)} value="" style={{ marginLeft: 'auto' }}>
-            <option value="">— 저장된 파츠 불러오기 —</option>
-            {parts.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.bbox.w}×{p.bbox.h}×{p.bbox.d})</option>)}
-          </select>
+          <span style={{ marginLeft: 'auto', color: '#888', fontSize: '0.8rem' }}>저장된 파츠 {parts.length}개</span>
         </div>
 
         {/* 좌우 분할 */}
@@ -78,15 +81,37 @@ export function PartEditor() {
           </div>
         </div>
 
-        {/* 라이브러리 삭제 목록 */}
+        {/* 저장된 파츠 라이브러리 — 썸네일 카드(클릭 불러오기, × 삭제) */}
         {parts.length > 0 && (
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: '0.8rem' }}>
-            {parts.map((p) => (
-              <span key={p.id} style={{ border: '1px solid #ddd', borderRadius: 4, padding: '2px 8px', display: 'inline-flex', gap: 6 }}>
-                {p.name}
-                <button onClick={() => onDel(p.id)} style={{ color: '#c33', border: 'none', background: 'none', cursor: 'pointer' }}>×</button>
-              </span>
-            ))}
+          <div>
+            <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-2)', margin: '4px 0 8px' }}>
+              저장된 파츠
+            </div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              {parts.map((p) => (
+                <div
+                  key={p.id}
+                  onClick={() => onSelect(p.id)}
+                  title="클릭해서 불러오기"
+                  style={{
+                    width: 100, padding: 6, borderRadius: 8, cursor: 'pointer', position: 'relative',
+                    border: cur.id === p.id ? '2px solid #36c' : '1px solid #ddd',
+                    background: cur.id === p.id ? 'rgba(54,108,204,0.06)' : '#fff',
+                  }}
+                >
+                  {p.thumb
+                    ? <img src={p.thumb} alt={p.name} width={80} height={80} style={{ display: 'block', margin: '0 auto', borderRadius: 4 }} />
+                    : <div style={{ height: 80, display: 'grid', placeItems: 'center', color: '#bbb' }}>—</div>}
+                  <div style={{ fontSize: '0.75rem', textAlign: 'center', marginTop: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+                  <div style={{ fontSize: '0.68rem', color: '#888', textAlign: 'center' }}>{p.bbox.w}×{p.bbox.h}×{p.bbox.d}</div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onDel(p.id); }}
+                    title="삭제"
+                    style={{ position: 'absolute', top: 2, right: 4, border: 'none', background: 'none', color: '#c33', cursor: 'pointer', fontSize: '1rem', lineHeight: 1 }}
+                  >×</button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </section>
