@@ -17,7 +17,7 @@ function build(profile: Profile, cs: Corner[]): Profile {
 /** 드래그 상태: 정점 하나 또는 변(두 정점) 이동. 시작 시점 좌표를 담아 delta로 이동. */
 type DragInfo =
   | { kind: 'vertex'; index: number; startCursor: Vec2; startPts: Vec2[] }
-  | { kind: 'edge'; index: number; startCursor: Vec2; startPts: Vec2[] };
+  | { kind: 'edge'; index: number; startCursor: Vec2; startPts: Vec2[]; startClient: [number, number]; moved: boolean };
 
 /** 정렬 가이드 — 이동 점 기준 확장선(axis,v)과 다른 점에 스냅됐는지(snap). */
 type Guide = { axis: 'x' | 'y'; v: number; snap: boolean };
@@ -129,9 +129,15 @@ export function SketchCanvas({ profile, onChange }: { profile: Profile; onChange
     e.stopPropagation();
     setSelEdge(i); setSel(null);
     const m = clientToMm(e.clientX, e.clientY) ?? verts[i];
-    dragRef.current = { kind: 'edge', index: i, startCursor: m, startPts: [verts[i], verts[(i + 1) % n]] };
+    dragRef.current = { kind: 'edge', index: i, startCursor: m, startPts: [verts[i], verts[(i + 1) % n]], startClient: [e.clientX, e.clientY], moved: false };
     setFrozen({ minX: minX0, minY: minY0, s: s0 });
     svgRef.current?.setPointerCapture(e.pointerId);
+  };
+  /** 변 i의 위치 P에 새 꼭지점 삽입(클릭 추가). */
+  const insertOnEdge = (i: number, P: Vec2) => {
+    const nc = [...cs]; nc.splice(i + 1, 0, { pt: snapPt(P) });
+    onChange(build(profile, nc));
+    setSelEdge(null); setSel(i + 1);
   };
   const startPan = (e: React.PointerEvent<SVGSVGElement>) => {
     if (dragRef.current) return;
@@ -152,6 +158,10 @@ export function SketchCanvas({ profile, onChange }: { profile: Profile; onChange
         setCorner(dr.index, { pt: pts[0] });
         setGuides(g);
       } else {
+        // 임계값 이전엔 클릭(점 추가) 후보로 보고 이동하지 않음
+        const dpx = Math.hypot(e.clientX - dr.startClient[0], e.clientY - dr.startClient[1]);
+        if (!dr.moved && dpx < 4) return;
+        dr.moved = true;
         const targets: Vec2[] = dr.startPts.map((s): Vec2 => [s[0] + dxm, s[1] + dym]);
         const j = (dr.index + 1) % n;
         const { pts, guides: g } = applyAlign(targets, [dr.index, j]);
@@ -173,7 +183,13 @@ export function SketchCanvas({ profile, onChange }: { profile: Profile; onChange
     if (dr) {
       // 놓을 때 격자 스냅(정렬로 이미 맞은 좌표는 그리드로 반올림)
       if (dr.kind === 'vertex') setCorner(dr.index, { pt: snapPt(verts[dr.index]) });
-      else {
+      else if (!dr.moved) {
+        // 이동 없이 클릭만 → 변 위 클릭 지점에 점 추가
+        dragRef.current = null; setGuides([]); setFrozen(null);
+        svgRef.current?.releasePointerCapture(e.pointerId);
+        insertOnEdge(dr.index, dr.startCursor);
+        return;
+      } else {
         const j = (dr.index + 1) % n;
         setCorners((c) => c.map((v, k) => (k === dr.index || k === j ? { ...v, pt: snapPt(v.pt) } : v)));
       }
@@ -189,13 +205,6 @@ export function SketchCanvas({ profile, onChange }: { profile: Profile; onChange
   };
   const resetView = () => setView({ x: 0, y: 0, w: W, h: H });
 
-  const addPoint = () => {
-    const e = selEdge ?? sel ?? n - 1;
-    const a = verts[e]; const b = verts[(e + 1) % n];
-    const mid: Vec2 = [snap((a[0] + b[0]) / 2), snap((a[1] + b[1]) / 2)];
-    const nc = [...cs]; nc.splice(e + 1, 0, { pt: mid });
-    onChange(build(profile, nc));
-  };
   const delPoint = () => {
     if (sel == null || n <= 3) return;
     onChange(build(profile, cs.filter((_, i) => i !== sel)));
@@ -281,7 +290,7 @@ export function SketchCanvas({ profile, onChange }: { profile: Profile; onChange
         })}
       </svg>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: '0.85rem', flexWrap: 'wrap' }}>
-        <button onClick={addPoint}>+ 점 추가</button>
+        <span style={{ color: '#888' }}>변(선)을 클릭해 점 추가</span>
         <button onClick={delPoint} disabled={sel == null || n <= 3}>점 삭제</button>
         <button onClick={resetView} title="화면 맞춤">⤢ 맞춤</button>
         {sel != null && (
