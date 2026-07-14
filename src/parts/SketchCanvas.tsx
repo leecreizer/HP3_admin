@@ -3,22 +3,31 @@ import type { Profile, Vec2, Corner } from './types';
 import { outlinePoints } from './partGeometry';
 
 const SNAP = 10; // mm — 놓을 때 격자 스냅 간격
+const ALIGN_PX = 8; // 정렬 스냅 허용 오차(화면 px)
 const snap = (v: number) => Math.round(v / SNAP) * SNAP;
 const snapPt = (p: Vec2): Vec2 => [snap(p[0]), snap(p[1])];
 
 function corners(profile: Profile): Corner[] {
   return profile.contours[0]?.corners ?? [];
 }
-/** 꼭지점 목록으로 외곽 컨투어 재구성. */
 function build(profile: Profile, cs: Corner[]): Profile {
   return { ...profile, contours: [{ closed: true, corners: cs }, ...profile.contours.slice(1)] };
 }
+
+/** 드래그 상태: 정점 하나 또는 변(두 정점) 이동. 시작 시점 좌표를 담아 delta로 이동. */
+type DragInfo =
+  | { kind: 'vertex'; index: number; startCursor: Vec2; startPts: Vec2[] }
+  | { kind: 'edge'; index: number; startCursor: Vec2; startPts: Vec2[] };
+
+/** 정렬 가이드 — 이동 점 기준 확장선(axis,v)과 다른 점에 스냅됐는지(snap). */
+type Guide = { axis: 'x' | 'y'; v: number; snap: boolean };
 
 export function SketchCanvas({ profile, onChange }: { profile: Profile; onChange: (p: Profile) => void }) {
   const cs = corners(profile);
   const n = cs.length;
   const verts = cs.map((c) => c.pt);
   const [sel, setSel] = useState<number | null>(null);
+  const [selEdge, setSelEdge] = useState<number | null>(null);
 
   const W = 800, H = 600, PAD = 40;
   const xs = verts.map((p) => p[0]); const ys = verts.map((p) => p[1]);
@@ -39,7 +48,8 @@ export function SketchCanvas({ profile, onChange }: { profile: Profile; onChange
   ];
 
   const svgRef = useRef<SVGSVGElement>(null);
-  const [drag, setDrag] = useState<number | null>(null);
+  const dragRef = useRef<DragInfo | null>(null);
+  const [guides, setGuides] = useState<Guide[]>([]);
   const [view, setView] = useState<{ x: number; y: number; w: number; h: number }>({ x: 0, y: 0, w: W, h: H });
   const panRef = useRef<{ lastX: number; lastY: number } | null>(null);
 
@@ -49,8 +59,12 @@ export function SketchCanvas({ profile, onChange }: { profile: Profile; onChange
     const p = new DOMPoint(clientX, clientY).matrixTransform(ctm.inverse());
     return [p.x, p.y];
   };
+  const clientToMm = (clientX: number, clientY: number): Vec2 | null => {
+    const l = clientToLocal(clientX, clientY);
+    return l ? toMm(l[0], l[1]) : null;
+  };
 
-  // 휠 줌: 커서 지점 고정. React onWheel은 passive라 네이티브로 등록.
+  // 휠 줌
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg) return;
@@ -71,26 +85,79 @@ export function SketchCanvas({ profile, onChange }: { profile: Profile; onChange
     return () => svg.removeEventListener('wheel', onWheel);
   }, []);
 
+  const setCorners = (updater: (cs: Corner[]) => Corner[]) => onChange(build(profile, updater(cs)));
   const setCorner = (i: number, patch: Partial<Corner>) =>
-    onChange(build(profile, cs.map((c, k) => (k === i ? { ...c, ...patch } : c))));
+    setCorners((c) => c.map((v, k) => (k === i ? { ...v, ...patch } : v)));
 
-  const startDrag = (i: number, e: React.PointerEvent) => {
+  /**
+   * 이동 대상 점들의 목표 위치를 받아, 이동하지 않는 다른 정점과 X/Y가 맞으면 스냅한다.
+   * 반환: 스냅 적용된 위치들 + 표시할 가이드.
+   */
+  const applyAlign = (targets: Vec2[], movingIdx: number[]): { pts: Vec2[]; guides: Guide[] } => {
+    const tol = ALIGN_PX / tS;
+    const others = verts.filter((_, i) => !movingIdx.includes(i));
+    // 공통 보정(변 이동 시 두 점이 같은 delta 유지): 첫 정렬되는 축값으로 보정량 계산
+    let dx = 0, dy = 0; let snapX = false, snapY = false;
+    for (const t of targets) {
+      if (!snapX) {
+        const m = others.find((o) => Math.abs(t[0] + dx - o[0]) <= tol);
+        if (m) { dx = m[0] - t[0]; snapX = true; }
+      }
+      if (!snapY) {
+        const m = others.find((o) => Math.abs(t[1] + dy - o[1]) <= tol);
+        if (m) { dy = m[1] - t[1]; snapY = true; }
+      }
+    }
+    const pts = targets.map((t): Vec2 => [t[0] + dx, t[1] + dy]);
+    const g: Guide[] = [];
+    for (const p of pts) {
+      g.push({ axis: 'x', v: p[0], snap: snapX });
+      g.push({ axis: 'y', v: p[1], snap: snapY });
+    }
+    return { pts, guides: g };
+  };
+
+  const startVertexDrag = (i: number, e: React.PointerEvent) => {
     e.stopPropagation();
-    setSel(i);
-    setDrag(i);
+    setSel(i); setSelEdge(null);
+    const m = clientToMm(e.clientX, e.clientY) ?? verts[i];
+    dragRef.current = { kind: 'vertex', index: i, startCursor: m, startPts: [verts[i]] };
+    setFrozen({ minX: minX0, minY: minY0, s: s0 });
+    svgRef.current?.setPointerCapture(e.pointerId);
+  };
+  const startEdgeDrag = (i: number, e: React.PointerEvent) => {
+    e.stopPropagation();
+    setSelEdge(i); setSel(null);
+    const m = clientToMm(e.clientX, e.clientY) ?? verts[i];
+    dragRef.current = { kind: 'edge', index: i, startCursor: m, startPts: [verts[i], verts[(i + 1) % n]] };
     setFrozen({ minX: minX0, minY: minY0, s: s0 });
     svgRef.current?.setPointerCapture(e.pointerId);
   };
   const startPan = (e: React.PointerEvent<SVGSVGElement>) => {
-    if (drag != null) return;
+    if (dragRef.current) return;
+    setSel(null); setSelEdge(null);
     panRef.current = { lastX: e.clientX, lastY: e.clientY };
     svgRef.current?.setPointerCapture(e.pointerId);
   };
+
   const onMove = (e: React.PointerEvent<SVGSVGElement>) => {
-    if (drag != null) {
-      const local = clientToLocal(e.clientX, e.clientY);
-      if (!local) return;
-      setCorner(drag, { pt: toMm(local[0], local[1]) });
+    const dr = dragRef.current;
+    if (dr) {
+      const m = clientToMm(e.clientX, e.clientY);
+      if (!m) return;
+      const dxm = m[0] - dr.startCursor[0], dym = m[1] - dr.startCursor[1];
+      if (dr.kind === 'vertex') {
+        const target: Vec2 = [dr.startPts[0][0] + dxm, dr.startPts[0][1] + dym];
+        const { pts, guides: g } = applyAlign([target], [dr.index]);
+        setCorner(dr.index, { pt: pts[0] });
+        setGuides(g);
+      } else {
+        const targets: Vec2[] = dr.startPts.map((s): Vec2 => [s[0] + dxm, s[1] + dym]);
+        const j = (dr.index + 1) % n;
+        const { pts, guides: g } = applyAlign(targets, [dr.index, j]);
+        setCorners((c) => c.map((v, k) => (k === dr.index ? { ...v, pt: pts[0] } : k === j ? { ...v, pt: pts[1] } : v)));
+        setGuides(g);
+      }
       return;
     }
     if (panRef.current) {
@@ -102,22 +169,28 @@ export function SketchCanvas({ profile, onChange }: { profile: Profile; onChange
     }
   };
   const endDrag = (e: React.PointerEvent<SVGSVGElement>) => {
-    if (drag != null) {
-      setCorner(drag, { pt: snapPt(verts[drag]) });
+    const dr = dragRef.current;
+    if (dr) {
+      // 놓을 때 격자 스냅(정렬로 이미 맞은 좌표는 그리드로 반올림)
+      if (dr.kind === 'vertex') setCorner(dr.index, { pt: snapPt(verts[dr.index]) });
+      else {
+        const j = (dr.index + 1) % n;
+        setCorners((c) => c.map((v, k) => (k === dr.index || k === j ? { ...v, pt: snapPt(v.pt) } : v)));
+      }
+      dragRef.current = null;
+      setGuides([]);
       svgRef.current?.releasePointerCapture(e.pointerId);
     }
     if (panRef.current) {
       panRef.current = null;
       svgRef.current?.releasePointerCapture(e.pointerId);
     }
-    setDrag(null);
     setFrozen(null);
   };
   const resetView = () => setView({ x: 0, y: 0, w: W, h: H });
 
   const addPoint = () => {
-    // 선택 꼭지점 다음(없으면 마지막) 변 중간에 꼭지점 추가
-    const e = sel ?? n - 1;
+    const e = selEdge ?? sel ?? n - 1;
     const a = verts[e]; const b = verts[(e + 1) % n];
     const mid: Vec2 = [snap((a[0] + b[0]) / 2), snap((a[1] + b[1]) / 2)];
     const nc = [...cs]; nc.splice(e + 1, 0, { pt: mid });
@@ -134,11 +207,23 @@ export function SketchCanvas({ profile, onChange }: { profile: Profile; onChange
     setCorner(sel, { pt: axis === 0 ? [v, p[1]] : [p[0], v] });
   };
 
-  // 미리보기 경계: 필렛 전개(3D와 동일한 outlinePoints)
   const outline = n > 0 ? outlinePoints({ closed: true, corners: cs }) : [];
   const poly = outline.map(toPx).map(([x, y]) => `${x},${y}`).join(' ');
-
   const selR = sel != null ? (cs[sel].r ?? 0) : 0;
+
+  // 가이드/스냅선 렌더용: 현재 보이는 뷰(viewBox) 범위 전체를 가로지르게
+  const vb = view;
+  const guideLine = (g: Guide, i: number) => {
+    const stroke = g.snap ? '#f80' : '#7aa';
+    if (g.axis === 'x') {
+      const [px] = toPx([g.v, 0]);
+      return <line key={`gx${i}`} x1={px} y1={vb.y} x2={px} y2={vb.y + vb.h}
+        stroke={stroke} strokeWidth={1} strokeDasharray="5 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />;
+    }
+    const [, py] = toPx([0, g.v]);
+    return <line key={`gy${i}`} x1={vb.x} y1={py} x2={vb.x + vb.w} y2={py}
+      stroke={stroke} strokeWidth={1} strokeDasharray="5 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />;
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, height: '100%' }}>
@@ -151,16 +236,31 @@ export function SketchCanvas({ profile, onChange }: { profile: Profile; onChange
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
       >
-        <polygon points={poly} fill="rgba(120,160,220,0.25)" stroke="#3a6" strokeWidth={2} />
+        {guides.map(guideLine)}
+        <polygon points={poly} fill="rgba(120,160,220,0.25)" stroke="#3a6" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+        {/* 변(edge) 히트/선택 — 정점 사이 직선(필렛 전) */}
+        {verts.map((p, i) => {
+          const q = verts[(i + 1) % n];
+          const [x1, y1] = toPx(p); const [x2, y2] = toPx(q);
+          return (
+            <line
+              key={`e${i}`} x1={x1} y1={y1} x2={x2} y2={y2}
+              stroke={selEdge === i ? '#e06' : 'transparent'}
+              strokeWidth={selEdge === i ? 3 : 12} vectorEffect="non-scaling-stroke"
+              style={{ cursor: 'move' }}
+              onPointerDown={(e) => startEdgeDrag(i, e)}
+            />
+          );
+        })}
         {verts.map((p, i) => {
           const [x, y] = toPx(p);
           const rounded = (cs[i].r ?? 0) > 0;
           return (
             <circle
-              key={i} cx={x} cy={y} r={7}
+              key={`v${i}`} cx={x} cy={y} r={7} vectorEffect="non-scaling-stroke"
               fill={sel === i ? '#e06' : rounded ? '#2a8' : '#36c'}
               stroke={rounded ? '#0a5' : 'none'} strokeWidth={rounded ? 2 : 0}
-              onPointerDown={(e) => startDrag(i, e)}
+              onPointerDown={(e) => startVertexDrag(i, e)}
               style={{ cursor: 'grab' }}
             />
           );
@@ -186,7 +286,8 @@ export function SketchCanvas({ profile, onChange }: { profile: Profile; onChange
               : <span style={{ color: '#888' }}>0 = 각진 모서리</span>}
           </>
         )}
-        <span style={{ marginLeft: 'auto', color: '#888' }}>스냅 {SNAP}mm</span>
+        {sel == null && selEdge != null && <span style={{ color: '#888' }}>변 선택됨 — 드래그로 이동</span>}
+        <span style={{ marginLeft: 'auto', color: '#888' }}>스냅 {SNAP}mm · 정렬 자동</span>
       </div>
     </div>
   );
