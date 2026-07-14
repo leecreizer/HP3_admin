@@ -265,6 +265,20 @@ export function SketchCanvas({ profile, onChange }: { profile: Profile; onChange
             />
           );
         })}
+        {/* 점 번호 + 좌표값 라벨 (줌과 무관하게 화면상 크기 유지) */}
+        {verts.map((p, i) => {
+          const [x, y] = toPx(p);
+          const fs = view.w * 0.018; const off = fs * 0.6;
+          return (
+            <text
+              key={`t${i}`} x={x + off} y={y - off} fontSize={fs}
+              fill={sel === i ? '#c0055a' : '#234'} stroke="#fff" strokeWidth={fs * 0.14}
+              paintOrder="stroke" style={{ pointerEvents: 'none', fontWeight: 700 }}
+            >
+              {i + 1}: {p[0]},{p[1]}
+            </text>
+          );
+        })}
       </svg>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: '0.85rem', flexWrap: 'wrap' }}>
         <button onClick={addPoint}>+ 점 추가</button>
