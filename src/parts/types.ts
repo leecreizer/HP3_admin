@@ -2,9 +2,20 @@ export type Vec2 = [number, number];
 
 /** 단면의 꼭지점. r>0이면 그 모서리를 반지름 R로 라운드(필렛)한다. */
 export interface Corner {
+  /** 확정 좌표(mm). xExpr/yExpr가 있으면 그 평가값으로 덮인다. */
   pt: Vec2;
   /** 모서리 필렛 반지름(mm). 없거나 0이면 각진 모서리. */
   r?: number;
+  /** X 좌표 수식(변수·연산 사용). 없으면 pt[0] 리터럴 사용. */
+  xExpr?: string;
+  /** Y 좌표 수식. 없으면 pt[1] 리터럴 사용. */
+  yExpr?: string;
+}
+
+/** 파츠 변수 — 이름과 수식(리터럴 숫자 포함). 점 좌표 수식에서 참조. */
+export interface PartVar {
+  name: string;
+  expr: string;
 }
 
 export interface Contour {
@@ -29,6 +40,8 @@ export interface Part {
   method: 'extrude';
   /** 작업 평면(기본 XY=정면). 없으면 XY로 간주. */
   plane?: WorkPlane;
+  /** 파츠 변수 — 점 좌표 수식에서 참조(#W, #H 등). */
+  vars?: PartVar[];
   extrude: { depth: number; bevel?: { size: number; thickness: number } };
   material?: { color: string; name?: string };
   bbox: { w: number; h: number; d: number };
