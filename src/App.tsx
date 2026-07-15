@@ -195,6 +195,7 @@ export default function App() {
         />
       );
       break;
+    case 'editor':
     case 'parts':
       content = <PartEditor />;
       break;
