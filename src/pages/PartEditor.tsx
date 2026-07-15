@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { SketchCanvas } from '../parts/SketchCanvas';
 import { ExtrudePreview } from '../parts/ExtrudePreview';
 import { loadParts, upsertPart, deletePart, newPart } from '../parts/partStore';
@@ -83,6 +83,37 @@ export function PartEditor() {
   const onDup = () => setCur({ ...newPart(cur.name + ' 복제'), profile: cur.profile, extrude: cur.extrude, material: cur.material, plane: cur.plane, vars: cur.vars });
   const onDel = (id: string) => { setParts(deletePart(id)); if (cur.id === id) onNew(); };
 
+  // ── 파일로 내보내기 / 불러오기 ────────────────────────────────
+  const fileRef = useRef<HTMLInputElement>(null);
+  const onExport = () => {
+    const data = JSON.stringify({ ...cur, name: cur.name.trim() || '새 파츠' }, null, 2);
+    const url = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(cur.name.trim() || 'part').replace(/[\\/:*?"<>|\s]+/g, '_')}.part.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setMsg('파일로 저장됨');
+  };
+  const onImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    e.target.value = ''; // 같은 파일 다시 선택 허용
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const p = JSON.parse(String(reader.result)) as Part;
+        if (!p?.profile?.contours?.length || !p.extrude) throw new Error('bad');
+        const loaded: Part = { ...newPart(p.name || '가져온 파츠'), ...p, id: p.id || newPart('x').id };
+        setCur(loaded);
+        setMsg(`파일 불러옴: ${loaded.name}`);
+      } catch {
+        setMsg('불러오기 실패: 올바른 파츠 파일(.part.json)이 아닙니다');
+      }
+    };
+    reader.readAsText(f);
+  };
+
   const th: React.CSSProperties = { textAlign: 'left', fontWeight: 600, color: 'var(--text-3)', padding: '2px 6px', fontSize: '0.72rem' };
   const td: React.CSSProperties = { padding: '2px 6px' };
 
@@ -96,6 +127,10 @@ export function PartEditor() {
           <input value={cur.name} onChange={(e) => patch({ name: e.target.value })} placeholder="파츠 이름" style={{ width: 160 }} />
           <button onClick={onSave}>저장</button>
           <button onClick={onDup}>복제</button>
+          <span style={{ width: 1, alignSelf: 'stretch', background: '#ddd' }} />
+          <button onClick={onExport} title="현재 파츠를 파일(.part.json)로 저장">파일로 저장</button>
+          <button onClick={() => fileRef.current?.click()} title="파츠 파일 불러오기">파일 열기</button>
+          <input ref={fileRef} type="file" accept=".json,application/json" onChange={onImportFile} style={{ display: 'none' }} />
           {msg && <span style={{ color: errs.length ? '#c33' : '#292', fontSize: '0.85rem' }}>{msg}</span>}
           <span style={{ marginLeft: 'auto', color: '#888', fontSize: '0.8rem' }}>저장된 파츠 {parts.length}개</span>
         </div>
