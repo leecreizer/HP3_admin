@@ -9,6 +9,7 @@ export interface Placement {
   rx: string; ry: string; rz: string; // 회전(도) 수식
   w: string; h: string; d: string;    // 실제 크기(mm) 수식 — 폭·높이·두께. 빈값=파츠 원본
   hidden?: boolean;                    // true면 3D에서 숨김
+  vars?: { name: string; expr: string }[]; // 이 배치 전용 변수(위치/회전/크기 수식에서 #이름 참조)
 }
 
 export interface Assembly {
@@ -43,5 +44,6 @@ export function newPlacement(partId: string): Placement {
     px: '0', py: '0', pz: '0',
     rx: '0', ry: '0', rz: '0',
     w: '', h: '', d: '',
+    vars: [],
   };
 }

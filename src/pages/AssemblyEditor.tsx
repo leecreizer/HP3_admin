@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, TransformControls } from '@react-three/drei';
 import type { Object3D } from 'three';
-import { loadParts, upsertPart, deletePart } from '../parts/partStore';
+import { loadParts, upsertPart } from '../parts/partStore';
 import type { Part } from '../parts/types';
 import { loadAssembly, saveAssembly, newPlacement, type Assembly, type Placement } from '../parts/assemblyStore';
 import { PartObject } from '../parts/PartObject';
@@ -25,17 +25,17 @@ export function AssemblyEditor() {
     const files = Array.from(e.target.files ?? []); // value 초기화 전에 참조 복사(FileList가 비워지는 것 방지)
     e.target.value = '';
     if (!files.length) return;
-    let ok = 0;
     let seq = 0;
+    const imported: Part[] = [];
     const read = (f: File) => new Promise<void>((res) => {
       const r = new FileReader();
       r.onload = () => {
         try {
           const p = JSON.parse(String(r.result)) as Part;
           if (p?.profile?.contours?.length && p.extrude) {
-            // 불러올 때마다 항상 새 고유 id → 라이브러리에 누적(덮어쓰기 방지)
-            upsertPart({ ...p, id: `imp-${Date.now()}-${seq++}-${Math.floor(Math.random() * 1e6)}` });
-            ok++;
+            const np: Part = { ...p, id: `imp-${Date.now()}-${seq++}-${Math.floor(Math.random() * 1e6)}` };
+            upsertPart(np); // 라이브러리에도 저장(드롭다운에서 재사용)
+            imported.push(np);
           }
         } catch { /* skip */ }
         res();
@@ -43,9 +43,14 @@ export function AssemblyEditor() {
       r.onerror = () => res();
       r.readAsText(f);
     });
-    await Promise.all(Array.from(files).map(read));
+    await Promise.all(files.map(read));
     reloadParts();
-    setImpMsg(`${ok}개 불러옴`);
+    // 팔레트 없이 배치 목록에 바로 추가(원본 크기로 채움)
+    const pls: Placement[] = imported.map((np) => ({
+      ...newPlacement(np.id), w: String(np.bbox.w), h: String(np.bbox.h), d: String(np.bbox.d),
+    }));
+    if (pls.length) { setAsm((a) => ({ ...a, items: [...a.items, ...pls] })); setSel(pls[pls.length - 1].id); }
+    setImpMsg(`${imported.length}개 불러와 배치에 추가`);
   };
   const [asm, setAsm] = useState<Assembly>(loadAssembly);
   const [sel, setSel] = useState<string | null>(null);
@@ -57,14 +62,13 @@ export function AssemblyEditor() {
   const [selObj, setSelObj] = useState<Object3D | null>(null);
   useEffect(() => { setSelObj(sel ? objs.current.get(sel) ?? null : null); }, [sel, asm.items]);
 
-  const asmScope = buildScope(asm.vars, {});
+  // 배치별 스코프 = 그 배치의 변수 + 파츠 치수(W/H/D) + 순번(i)
   const scopeFor = (pl: Placement, i: number): Record<string, number> => {
     const p = partMap.get(pl.partId);
-    return { ...asmScope, W: p?.bbox.w ?? 0, H: p?.bbox.h ?? 0, D: p?.bbox.d ?? 0, i };
+    return buildScope(pl.vars, { W: p?.bbox.w ?? 0, H: p?.bbox.h ?? 0, D: p?.bbox.d ?? 0, i });
   };
 
   const setItems = (items: Placement[]) => setAsm((a) => ({ ...a, items }));
-  const setVars = (vars: Assembly['vars']) => setAsm((a) => ({ ...a, vars }));
   const addPart = (partId: string) => {
     const p = partMap.get(partId);
     // 실제 크기(mm)를 파츠 원본 치수로 미리 채워 값이 보이게 한다
@@ -79,12 +83,6 @@ export function AssemblyEditor() {
     setAsm((a) => ({ ...a, items: [...a.items, copy] })); setSel(copy.id);
   };
   const toggleHide = (id: string) => setItems(asm.items.map((x) => (x.id === id ? { ...x, hidden: !x.hidden } : x)));
-  // 팔레트(라이브러리)에서 파츠 제거 + 그 파츠를 쓰는 배치도 정리
-  const delPartFromLib = (partId: string) => {
-    deletePart(partId);
-    setParts(loadParts());
-    setItems(asm.items.filter((x) => x.partId !== partId));
-  };
   // 배치 크기(mm) → 파츠 원본 bbox 대비 스케일. 빈값이면 원본(스케일 1).
   const scaleFor = (pl: Placement, sc: Record<string, number>): [number, number, number] => {
     const p = partMap.get(pl.partId);
@@ -97,10 +95,12 @@ export function AssemblyEditor() {
   const setField = (id: string, k: keyof Placement, v: string) =>
     setItems(asm.items.map((x) => (x.id === id ? { ...x, [k]: v } : x)));
 
-  const addVar = () => setVars([...asm.vars, { name: `V${asm.vars.length + 1}`, expr: '0' }]);
-  const delVar = (i: number) => setVars(asm.vars.filter((_, k) => k !== i));
+  // 선택 배치 전용 변수 관리
+  const setSelVars = (vars: { name: string; expr: string }[]) => { if (sel) setItems(asm.items.map((x) => (x.id === sel ? { ...x, vars } : x))); };
+  const addVar = () => { const vs = selItem?.vars ?? []; setSelVars([...vs, { name: `V${vs.length + 1}`, expr: '0' }]); };
+  const delVar = (i: number) => setSelVars((selItem?.vars ?? []).filter((_, k) => k !== i));
   const setVar = (i: number, p: Partial<{ name: string; expr: string }>) =>
-    setVars(asm.vars.map((v, k) => (k === i ? { ...v, ...p } : v)));
+    setSelVars((selItem?.vars ?? []).map((v, k) => (k === i ? { ...v, ...p } : v)));
 
   // 기즈모 이동 → 스냅해서 위치 수식을 리터럴로 확정
   const onGizmo = () => {
@@ -114,8 +114,6 @@ export function AssemblyEditor() {
   const selItem = asm.items.find((x) => x.id === sel) ?? null;
   const selPart = selItem ? partMap.get(selItem.partId) : null;
 
-  const th: React.CSSProperties = { textAlign: 'left', fontWeight: 600, color: 'var(--text-3)', padding: '2px 5px', fontSize: '0.7rem' };
-  const td: React.CSSProperties = { padding: '1px 4px' };
   const lbl: React.CSSProperties = { fontSize: '0.76rem', color: 'var(--text-2)', width: 44, display: 'inline-block' };
 
   const axisRow = (label: string, keys: [keyof Placement, keyof Placement, keyof Placement]) => selItem && (
@@ -143,33 +141,9 @@ export function AssemblyEditor() {
           <button onClick={() => fileRef.current?.click()} title="외부 .part.json 파일에서 파츠 불러오기">파일에서 불러오기</button>
           <input ref={fileRef} type="file" accept=".json,application/json" multiple onChange={onImportFiles} style={{ display: 'none' }} />
           {impMsg && <span style={{ color: '#292' }}>{impMsg}</span>}
-          <span style={{ color: '#888' }}>저장된 파츠 {parts.length}개 · 팔레트에서 클릭하거나 위 목록에서 선택해 추가</span>
+          <span style={{ color: '#888' }}>드롭다운 선택 또는 파일 불러오기로 배치에 추가됩니다</span>
         </div>
         <div style={{ display: 'flex', gap: 12, minHeight: 560 }}>
-          {/* 파츠 팔레트 */}
-          <div style={{ width: 150, borderRight: '1px solid var(--line,#eee)', paddingRight: 10, overflowY: 'auto', maxHeight: 620 }}>
-            <div style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: 6 }}>파츠 팔레트</div>
-            {parts.length === 0 && <div style={{ fontSize: '0.76rem', color: '#999' }}>저장된 파츠가 없습니다. 파츠 모델러에서 만들어 저장하세요.</div>}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {parts.map((p) => (
-                <div key={p.id} style={{ position: 'relative' }}>
-                  <button onClick={() => addPart(p.id)} title="클릭해서 조립에 추가"
-                    style={{ display: 'flex', alignItems: 'center', gap: 6, padding: 5, paddingRight: 20, cursor: 'pointer', textAlign: 'left', border: '1px solid #ddd', borderRadius: 6, background: '#fff', width: '100%' }}>
-                    {p.thumb
-                      ? <img src={p.thumb} width={34} height={34} alt="" style={{ borderRadius: 3, flexShrink: 0 }} />
-                      : <span style={{ width: 34, height: 34, borderRadius: 3, background: p.material?.color ?? '#d8c5a8', flexShrink: 0 }} />}
-                    <span style={{ fontSize: '0.74rem', overflow: 'hidden' }}>
-                      <span style={{ display: 'block', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{p.name}</span>
-                      <span style={{ color: '#999', fontSize: '0.66rem' }}>{p.bbox.w}×{p.bbox.h}×{p.bbox.d}</span>
-                    </span>
-                  </button>
-                  <button onClick={() => delPartFromLib(p.id)} title="팔레트에서 이 파츠 제거(라이브러리 삭제)"
-                    style={{ position: 'absolute', top: 2, right: 3, border: 'none', background: 'none', color: '#c33', cursor: 'pointer', fontSize: '0.95rem', lineHeight: 1 }}>×</button>
-                </div>
-              ))}
-            </div>
-          </div>
-
           {/* 3D 실시간 뷰 + 기즈모 */}
           <div style={{ flex: 1, minHeight: 560 }}>
             <Canvas camera={{ position: [1.2, 1, 1.2], fov: 45 }} style={{ width: '100%', height: '100%', background: '#1a1c20' }}
@@ -247,35 +221,30 @@ export function AssemblyEditor() {
                     );
                   })()}
                 </div>
+                {/* 배치 전용 변수 */}
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: '0.74rem', margin: '6px 0 3px' }}>변수 <span style={{ color: '#888', fontWeight: 400 }}>· 위/회전/크기 수식에서 #이름 (내장 #W/#H/#D=원본치수, #i=순번)</span></div>
+                  {(() => {
+                    const sc = scopeFor(selItem, asm.items.indexOf(selItem));
+                    return (selItem.vars ?? []).map((v, i) => {
+                      const val = sc[v.name.replace(/^#/, '')];
+                      return (
+                        <div key={i} style={{ display: 'flex', gap: 3, alignItems: 'center', marginBottom: 3 }}>
+                          <input value={v.name} placeholder="이름" style={{ width: 56 }} onChange={(e) => setVar(i, { name: e.target.value })} />
+                          <input value={v.expr} placeholder="수식" style={{ width: 80 }} onChange={(e) => setVar(i, { expr: e.target.value })} />
+                          <span style={{ fontSize: '0.7rem', color: val == null ? '#c33' : '#888', minWidth: 30 }}>{val == null ? '오류' : Math.round(val * 100) / 100}</span>
+                          <button onClick={() => delVar(i)} style={{ color: '#c33', border: 'none', background: 'none', cursor: 'pointer' }}>×</button>
+                        </div>
+                      );
+                    });
+                  })()}
+                  <button onClick={addVar} style={{ fontSize: '0.76rem' }}>+ 변수 추가</button>
+                </div>
                 <div style={{ color: '#888', fontSize: '0.72rem' }}>3D의 화살표(기즈모)를 끌어 {SNAP}mm 단위로 이동할 수 있습니다.</div>
                 <button onClick={() => delItem(selItem.id)} style={{ color: '#c33', alignSelf: 'flex-start' }}>삭제</button>
               </div>
             )}
           </div>
-        </div>
-
-        {/* 조립 변수 */}
-        <div>
-          <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-2)', margin: '4px 0 6px' }}>
-            조립 변수 <span style={{ color: '#888', fontWeight: 400 }}>· 배치 수식에서 #이름 참조 (배치별 내장 #W/#H/#D=파츠 치수, #i=순번)</span>
-          </div>
-          <table style={{ borderCollapse: 'collapse', fontSize: '0.8rem' }}>
-            <thead><tr><th style={th}>이름</th><th style={th}>수식</th><th style={th}>값</th><th style={th}></th></tr></thead>
-            <tbody>
-              {asm.vars.map((v, i) => {
-                const val = asmScope[v.name.replace(/^#/, '')];
-                return (
-                  <tr key={i}>
-                    <td style={td}><input value={v.name} style={{ width: 80 }} onChange={(e) => setVar(i, { name: e.target.value })} /></td>
-                    <td style={td}><input value={v.expr} style={{ width: 130 }} onChange={(e) => setVar(i, { expr: e.target.value })} /></td>
-                    <td style={{ ...td, color: val == null ? '#c33' : '#333' }}>{val == null ? '오류' : Math.round(val * 100) / 100}</td>
-                    <td style={td}><button onClick={() => delVar(i)} style={{ color: '#c33', border: 'none', background: 'none', cursor: 'pointer' }}>×</button></td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          <button onClick={addVar} style={{ marginTop: 4, fontSize: '0.8rem' }}>+ 변수 추가</button>
         </div>
       </section>
     </main>
