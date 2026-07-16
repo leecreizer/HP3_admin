@@ -26,13 +26,15 @@ export function AssemblyEditor() {
     e.target.value = '';
     if (!files.length) return;
     let ok = 0;
+    let seq = 0;
     const read = (f: File) => new Promise<void>((res) => {
       const r = new FileReader();
       r.onload = () => {
         try {
           const p = JSON.parse(String(r.result)) as Part;
           if (p?.profile?.contours?.length && p.extrude) {
-            upsertPart({ ...p, id: p.id || `imp-${Date.now()}-${Math.floor(Math.random() * 1e4)}` });
+            // 불러올 때마다 항상 새 고유 id → 라이브러리에 누적(덮어쓰기 방지)
+            upsertPart({ ...p, id: `imp-${Date.now()}-${seq++}-${Math.floor(Math.random() * 1e6)}` });
             ok++;
           }
         } catch { /* skip */ }
