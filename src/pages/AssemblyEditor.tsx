@@ -127,9 +127,9 @@ export function AssemblyEditor() {
   );
 
   return (
-    <main className="main">
+    <main className="main" style={{ display: 'flex', flexDirection: 'column' }}>
       <div className="page-head"><h1>조립</h1></div>
-      <section className="panel" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <section className="panel" style={{ display: 'flex', flexDirection: 'column', gap: 12, flex: 1, minHeight: 0 }}>
         {/* 파츠 추가 툴바 */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: '0.85rem' }}>
           <b>파츠 추가</b>
@@ -143,9 +143,9 @@ export function AssemblyEditor() {
           {impMsg && <span style={{ color: '#292' }}>{impMsg}</span>}
           <span style={{ color: '#888' }}>드롭다운 선택 또는 파일 불러오기로 배치에 추가됩니다</span>
         </div>
-        <div style={{ display: 'flex', gap: 12, minHeight: 560 }}>
+        <div style={{ display: 'flex', gap: 12, flex: 1, minHeight: 0 }}>
           {/* 3D 실시간 뷰 + 기즈모 */}
-          <div style={{ flex: 1, minHeight: 560 }}>
+          <div style={{ flex: 1, minHeight: 0 }}>
             <Canvas camera={{ position: [1.2, 1, 1.2], fov: 45 }} style={{ width: '100%', height: '100%', background: '#1a1c20' }}
               onPointerMissed={() => setSel(null)}>
               <ambientLight intensity={0.6} />
@@ -176,7 +176,7 @@ export function AssemblyEditor() {
           </div>
 
           {/* 배치 목록 (파츠명 + 복사/숨김/삭제) */}
-          <div style={{ width: 190, borderLeft: '1px solid var(--line,#eee)', paddingLeft: 10, overflowY: 'auto', maxHeight: 620 }}>
+          <div style={{ width: 190, borderLeft: '1px solid var(--line,#eee)', paddingLeft: 10, overflowY: 'auto', minHeight: 0 }}>
             <div style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: 6 }}>배치 목록 ({asm.items.length})</div>
             {asm.items.length === 0 && <div style={{ fontSize: '0.74rem', color: '#999' }}>팔레트/드롭다운에서 파츠를 추가하세요.</div>}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -197,7 +197,7 @@ export function AssemblyEditor() {
           </div>
 
           {/* 선택 정보 패널 */}
-          <div style={{ width: 240, borderLeft: '1px solid var(--line,#eee)', paddingLeft: 12 }}>
+          <div style={{ width: 240, borderLeft: '1px solid var(--line,#eee)', paddingLeft: 12, overflowY: 'auto', minHeight: 0 }}>
             <div style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: 8 }}>선택 정보</div>
             {!selItem && <div style={{ fontSize: '0.78rem', color: '#999' }}>3D에서 파츠를 클릭하거나 아래 배치 목록에서 선택하세요.</div>}
             {selItem && (
