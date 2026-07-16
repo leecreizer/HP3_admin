@@ -3,7 +3,7 @@ import {
   PerspectiveCamera, WebGLRenderer, Box3, Vector3, Sphere, AmbientLight, DirectionalLight, Color,
 } from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
-import { buildShape, planeEuler } from './partGeometry';
+import { buildShape, partEuler } from './partGeometry';
 import { resolveProfile } from './formula';
 import type { Part } from './types';
 
@@ -45,7 +45,7 @@ function buildScene(items: ResolvedItem[]): { scene: Scene; root: Group } {
     const geom = new ExtrudeGeometry(buildShape(resolveProfile(it.part)), { depth: it.part.extrude.depth, bevelEnabled: false });
     const mesh = new Mesh(geom, new MeshStandardMaterial({ color: it.part.material?.color ?? '#d8c5a8' }));
     mesh.scale.setScalar(MM);
-    const planeG = new Group(); planeG.rotation.set(...planeEuler(it.part.plane)); planeG.add(mesh);
+    const pe = partEuler(it.part); const planeG = new Group(); planeG.rotation.set(pe[0], pe[1], pe[2]); planeG.add(mesh);
     const scaleG = new Group(); scaleG.scale.set(it.scale[0] || 1, it.scale[1] || 1, it.scale[2] || 1); scaleG.add(planeG);
     const posG = new Group();
     posG.position.set(it.pos[0] * MM, it.pos[1] * MM, it.pos[2] * MM);

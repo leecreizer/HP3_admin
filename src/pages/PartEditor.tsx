@@ -150,12 +150,11 @@ export function PartEditor() {
               <span>두께(mm)</span>
               <input type="number" value={cur.extrude.depth} style={{ width: 80 }}
                 onChange={(e) => patch({ extrude: { ...cur.extrude, depth: Number(e.target.value) } })} />
-              <span>작업 평면</span>
-              <select value={cur.plane ?? 'XY'} onChange={(e) => patch({ plane: e.target.value as Part['plane'] })}>
-                <option value="XY">정면 XY (앞쪽으로 압출)</option>
-                <option value="XZ">평면 XZ (위로 압출)</option>
-                <option value="YZ">측면 YZ (옆으로 압출)</option>
-              </select>
+              <span>회전(도) X Y Z</span>
+              {[0, 1, 2].map((a) => (
+                <input key={a} type="number" value={(cur.rot ?? [0, 0, 0])[a]} style={{ width: 56 }}
+                  onChange={(e) => { const r: [number, number, number] = [...(cur.rot ?? [0, 0, 0])] as [number, number, number]; r[a] = Number(e.target.value); patch({ rot: r }); }} />
+              ))}
               <span>색상</span>
               <input type="color" value={cur.material?.color ?? '#d8c5a8'}
                 onChange={(e) => patch({ material: { ...cur.material, color: e.target.value } })} />
@@ -163,7 +162,7 @@ export function PartEditor() {
             </div>
             <div style={{ flex: 1, minHeight: 560 }}>
               {errs.length === 0
-                ? <ExtrudePreview profile={resolvedProfile} depth={cur.extrude.depth} color={cur.material?.color} plane={cur.plane ?? 'XY'} />
+                ? <ExtrudePreview profile={resolvedProfile} depth={cur.extrude.depth} color={cur.material?.color} rotDeg={cur.rot ?? [0, 0, 0]} />
                 : <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: '#c33' }}>{errs.join(' / ')}</div>}
             </div>
           </div>

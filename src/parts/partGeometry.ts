@@ -1,11 +1,18 @@
 import { Shape, Path } from 'three';
 import type { Profile, Contour, Vec2, WorkPlane } from './types';
 
-/** 작업 평면별 회전(오일러). 기본 압출 +Z를 해당 축에 맞춘다. 3D 미리보기·조립 공용. */
+/** 작업 평면별 회전(오일러). (구버전 호환) */
 export function planeEuler(plane?: WorkPlane): [number, number, number] {
   if (plane === 'XZ') return [-Math.PI / 2, 0, 0];
   if (plane === 'YZ') return [0, Math.PI / 2, 0];
   return [0, 0, 0];
+}
+
+/** 파츠 방향(라디안) — rot(도) 우선, 없으면 구버전 plane. 3D·조립·GLB 공용. */
+export function partEuler(part: { rot?: [number, number, number]; plane?: WorkPlane }): [number, number, number] {
+  const D = Math.PI / 180;
+  if (part.rot) return [part.rot[0] * D, part.rot[1] * D, part.rot[2] * D];
+  return planeEuler(part.plane);
 }
 
 const sub = (a: Vec2, b: Vec2): Vec2 => [a[0] - b[0], a[1] - b[1]];
