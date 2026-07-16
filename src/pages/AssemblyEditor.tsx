@@ -62,11 +62,34 @@ export function AssemblyEditor() {
   const [selObj, setSelObj] = useState<Object3D | null>(null);
   useEffect(() => { setSelObj(sel ? objs.current.get(sel) ?? null : null); }, [sel, asm.items]);
 
-  // 배치별 스코프 = 그 배치의 변수 + 파츠 치수(W/H/D) + 순번(i)
-  const scopeFor = (pl: Placement, i: number): Record<string, number> => {
+  // 배치의 로컬 스코프 = 그 배치의 변수 + 원본 파츠 치수(W/H/D) + 순번(i)
+  const localScope = (pl: Placement, i: number): Record<string, number> => {
     const p = partMap.get(pl.partId);
     return buildScope(pl.vars, { W: p?.bbox.w ?? 0, H: p?.bbox.h ?? 0, D: p?.bbox.d ?? 0, i });
   };
+  // 배치 크기(mm) → 파츠 원본 bbox 대비 스케일. 빈값이면 원본(스케일 1).
+  const scaleFor = (pl: Placement, sc: Record<string, number>): [number, number, number] => {
+    const p = partMap.get(pl.partId);
+    const bw = p?.bbox.w || 1, bh = p?.bbox.h || 1, bd = p?.bbox.d || 1;
+    const tw = pl.w.trim() ? num(pl.w, sc) : bw;
+    const th = pl.h.trim() ? num(pl.h, sc) : bh;
+    const tdp = pl.d.trim() ? num(pl.d, sc) : bd;
+    return [tw / bw, th / bh, tdp / bd];
+  };
+  // 배치 간 참조 스코프: 정의변수(ref)를 가진 배치의 실제 W/H/D를 "ref.W/.H/.D"로 공개.
+  // (자기 로컬 스코프로만 해석 → 순환 참조 방지)
+  const crossScope: Record<string, number> = {};
+  asm.items.forEach((pl, i) => {
+    const ref = pl.ref?.trim();
+    if (!ref) return;
+    const p = partMap.get(pl.partId);
+    const sf = scaleFor(pl, localScope(pl, i));
+    crossScope[`${ref}.W`] = Math.round((p?.bbox.w ?? 0) * sf[0]);
+    crossScope[`${ref}.H`] = Math.round((p?.bbox.h ?? 0) * sf[1]);
+    crossScope[`${ref}.D`] = Math.round((p?.bbox.d ?? 0) * sf[2]);
+  });
+  // 최종 배치 스코프 = 참조 스코프 + 로컬 스코프(로컬이 우선)
+  const scopeFor = (pl: Placement, i: number): Record<string, number> => ({ ...crossScope, ...localScope(pl, i) });
 
   const setItems = (items: Placement[]) => setAsm((a) => ({ ...a, items }));
   const addPart = (partId: string) => {
@@ -83,15 +106,6 @@ export function AssemblyEditor() {
     setAsm((a) => ({ ...a, items: [...a.items, copy] })); setSel(copy.id);
   };
   const toggleHide = (id: string) => setItems(asm.items.map((x) => (x.id === id ? { ...x, hidden: !x.hidden } : x)));
-  // 배치 크기(mm) → 파츠 원본 bbox 대비 스케일. 빈값이면 원본(스케일 1).
-  const scaleFor = (pl: Placement, sc: Record<string, number>): [number, number, number] => {
-    const p = partMap.get(pl.partId);
-    const bw = p?.bbox.w || 1, bh = p?.bbox.h || 1, bd = p?.bbox.d || 1;
-    const tw = pl.w.trim() ? num(pl.w, sc) : bw;
-    const th = pl.h.trim() ? num(pl.h, sc) : bh;
-    const tdp = pl.d.trim() ? num(pl.d, sc) : bd;
-    return [tw / bw, th / bh, tdp / bd];
-  };
   const setField = (id: string, k: keyof Placement, v: string) =>
     setItems(asm.items.map((x) => (x.id === id ? { ...x, [k]: v } : x)));
 
@@ -186,7 +200,11 @@ export function AssemblyEditor() {
                   <div key={pl.id} onClick={() => setSel(pl.id)}
                     style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '3px 4px', borderRadius: 5, cursor: 'pointer',
                       background: sel === pl.id ? 'rgba(255,179,71,0.18)' : undefined, opacity: pl.hidden ? 0.45 : 1 }}>
-                    <span style={{ flex: 1, fontSize: '0.75rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p?.name ?? '(삭제된 파츠)'}</span>
+                    <input value={pl.ref ?? ''} placeholder={p?.name ?? '(삭제)'} title="이름/정의변수 — 클릭해 수정"
+                      onClick={(e) => e.stopPropagation()} onChange={(e) => setField(pl.id, 'ref', e.target.value)}
+                      style={{ flex: 1, minWidth: 0, fontSize: '0.75rem', border: '1px solid transparent', background: 'transparent', padding: '1px 2px', borderRadius: 3 }}
+                      onFocus={(e) => { e.currentTarget.style.border = '1px solid #ccc'; e.currentTarget.style.background = '#fff'; }}
+                      onBlur={(e) => { e.currentTarget.style.border = '1px solid transparent'; e.currentTarget.style.background = 'transparent'; }} />
                     <button title="복사" onClick={(e) => { e.stopPropagation(); dupItem(pl.id); }} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.85rem', padding: 0 }}>⧉</button>
                     <button title={pl.hidden ? '표시' : '숨김'} onClick={(e) => { e.stopPropagation(); toggleHide(pl.id); }} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.85rem', padding: 0 }}>{pl.hidden ? '🙈' : '👁'}</button>
                     <button title="삭제" onClick={(e) => { e.stopPropagation(); delItem(pl.id); }} style={{ border: 'none', background: 'none', color: '#c33', cursor: 'pointer', fontSize: '0.9rem', padding: 0 }}>×</button>
@@ -204,6 +222,12 @@ export function AssemblyEditor() {
               <div style={{ fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <div><b>{selPart?.name ?? '(삭제된 파츠)'}</b></div>
                 {selPart && <div style={{ color: '#888', fontSize: '0.74rem' }}>크기 {selPart.bbox.w}×{selPart.bbox.h}×{selPart.bbox.d} mm · 평면 {selPart.plane ?? 'XY'}</div>}
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                  <span style={lbl}>정의변수</span>
+                  <input value={selItem.ref ?? ''} placeholder="예: 몸통" style={{ width: 100 }}
+                    onChange={(e) => setField(selItem.id, 'ref', e.target.value)} />
+                  {selItem.ref?.trim() && <span style={{ color: '#888', fontSize: '0.68rem' }}>다른 파츠에서 {selItem.ref.trim()}.W / .H / .D 로 참조</span>}
+                </div>
                 {(() => {
                   const s = scopeFor(selItem, asm.items.indexOf(selItem));
                   const rv = (k: keyof Placement) => { const v = evalExpr(selItem[k] as string, s); return v == null ? '오류' : Math.round(v * 100) / 100; };

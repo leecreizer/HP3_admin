@@ -9,6 +9,7 @@ export interface Placement {
   rx: string; ry: string; rz: string; // 회전(도) 수식
   w: string; h: string; d: string;    // 실제 크기(mm) 수식 — 폭·높이·두께. 빈값=파츠 원본
   hidden?: boolean;                    // true면 3D에서 숨김
+  ref?: string;                        // 정의 변수/이름 — 다른 배치가 ref.W/.H/.D 로 참조
   vars?: { name: string; expr: string }[]; // 이 배치 전용 변수(위치/회전/크기 수식에서 #이름 참조)
 }
 
