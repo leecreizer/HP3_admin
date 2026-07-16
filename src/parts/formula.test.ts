@@ -20,6 +20,22 @@ describe('evalExpr', () => {
   it('단항 음수', () => {
     expect(evalExpr('-5 + 3', {})).toBe(-2);
   });
+  it('비교 연산은 1/0', () => {
+    expect(evalExpr('600 == 600-(18*2)', {})).toBe(0); // 600 vs 564
+    expect(evalExpr('#W == 600-(18*2)', { W: 564 })).toBe(1);
+    expect(evalExpr('#W >= 500', { W: 564 })).toBe(1);
+    expect(evalExpr('3 < 2', {})).toBe(0);
+  });
+  it('논리·부정', () => {
+    expect(evalExpr('#W>500 && #H<800', { W: 564, H: 720 })).toBe(1);
+    expect(evalExpr('!(1)', {})).toBe(0);
+    expect(evalExpr('0 || 5', {})).toBe(1);
+  });
+  it('삼항 조건식', () => {
+    expect(evalExpr('#W>500 ? 600 : 400', { W: 564 })).toBe(600);
+    expect(evalExpr('#W>500 ? 600 : 400', { W: 300 })).toBe(400);
+    expect(evalExpr('#W>500 ? #W-36 : #W', { W: 564 })).toBe(528);
+  });
   it('미정의 변수·문법오류는 null', () => {
     expect(evalExpr('#missing + 1', {})).toBeNull();
     expect(evalExpr('2 +', {})).toBeNull();

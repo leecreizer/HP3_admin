@@ -1,22 +1,25 @@
 import type { Corner, PartVar, Vec2, Part, Profile } from './types';
 
 /**
- * 파츠용 경량 수식 평가기. 좌표·변수 계산에 필요한 사칙·괄호·단항·함수를 지원.
- * 지원: + - * / %, 단항 -, 괄호, 숫자, 변수(식별자, 앞의 # 무시),
- * 함수 abs/sqrt/round/floor/ceil/pow/min/max/sin/cos/tan(도 단위).
+ * 파츠용 경량 수식/조건식 평가기. 불리언은 1/0으로 취급.
+ * 지원: 사칙 + - * / %, 단항 -/+/!, 괄호, 숫자, 변수(식별자, 앞의 # 무시),
+ *   비교 == != < > <= >=, 논리 && ||, 삼항 조건식  cond ? a : b,
+ *   함수 abs/sqrt/round/floor/ceil/pow/min/max/sin/cos/tan(도 단위).
+ * 예) #W == 600-(18*2),  #W>500 ? 600 : 400,  min(#W, #H)/2
  * 평가 실패(문법 오류·미정의 변수 등)면 null 반환.
  */
 export function evalExpr(expr: string | undefined, scope: Record<string, number>): number | null {
   if (expr == null) return null;
   const s = String(expr).trim();
   if (s === '') return null;
-  const re = /[0-9]*\.?[0-9]+|[A-Za-z_#가-힣][A-Za-z0-9_.가-힣]*|[-+*/%(),]/g;
+  const re = /[0-9]*\.?[0-9]+|[A-Za-z_#가-힣][A-Za-z0-9_.가-힣]*|==|!=|<=|>=|&&|\|\||[-+*/%(),<>!?:]/g;
   const tokens: string[] = [];
   let m: RegExpExecArray | null;
   while ((m = re.exec(s))) tokens.push(m[0]);
   let p = 0;
   const peek = () => tokens[p];
   const next = () => tokens[p++];
+  const B = (b: boolean) => (b ? 1 : 0);
 
   const FUNCS: Record<string, (...a: number[]) => number> = {
     abs: Math.abs, sqrt: Math.sqrt, round: Math.round, floor: Math.floor, ceil: Math.ceil,
@@ -26,6 +29,31 @@ export function evalExpr(expr: string | undefined, scope: Record<string, number>
     tan: (x) => Math.tan((x * Math.PI) / 180),
   };
 
+  function parseTernary(): number {
+    const c = parseOr();
+    if (peek() === '?') {
+      next(); const a = parseTernary();
+      if (next() !== ':') throw new Error(':');
+      const b = parseTernary();
+      return c !== 0 ? a : b;
+    }
+    return c;
+  }
+  function parseOr(): number { let v = parseAnd(); while (peek() === '||') { next(); const r = parseAnd(); v = B(v !== 0 || r !== 0); } return v; }
+  function parseAnd(): number { let v = parseEq(); while (peek() === '&&') { next(); const r = parseEq(); v = B(v !== 0 && r !== 0); } return v; }
+  function parseEq(): number {
+    let v = parseCmp();
+    while (peek() === '==' || peek() === '!=') { const op = next(); const r = parseCmp(); v = B(op === '==' ? v === r : v !== r); }
+    return v;
+  }
+  function parseCmp(): number {
+    let v = parseAdd();
+    while (peek() === '<' || peek() === '>' || peek() === '<=' || peek() === '>=') {
+      const op = next(); const r = parseAdd();
+      v = B(op === '<' ? v < r : op === '>' ? v > r : op === '<=' ? v <= r : v >= r);
+    }
+    return v;
+  }
   function parseAdd(): number {
     let v = parseMul();
     while (peek() === '+' || peek() === '-') { const op = next(); const r = parseMul(); v = op === '+' ? v + r : v - r; }
@@ -42,17 +70,18 @@ export function evalExpr(expr: string | undefined, scope: Record<string, number>
   function parseUnary(): number {
     if (peek() === '-') { next(); return -parseUnary(); }
     if (peek() === '+') { next(); return parseUnary(); }
+    if (peek() === '!') { next(); return B(parseUnary() === 0); }
     return parsePrimary();
   }
   function parsePrimary(): number {
     const t = next();
     if (t === undefined) throw new Error('eof');
-    if (t === '(') { const v = parseAdd(); if (next() !== ')') throw new Error(')'); return v; }
+    if (t === '(') { const v = parseTernary(); if (next() !== ')') throw new Error(')'); return v; }
     if (/^[0-9.]/.test(t)) return parseFloat(t);
     if (peek() === '(') { // 함수 호출
       next();
       const args: number[] = [];
-      if (peek() !== ')') { args.push(parseAdd()); while (peek() === ',') { next(); args.push(parseAdd()); } }
+      if (peek() !== ')') { args.push(parseTernary()); while (peek() === ',') { next(); args.push(parseTernary()); } }
       if (next() !== ')') throw new Error(')');
       const fn = FUNCS[t.toLowerCase()];
       if (!fn) throw new Error('fn ' + t);
@@ -64,7 +93,7 @@ export function evalExpr(expr: string | undefined, scope: Record<string, number>
   }
 
   try {
-    const v = parseAdd();
+    const v = parseTernary();
     if (p !== tokens.length) return null; // 남은 토큰 = 문법 오류
     return Number.isFinite(v) ? v : null;
   } catch {

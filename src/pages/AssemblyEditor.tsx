@@ -204,23 +204,29 @@ export function AssemblyEditor() {
               <div style={{ fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <div><b>{selPart?.name ?? '(삭제된 파츠)'}</b></div>
                 {selPart && <div style={{ color: '#888', fontSize: '0.74rem' }}>크기 {selPart.bbox.w}×{selPart.bbox.h}×{selPart.bbox.d} mm · 평면 {selPart.plane ?? 'XY'}</div>}
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: '0.74rem', margin: '4px 0 3px' }}>위치 (mm)</div>
-                  {axisRow('X Y Z', ['px', 'py', 'pz'])}
-                  <div style={{ fontWeight: 600, fontSize: '0.74rem', margin: '4px 0 3px' }}>회전 (도)</div>
-                  {axisRow('X Y Z', ['rx', 'ry', 'rz'])}
-                  <div style={{ fontWeight: 600, fontSize: '0.74rem', margin: '4px 0 3px' }}>크기 (mm) · 폭·높이·두께</div>
-                  {axisRow('W H T', ['w', 'h', 'd'])}
-                  {selPart && (() => {
-                    const s = scopeFor(selItem, asm.items.indexOf(selItem));
-                    const sf = scaleFor(selItem, s);
-                    return (
-                      <div style={{ color: '#888', fontSize: '0.72rem', marginTop: 2 }}>
-                        실제 {Math.round(selPart.bbox.w * sf[0])}×{Math.round(selPart.bbox.h * sf[1])}×{Math.round(selPart.bbox.d * sf[2])} mm (빈칸=원본 {selPart.bbox.w}×{selPart.bbox.h}×{selPart.bbox.d})
-                      </div>
-                    );
-                  })()}
-                </div>
+                {(() => {
+                  const s = scopeFor(selItem, asm.items.indexOf(selItem));
+                  const rv = (k: keyof Placement) => { const v = evalExpr(selItem[k] as string, s); return v == null ? '오류' : Math.round(v * 100) / 100; };
+                  const preview: React.CSSProperties = { color: '#888', fontSize: '0.7rem', marginTop: 1 };
+                  const sf = selPart ? scaleFor(selItem, s) : [1, 1, 1];
+                  return (
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '0.74rem', margin: '4px 0 3px' }}>위치 (mm) <span style={{ color: '#aaa', fontWeight: 400 }}>수식·조건식 가능</span></div>
+                      {axisRow('X Y Z', ['px', 'py', 'pz'])}
+                      <div style={preview}>→ ({rv('px')}, {rv('py')}, {rv('pz')})</div>
+                      <div style={{ fontWeight: 600, fontSize: '0.74rem', margin: '4px 0 3px' }}>회전 (도)</div>
+                      {axisRow('X Y Z', ['rx', 'ry', 'rz'])}
+                      <div style={preview}>→ ({rv('rx')}, {rv('ry')}, {rv('rz')})</div>
+                      <div style={{ fontWeight: 600, fontSize: '0.74rem', margin: '4px 0 3px' }}>크기 (mm) · 폭·높이·두께</div>
+                      {axisRow('W H T', ['w', 'h', 'd'])}
+                      {selPart && (
+                        <div style={preview}>
+                          실제 {Math.round(selPart.bbox.w * sf[0])}×{Math.round(selPart.bbox.h * sf[1])}×{Math.round(selPart.bbox.d * sf[2])} mm (빈칸=원본 {selPart.bbox.w}×{selPart.bbox.h}×{selPart.bbox.d})
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
                 {/* 배치 전용 변수 */}
                 <div>
                   <div style={{ fontWeight: 600, fontSize: '0.74rem', margin: '6px 0 3px' }}>변수 <span style={{ color: '#888', fontWeight: 400 }}>· 위/회전/크기 수식에서 #이름 (내장 #W/#H/#D=원본치수, #i=순번)</span></div>
