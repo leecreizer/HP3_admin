@@ -9,7 +9,7 @@ import { PartObject } from '../parts/PartObject';
 import { evalExpr, buildScope } from '../parts/formula';
 import { saveAssemblyModel, type AssemblyModel } from '../parts/assemblyModelStore';
 import { loadSwapState, saveSwapState } from '../data/groups';
-import { loadProductsSnapshot, categoryFolders, genContentCode, appendProduct } from '../parts/productLink';
+import { loadProductsSnapshot, categoryFolders, genContentCode, appendProduct, productTaxonomy } from '../parts/productLink';
 import { exportAssemblyGlb, type ResolvedItem } from '../parts/assemblyGlb';
 
 const MM = 0.001;
@@ -64,7 +64,11 @@ export function AssemblyEditor() {
   const swapCats = useMemo(() => loadSwapState().categories, []);
   const prodSnap = useMemo(() => loadProductsSnapshot(), []);
   const catFolders = useMemo(() => (prodSnap ? categoryFolders(prodSnap) : []), [prodSnap]);
+  const tax = useMemo(() => (prodSnap ? productTaxonomy(prodSnap) : { groups: [], quoteByGroup: {}, kindsByGroup: {} }), [prodSnap]);
   const [saveFolder, setSaveFolder] = useState('');
+  const [pGroup, setPGroup] = useState('');       // 상품군
+  const [pQuote, setPQuote] = useState('');        // 견적그룹
+  const [pKind, setPKind] = useState('');          // 상품구분
 
   useEffect(() => { saveAssembly(asm); }, [asm]);
 
@@ -89,6 +93,10 @@ export function AssemblyEditor() {
 
     // 기본 상품 정보 등록 (컨텐츠 관리 카테고리에 연결) + 실제 GLB 모델링 에셋
     let where = '';
+    if (prodSnap && saveFolder && !(pGroup && pQuote && pKind)) {
+      setSaveMsg('상품 규칙 필수: 상품군·견적그룹·상품구분을 선택하세요');
+      return;
+    }
     if (prodSnap && saveFolder) {
       // 조립 전체 크기(mm) 근사 + GLB용 해석 배치 목록
       const lo = [Infinity, Infinity, Infinity]; const hi = [-Infinity, -Infinity, -Infinity];
@@ -108,12 +116,24 @@ export function AssemblyEditor() {
       catch { /* GLB 실패해도 상품 등록은 진행 */ }
       const code = genContentCode(prodSnap);
       const today = new Date().toISOString().slice(0, 10);
+      const W = dim(0), D = dim(2), H = dim(1);
       const product = {
-        contentCode: code, name, brand: '한샘', productGroup: '', quoteGroup: '', productCode: code,
-        visible: true, permission: '전체', w: dim(0), d: dim(2), h: dim(1),
-        placement: '바닥', placeHeight: 0, attrType: '모델링', modelingType: '설계형',
-        productKind: '', modelKind: kind, modelGroupId: id,
-        thumb: '', thumbUrl: thumb || undefined,
+        // 기본정보(필수 규칙)
+        contentCode: code, name, brand: '한샘',
+        productGroup: pGroup, quoteGroup: pQuote, productKind: pKind, productCode: code,
+        modelKind: kind, visible: true, permission: '전체',
+        w: W, d: D, h: H, placement: '바닥', placeHeight: 0, nonStandard: false,
+        attrType: '모델링', modelingType: '설계형',
+        // 설계규칙(운영 사이즈·변수) — 조립 크기 기반 기본값
+        opSize: { minW: W, maxW: W, gapW: 0, minD: D, maxD: D, gapD: 0, minH: H, maxH: H, gapH: 0 },
+        vars: [
+          { name: 'W', value: String(W), type: '고정값' as const },
+          { name: 'D', value: String(D), type: '고정값' as const },
+          { name: 'H', value: String(H), type: '고정값' as const },
+        ],
+        modelingSlots: [], styleIds: [], filterValues: [],
+        // 모델링 연계 + 에셋
+        modelGroupId: id, thumb: '', thumbUrl: thumb || undefined,
         assets: glb ? [{ id: `as-${code}`, name: `${name}.glb`, type: '모델링', url: glb }] : undefined,
         modelUrl: glb || undefined,
         folderId: saveFolder, updatedAt: today, updatedBy: '관리자',
@@ -239,6 +259,25 @@ export function AssemblyEditor() {
               {catFolders.map((f) => <option key={f.id} value={f.id}>{f.path}</option>)}
             </select>
           ) : <span style={{ color: '#c33', fontSize: '0.78rem' }}>상품 관리를 먼저 열어야 등록 가능</span>}
+          {prodSnap && (
+            <>
+              <span>상품군</span>
+              <select value={pGroup} onChange={(e) => { setPGroup(e.target.value); setPQuote(''); setPKind(''); }} style={{ width: 100 }}>
+                <option value="">—</option>
+                {tax.groups.map((g) => <option key={g} value={g}>{g}</option>)}
+              </select>
+              <span>견적그룹</span>
+              <select value={pQuote} onChange={(e) => setPQuote(e.target.value)} disabled={!pGroup} style={{ width: 110 }}>
+                <option value="">—</option>
+                {(tax.quoteByGroup[pGroup] ?? []).map((q) => <option key={q} value={q}>{q}</option>)}
+              </select>
+              <span>상품구분</span>
+              <select value={pKind} onChange={(e) => setPKind(e.target.value)} disabled={!pGroup} style={{ width: 100 }}>
+                <option value="">—</option>
+                {(tax.kindsByGroup[pGroup] ?? []).map((k) => <option key={k} value={k}>{k}</option>)}
+              </select>
+            </>
+          )}
           <button onClick={saveAsModel}>모델 저장 · 상품 등록</button>
           {saveMsg && <span style={{ color: saveMsg.includes('입력') || saveMsg.includes('비어') ? '#c33' : '#292' }}>{saveMsg}</span>}
         </div>

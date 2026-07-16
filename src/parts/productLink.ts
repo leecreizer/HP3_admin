@@ -35,6 +35,19 @@ export function categoryFolders(s: any): CatFolder[] {
     .map((f) => ({ id: f.id, path: path(f) }));
 }
 
+/** 상품 분류(기본정보 필수 필드용) — 상품군·견적그룹(군별)·상품구분(군별). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function productTaxonomy(s: any): { groups: string[]; quoteByGroup: Record<string, string[]>; kindsByGroup: Record<string, string[]> } {
+  const qg = s.quoteGroups ?? {};
+  const quoteByGroup: Record<string, string[]> = {};
+  for (const g of Object.keys(qg)) {
+    const arr = Array.isArray(qg[g]) ? qg[g] : [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    quoteByGroup[g] = arr.map((q: any) => (typeof q === 'string' ? q : q?.name)).filter(Boolean);
+  }
+  return { groups: s.productGroups ?? [], quoteByGroup, kindsByGroup: s.kindsByGroup ?? {} };
+}
+
 /** 기존 상품과 겹치지 않는 contentCode 생성(MDL + 6자리). */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function genContentCode(s: any): string {
