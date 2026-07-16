@@ -13,7 +13,8 @@ const num = (s: string, scope: Record<string, number>) => evalExpr(s, scope) ?? 
 const snapMm = (mMeters: number) => Math.round(mMeters / MM / SNAP) * SNAP;
 
 export function AssemblyEditor() {
-  const parts = useMemo(() => loadParts(), []);
+  const [parts, setParts] = useState(loadParts);
+  const reloadParts = () => setParts(loadParts());
   const partMap = useMemo(() => new Map(parts.map((p) => [p.id, p])), [parts]);
   const [asm, setAsm] = useState<Assembly>(loadAssembly);
   const [sel, setSel] = useState<string | null>(null);
@@ -73,6 +74,16 @@ export function AssemblyEditor() {
     <main className="main">
       <div className="page-head"><h1>조립</h1></div>
       <section className="panel" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {/* 파츠 추가 툴바 */}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: '0.85rem' }}>
+          <b>파츠 추가</b>
+          <select value="" onChange={(e) => { if (e.target.value) { addPart(e.target.value); e.target.value = ''; } }} style={{ minWidth: 200 }}>
+            <option value="">— 저장된 파츠 선택 —</option>
+            {parts.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.bbox.w}×{p.bbox.h}×{p.bbox.d})</option>)}
+          </select>
+          <button onClick={reloadParts} title="파츠 모델러에서 저장한 파츠를 다시 불러옵니다">목록 새로고침</button>
+          <span style={{ color: '#888' }}>저장된 파츠 {parts.length}개 · 팔레트에서 클릭하거나 위 목록에서 선택해 추가</span>
+        </div>
         <div style={{ display: 'flex', gap: 12, minHeight: 560 }}>
           {/* 파츠 팔레트 */}
           <div style={{ width: 150, borderRight: '1px solid var(--line,#eee)', paddingRight: 10, overflowY: 'auto', maxHeight: 620 }}>
@@ -81,7 +92,7 @@ export function AssemblyEditor() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {parts.map((p) => (
                 <button key={p.id} onClick={() => addPart(p.id)} title="클릭해서 조립에 추가"
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: 4, cursor: 'pointer', textAlign: 'left' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: 5, cursor: 'pointer', textAlign: 'left', border: '1px solid #ddd', borderRadius: 6, background: '#fff' }}>
                   {p.thumb
                     ? <img src={p.thumb} width={34} height={34} alt="" style={{ borderRadius: 3, flexShrink: 0 }} />
                     : <span style={{ width: 34, height: 34, borderRadius: 3, background: p.material?.color ?? '#d8c5a8', flexShrink: 0 }} />}
