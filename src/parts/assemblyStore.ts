@@ -7,6 +7,8 @@ export interface Placement {
   partId: string;
   px: string; py: string; pz: string; // 위치(mm) 수식
   rx: string; ry: string; rz: string; // 회전(도) 수식
+  w: string; h: string; d: string;    // 실제 크기(mm) 수식 — 폭·높이·두께. 빈값=파츠 원본
+  hidden?: boolean;                    // true면 3D에서 숨김
 }
 
 export interface Assembly {
@@ -19,7 +21,12 @@ const KEY = 'hp3-assembly';
 export function loadAssembly(): Assembly {
   try {
     const r = JSON.parse(localStorage.getItem(KEY) ?? 'null');
-    if (r && Array.isArray(r.items)) return { vars: r.vars ?? [], items: r.items };
+    if (r && Array.isArray(r.items)) {
+      const items: Placement[] = r.items.map((it: Placement) => ({
+        ...it, w: it.w ?? '', h: it.h ?? '', d: it.d ?? '', // 구버전 배치: 크기 빈값(=원본)
+      }));
+      return { vars: r.vars ?? [], items };
+    }
   } catch { /* ignore */ }
   return { vars: [], items: [] };
 }
@@ -35,5 +42,6 @@ export function newPlacement(partId: string): Placement {
     partId,
     px: '0', py: '0', pz: '0',
     rx: '0', ry: '0', rz: '0',
+    w: '', h: '', d: '',
   };
 }

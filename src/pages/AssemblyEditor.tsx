@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, TransformControls } from '@react-three/drei';
 import type { Object3D } from 'three';
-import { loadParts, upsertPart } from '../parts/partStore';
+import { loadParts, upsertPart, deletePart } from '../parts/partStore';
 import type { Part } from '../parts/types';
 import { loadAssembly, saveAssembly, newPlacement, type Assembly, type Placement } from '../parts/assemblyStore';
 import { PartObject } from '../parts/PartObject';
@@ -65,8 +65,35 @@ export function AssemblyEditor() {
 
   const setItems = (items: Placement[]) => setAsm((a) => ({ ...a, items }));
   const setVars = (vars: Assembly['vars']) => setAsm((a) => ({ ...a, vars }));
-  const addPart = (partId: string) => { const pl = newPlacement(partId); setAsm((a) => ({ ...a, items: [...a.items, pl] })); setSel(pl.id); };
+  const addPart = (partId: string) => {
+    const p = partMap.get(partId);
+    // 실제 크기(mm)를 파츠 원본 치수로 미리 채워 값이 보이게 한다
+    const pl: Placement = { ...newPlacement(partId), w: String(p?.bbox.w ?? ''), h: String(p?.bbox.h ?? ''), d: String(p?.bbox.d ?? '') };
+    setAsm((a) => ({ ...a, items: [...a.items, pl] }));
+    setSel(pl.id);
+  };
   const delItem = (id: string) => { setItems(asm.items.filter((x) => x.id !== id)); if (sel === id) setSel(null); };
+  const dupItem = (id: string) => {
+    const src = asm.items.find((x) => x.id === id); if (!src) return;
+    const copy: Placement = { ...src, ...newPlacement(src.partId), w: src.w, h: src.h, d: src.d, px: src.px, py: src.py, pz: src.pz, rx: src.rx, ry: src.ry, rz: src.rz };
+    setAsm((a) => ({ ...a, items: [...a.items, copy] })); setSel(copy.id);
+  };
+  const toggleHide = (id: string) => setItems(asm.items.map((x) => (x.id === id ? { ...x, hidden: !x.hidden } : x)));
+  // 팔레트(라이브러리)에서 파츠 제거 + 그 파츠를 쓰는 배치도 정리
+  const delPartFromLib = (partId: string) => {
+    deletePart(partId);
+    setParts(loadParts());
+    setItems(asm.items.filter((x) => x.partId !== partId));
+  };
+  // 배치 크기(mm) → 파츠 원본 bbox 대비 스케일. 빈값이면 원본(스케일 1).
+  const scaleFor = (pl: Placement, sc: Record<string, number>): [number, number, number] => {
+    const p = partMap.get(pl.partId);
+    const bw = p?.bbox.w || 1, bh = p?.bbox.h || 1, bd = p?.bbox.d || 1;
+    const tw = pl.w.trim() ? num(pl.w, sc) : bw;
+    const th = pl.h.trim() ? num(pl.h, sc) : bh;
+    const tdp = pl.d.trim() ? num(pl.d, sc) : bd;
+    return [tw / bw, th / bh, tdp / bd];
+  };
   const setField = (id: string, k: keyof Placement, v: string) =>
     setItems(asm.items.map((x) => (x.id === id ? { ...x, [k]: v } : x)));
 
@@ -125,16 +152,20 @@ export function AssemblyEditor() {
             {parts.length === 0 && <div style={{ fontSize: '0.76rem', color: '#999' }}>저장된 파츠가 없습니다. 파츠 모델러에서 만들어 저장하세요.</div>}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {parts.map((p) => (
-                <button key={p.id} onClick={() => addPart(p.id)} title="클릭해서 조립에 추가"
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: 5, cursor: 'pointer', textAlign: 'left', border: '1px solid #ddd', borderRadius: 6, background: '#fff' }}>
-                  {p.thumb
-                    ? <img src={p.thumb} width={34} height={34} alt="" style={{ borderRadius: 3, flexShrink: 0 }} />
-                    : <span style={{ width: 34, height: 34, borderRadius: 3, background: p.material?.color ?? '#d8c5a8', flexShrink: 0 }} />}
-                  <span style={{ fontSize: '0.74rem', overflow: 'hidden' }}>
-                    <span style={{ display: 'block', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{p.name}</span>
-                    <span style={{ color: '#999', fontSize: '0.66rem' }}>{p.bbox.w}×{p.bbox.h}×{p.bbox.d}</span>
-                  </span>
-                </button>
+                <div key={p.id} style={{ position: 'relative' }}>
+                  <button onClick={() => addPart(p.id)} title="클릭해서 조립에 추가"
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, padding: 5, paddingRight: 20, cursor: 'pointer', textAlign: 'left', border: '1px solid #ddd', borderRadius: 6, background: '#fff', width: '100%' }}>
+                    {p.thumb
+                      ? <img src={p.thumb} width={34} height={34} alt="" style={{ borderRadius: 3, flexShrink: 0 }} />
+                      : <span style={{ width: 34, height: 34, borderRadius: 3, background: p.material?.color ?? '#d8c5a8', flexShrink: 0 }} />}
+                    <span style={{ fontSize: '0.74rem', overflow: 'hidden' }}>
+                      <span style={{ display: 'block', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{p.name}</span>
+                      <span style={{ color: '#999', fontSize: '0.66rem' }}>{p.bbox.w}×{p.bbox.h}×{p.bbox.d}</span>
+                    </span>
+                  </button>
+                  <button onClick={() => delPartFromLib(p.id)} title="팔레트에서 이 파츠 제거(라이브러리 삭제)"
+                    style={{ position: 'absolute', top: 2, right: 3, border: 'none', background: 'none', color: '#c33', cursor: 'pointer', fontSize: '0.95rem', lineHeight: 1 }}>×</button>
+                </div>
               ))}
             </div>
           </div>
@@ -150,14 +181,17 @@ export function AssemblyEditor() {
               <OrbitControls makeDefault />
               {asm.items.map((pl, i) => {
                 const part = partMap.get(pl.partId);
-                if (!part) return null;
+                if (!part || pl.hidden) return null;
                 const sc = scopeFor(pl, i);
                 const pos: [number, number, number] = [num(pl.px, sc) * MM, num(pl.py, sc) * MM, num(pl.pz, sc) * MM];
                 const rot: [number, number, number] = [num(pl.rx, sc) * Math.PI / 180, num(pl.ry, sc) * Math.PI / 180, num(pl.rz, sc) * Math.PI / 180];
+                const scale = scaleFor(pl, sc);
                 return (
                   <group key={pl.id} position={pos} rotation={rot}
                     ref={(o) => { if (o) objs.current.set(pl.id, o); else objs.current.delete(pl.id); }}>
-                    <PartObject part={part} selected={sel === pl.id} onSelect={() => setSel(pl.id)} />
+                    <group scale={scale}>
+                      <PartObject part={part} selected={sel === pl.id} onSelect={() => setSel(pl.id)} />
+                    </group>
                   </group>
                 );
               })}
@@ -165,6 +199,27 @@ export function AssemblyEditor() {
                 <TransformControls object={selObj} mode="translate" translationSnap={SNAP * MM} onObjectChange={onGizmo} />
               )}
             </Canvas>
+          </div>
+
+          {/* 배치 목록 (파츠명 + 복사/숨김/삭제) */}
+          <div style={{ width: 190, borderLeft: '1px solid var(--line,#eee)', paddingLeft: 10, overflowY: 'auto', maxHeight: 620 }}>
+            <div style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: 6 }}>배치 목록 ({asm.items.length})</div>
+            {asm.items.length === 0 && <div style={{ fontSize: '0.74rem', color: '#999' }}>팔레트/드롭다운에서 파츠를 추가하세요.</div>}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {asm.items.map((pl) => {
+                const p = partMap.get(pl.partId);
+                return (
+                  <div key={pl.id} onClick={() => setSel(pl.id)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '3px 4px', borderRadius: 5, cursor: 'pointer',
+                      background: sel === pl.id ? 'rgba(255,179,71,0.18)' : undefined, opacity: pl.hidden ? 0.45 : 1 }}>
+                    <span style={{ flex: 1, fontSize: '0.75rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p?.name ?? '(삭제된 파츠)'}</span>
+                    <button title="복사" onClick={(e) => { e.stopPropagation(); dupItem(pl.id); }} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.85rem', padding: 0 }}>⧉</button>
+                    <button title={pl.hidden ? '표시' : '숨김'} onClick={(e) => { e.stopPropagation(); toggleHide(pl.id); }} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.85rem', padding: 0 }}>{pl.hidden ? '🙈' : '👁'}</button>
+                    <button title="삭제" onClick={(e) => { e.stopPropagation(); delItem(pl.id); }} style={{ border: 'none', background: 'none', color: '#c33', cursor: 'pointer', fontSize: '0.9rem', padding: 0 }}>×</button>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {/* 선택 정보 패널 */}
@@ -180,6 +235,17 @@ export function AssemblyEditor() {
                   {axisRow('X Y Z', ['px', 'py', 'pz'])}
                   <div style={{ fontWeight: 600, fontSize: '0.74rem', margin: '4px 0 3px' }}>회전 (도)</div>
                   {axisRow('X Y Z', ['rx', 'ry', 'rz'])}
+                  <div style={{ fontWeight: 600, fontSize: '0.74rem', margin: '4px 0 3px' }}>크기 (mm) · 폭·높이·두께</div>
+                  {axisRow('W H T', ['w', 'h', 'd'])}
+                  {selPart && (() => {
+                    const s = scopeFor(selItem, asm.items.indexOf(selItem));
+                    const sf = scaleFor(selItem, s);
+                    return (
+                      <div style={{ color: '#888', fontSize: '0.72rem', marginTop: 2 }}>
+                        실제 {Math.round(selPart.bbox.w * sf[0])}×{Math.round(selPart.bbox.h * sf[1])}×{Math.round(selPart.bbox.d * sf[2])} mm (빈칸=원본 {selPart.bbox.w}×{selPart.bbox.h}×{selPart.bbox.d})
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div style={{ color: '#888', fontSize: '0.72rem' }}>3D의 화살표(기즈모)를 끌어 {SNAP}mm 단위로 이동할 수 있습니다.</div>
                 <button onClick={() => delItem(selItem.id)} style={{ color: '#c33', alignSelf: 'flex-start' }}>삭제</button>
@@ -210,38 +276,6 @@ export function AssemblyEditor() {
             </tbody>
           </table>
           <button onClick={addVar} style={{ marginTop: 4, fontSize: '0.8rem' }}>+ 변수 추가</button>
-        </div>
-
-        {/* 배치 목록 */}
-        <div>
-          <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-2)', margin: '4px 0 6px' }}>
-            배치 목록 <span style={{ color: '#888', fontWeight: 400 }}>· 위치·회전에 숫자 또는 수식 (예: #gap*#i, #W/2)</span>
-          </div>
-          {asm.items.length === 0 && <div style={{ fontSize: '0.78rem', color: '#999' }}>팔레트에서 파츠를 클릭해 추가하세요.</div>}
-          {asm.items.length > 0 && (
-            <table style={{ borderCollapse: 'collapse', fontSize: '0.78rem' }}>
-              <thead><tr>
-                <th style={th}>파츠</th><th style={th}>X</th><th style={th}>Y</th><th style={th}>Z</th>
-                <th style={th}>RX</th><th style={th}>RY</th><th style={th}>RZ</th><th style={th}></th>
-              </tr></thead>
-              <tbody>
-                {asm.items.map((pl) => {
-                  const p = partMap.get(pl.partId);
-                  return (
-                    <tr key={pl.id} onClick={() => setSel(pl.id)}
-                      style={{ background: sel === pl.id ? 'rgba(255,179,71,0.15)' : undefined, cursor: 'pointer' }}>
-                      <td style={{ ...td, whiteSpace: 'nowrap' }}>{p?.name ?? '(삭제된 파츠)'}</td>
-                      {(['px', 'py', 'pz', 'rx', 'ry', 'rz'] as (keyof Placement)[]).map((k) => (
-                        <td key={k} style={td}><input value={pl[k] as string} style={{ width: 52 }}
-                          onClick={(e) => e.stopPropagation()} onChange={(e) => setField(pl.id, k, e.target.value)} /></td>
-                      ))}
-                      <td style={td}><button onClick={(e) => { e.stopPropagation(); delItem(pl.id); }} style={{ color: '#c33', border: 'none', background: 'none', cursor: 'pointer' }}>×</button></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
         </div>
       </section>
     </main>
