@@ -1,4 +1,4 @@
-import type { Corner, PartVar, Vec2 } from './types';
+import type { Corner, PartVar, Vec2, Part, Profile } from './types';
 
 /**
  * 파츠용 경량 수식 평가기. 좌표·변수 계산에 필요한 사칙·괄호·단항·함수를 지원.
@@ -91,4 +91,12 @@ export function resolveCorners(cs: Corner[], scope: Record<string, number>): Cor
     const pt: Vec2 = [x ?? c.pt[0], y ?? c.pt[1]];
     return { ...c, pt };
   });
+}
+
+/** 파츠의 변수·좌표 수식을 모두 평가해 확정 좌표 Profile을 반환(3D·조립 공용). */
+export function resolveProfile(part: Part): Profile {
+  const scope = buildScope(part.vars, { T: part.extrude.depth });
+  const cs = part.profile.contours[0]?.corners ?? [];
+  const resolved = resolveCorners(cs, scope);
+  return { ...part.profile, contours: [{ closed: true, corners: resolved }, ...part.profile.contours.slice(1)] };
 }

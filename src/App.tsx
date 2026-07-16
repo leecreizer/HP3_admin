@@ -9,6 +9,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Floorplans } from './pages/Floorplans';
 import { Products } from './pages/Products';
 import { PartEditor } from './pages/PartEditor';
+import { AssemblyEditor } from './pages/AssemblyEditor';
 import { Design } from './pages/Design';
 import { RoleManager } from './pages/RoleManager';
 import { ModelingLibrary } from './pages/ModelingLibrary';
@@ -197,7 +198,10 @@ export default function App() {
       break;
     case 'editor':
     case 'parts':
-      content = <PartEditor />;
+      content = active === 'assembly' ? <AssemblyEditor /> : <PartEditor />;
+      break;
+    case 'assembly':
+      content = <AssemblyEditor />;
       break;
     case 'design':
       content = <Design users={contentUsers} currentUserId={null} myGroupIds={myGroupIds} isAdmin={isAdminUser} userName={currentUserName} />;

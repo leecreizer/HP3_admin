@@ -2,17 +2,10 @@ import { useMemo, useEffect } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { ExtrudeGeometry, Euler, Vector3 } from 'three';
-import { buildShape, outlinePoints } from './partGeometry';
+import { buildShape, outlinePoints, planeEuler } from './partGeometry';
 import type { Profile, WorkPlane } from './types';
 
 const MM = 0.001; // mm → m
-
-/** 작업 평면별 회전(오일러). 기본 압출은 +Z, 회전으로 해당 축에 맞춘다. */
-function planeEuler(plane: WorkPlane): [number, number, number] {
-  if (plane === 'XZ') return [-Math.PI / 2, 0, 0]; // 평면(바닥): 압출 +Z→+Y(위로)
-  if (plane === 'YZ') return [0, Math.PI / 2, 0];  // 측면: 압출 +Z→+X
-  return [0, 0, 0]; // XY(정면): 압출 +Z 그대로
-}
 
 function Mesh({ profile, depth, color, plane }: { profile: Profile; depth: number; color: string; plane: WorkPlane }) {
   const geom = useMemo(() => {
