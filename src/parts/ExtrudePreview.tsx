@@ -1,7 +1,7 @@
 import { useMemo, useEffect } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
-import { ExtrudeGeometry, Euler, Vector3 } from 'three';
+import { OrbitControls, Html } from '@react-three/drei';
+import { ExtrudeGeometry, Euler, Vector3, ArrowHelper } from 'three';
 import { buildShape, outlinePoints } from './partGeometry';
 import type { Profile } from './types';
 
@@ -43,6 +43,27 @@ function useProfileFrame(profile: Profile, depth: number, rotDeg: Rot) {
   }, [profile, depth, rotDeg]);
 }
 
+/** 방향 확인용 축 화살표 + W/H/D 라벨 (X=W빨강, Y=H초록, Z=D파랑). */
+function Axes({ len }: { len: number }) {
+  const arrows = useMemo(() => {
+    const mk = (dir: Vector3, color: number) => new ArrowHelper(dir, new Vector3(0, 0, 0), len, color, len * 0.12, len * 0.07);
+    return [
+      mk(new Vector3(1, 0, 0), 0xff5555),
+      mk(new Vector3(0, 1, 0), 0x55dd55),
+      mk(new Vector3(0, 0, 1), 0x5599ff),
+    ];
+  }, [len]);
+  const lbl = (c: string): React.CSSProperties => ({ color: c, fontSize: 11, fontWeight: 700, pointerEvents: 'none', textShadow: '0 0 3px #000' });
+  return (
+    <>
+      {arrows.map((a, i) => <primitive key={i} object={a} />)}
+      <Html position={[len, 0, 0]}><span style={lbl('#ff7777')}>W(X)</span></Html>
+      <Html position={[0, len, 0]}><span style={lbl('#77e277')}>H(Y)</span></Html>
+      <Html position={[0, 0, len]}><span style={lbl('#77b0ff')}>D(Z)</span></Html>
+    </>
+  );
+}
+
 function Scene({ profile, depth, color, rotDeg }: { profile: Profile; depth: number; color: string; rotDeg: Rot }) {
   const { center, size } = useProfileFrame(profile, depth, rotDeg);
   const { camera } = useThree();
@@ -59,8 +80,8 @@ function Scene({ profile, depth, color, rotDeg }: { profile: Profile; depth: num
       <ambientLight intensity={0.6} />
       <directionalLight position={[2, 3, 2]} intensity={1} />
       <Mesh profile={profile} depth={depth} color={color} rotDeg={rotDeg} />
-      {/* 원점(0,0,0) — X(빨강)/Y(초록)/Z(파랑) */}
-      <axesHelper args={[Math.max(size, 0.3)]} />
+      {/* 방향 확인 축 화살표 + W/H/D 라벨 */}
+      <Axes len={Math.max(size, 0.3)} />
       <gridHelper args={[Math.max(2, size * 4), 20, '#555', '#2a2a2a']} />
       <OrbitControls makeDefault target={[center.x, center.y, center.z]} />
     </>

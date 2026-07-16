@@ -152,8 +152,8 @@ export function PartEditor() {
                 onChange={(e) => patch({ extrude: { ...cur.extrude, depth: Number(e.target.value) } })} />
               <span>회전(도) X Y Z</span>
               {[0, 1, 2].map((a) => (
-                <input key={a} type="number" value={(cur.rot ?? [0, 0, 0])[a]} style={{ width: 56 }}
-                  onChange={(e) => { const r: [number, number, number] = [...(cur.rot ?? [0, 0, 0])] as [number, number, number]; r[a] = Number(e.target.value); patch({ rot: r }); }} />
+                <input key={a} type="number" step={15} value={(cur.rot ?? [0, 0, 0])[a]} style={{ width: 56 }}
+                  onChange={(e) => { const n = e.target.value === '' || e.target.value === '-' ? 0 : Number(e.target.value); if (Number.isNaN(n)) return; const r: [number, number, number] = [...(cur.rot ?? [0, 0, 0])] as [number, number, number]; r[a] = n; patch({ rot: r }); }} />
               ))}
               <span>색상</span>
               <input type="color" value={cur.material?.color ?? '#d8c5a8'}
