@@ -116,7 +116,8 @@ export function AssemblyEditor() {
       catch { /* GLB 실패해도 상품 등록은 진행 */ }
       const code = genContentCode(prodSnap);
       const today = new Date().toISOString().slice(0, 10);
-      const W = dim(0), D = dim(2), H = dim(1);
+      // 설계 미리보기 축 매핑: 조립 W(x)→깊이, H(y)→폭, T(z)→높이
+      const W = dim(1), D = dim(0), H = dim(2);
       const product = {
         // 기본정보(필수 규칙)
         contentCode: code, name, brand: '한샘',

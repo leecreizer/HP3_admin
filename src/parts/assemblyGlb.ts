@@ -40,8 +40,19 @@ function buildScene(items: ResolvedItem[]): { scene: Scene; root: Group } {
     posG.add(scaleG);
     root.add(posG);
   }
-  scene.add(root);
-  return { scene, root };
+  // 설계 미리보기 축에 맞춘 재매핑: 조립 W(x)→깊이(Z), H(y)→폭(X), T(z)→높이(Y)
+  // worldX=locY, worldY=locZ, worldZ=locX
+  const oriented = new Group();
+  oriented.matrixAutoUpdate = false;
+  oriented.matrix.set(
+    0, 1, 0, 0,
+    0, 0, 1, 0,
+    1, 0, 0, 0,
+    0, 0, 0, 1,
+  );
+  oriented.add(root);
+  scene.add(oriented);
+  return { scene, root: oriented };
 }
 
 function abToB64(buf: ArrayBuffer): string {
