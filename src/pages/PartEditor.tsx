@@ -70,15 +70,20 @@ export function PartEditor() {
   const onSelect = (id: string) => { const p = parts.find((x) => x.id === id); if (p) { setCur(p); setMsg(''); } };
   const onSave = () => {
     if (errs.length) { setMsg('저장 불가: ' + errs.join(' ')); return; }
+    const name = cur.name.trim() || '새 파츠';
+    // 이름 기준 저장: 같은 이름이 있으면 그 파츠 갱신, 없으면 새 파츠로 추가
+    const existing = parts.find((p) => p.name === name);
+    const id = existing ? existing.id : `part-${Date.now()}-${Math.floor(Math.random() * 1e4)}`;
     const saved: Part = {
       ...cur,
-      name: cur.name.trim() || '새 파츠',
+      id,
+      name,
       bbox,
       thumb: profileThumb(resolvedProfile, cur.material?.color ?? '#d8c5a8'),
     };
     setParts(upsertPart(saved));
     setCur(saved);
-    setMsg(`저장됨 · 라이브러리 ${loadParts().length}개`);
+    setMsg(existing ? `갱신됨 · 라이브러리 ${loadParts().length}개` : `새로 저장됨 · 라이브러리 ${loadParts().length}개`);
   };
   const onDup = () => setCur({ ...newPart(cur.name + ' 복제'), profile: cur.profile, extrude: cur.extrude, material: cur.material, plane: cur.plane, vars: cur.vars });
   const onDel = (id: string) => { setParts(deletePart(id)); if (cur.id === id) onNew(); };
