@@ -64,11 +64,11 @@ describe('filletCorner', () => {
     expect(pts[0][0]).toBeCloseTo(0, 3);
     expect(pts[pts.length - 1][1]).toBeCloseTo(0, 3);
   });
-  it('R이 인접 변 절반보다 크면 접점거리를 절반으로 클램프', () => {
-    // 변 길이 100 → maxT=50. 매우 큰 R을 줘도 접점은 50 이내
+  it('R이 인접 변보다 크면 접점거리를 변 길이로 클램프', () => {
+    // 변 길이 100 → maxT=100. 매우 큰 R을 줘도 접점은 변 길이(100) 이내
     const pts = filletCorner([0, 100], [0, 0], [100, 0], 10000);
-    expect(pts[0][1]).toBeLessThanOrEqual(50 + 1e-6);
-    expect(pts[pts.length - 1][0]).toBeLessThanOrEqual(50 + 1e-6);
+    expect(pts[0][1]).toBeLessThanOrEqual(100 + 1e-6);
+    expect(pts[pts.length - 1][0]).toBeLessThanOrEqual(100 + 1e-6);
   });
 });
 

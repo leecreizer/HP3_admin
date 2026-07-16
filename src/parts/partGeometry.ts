@@ -31,7 +31,9 @@ export function filletCorner(prev: Vec2, V: Vec2, next: Vec2, r?: number): Vec2[
   const half = phi / 2;
   let t = r / Math.tan(half); // V로부터 접점까지 거리
   let rr = r;
-  const maxT = Math.min(l1, l2) / 2; // 인접 변 절반 넘지 않게 클램프
+  // 접점은 인접 변 길이까지 허용(절반이 아님) → 곡선 시작점에 점을 추가해
+  // 변이 접점 길이만큼 짧아져도 곡률(R)이 유지된다.
+  const maxT = Math.min(l1, l2);
   if (t > maxT) { t = maxT; rr = t * Math.tan(half); }
   const T1: Vec2 = [V[0] + u1[0] * t, V[1] + u1[1] * t];
   const T2: Vec2 = [V[0] + u2[0] * t, V[1] + u2[1] * t];
