@@ -16,9 +16,11 @@ export interface ResolvedItem {
   pos: [number, number, number];
   rotDeg: [number, number, number];
   scale: [number, number, number];
+  hidden?: boolean;   // true면 배치는 되지만 기본 비표시 + 견적 제외
+  ref?: string;       // 배치 이름/정의변수
 }
 
-/** 배치들을 실제 3D 씬(그룹)으로 조립. GLB·썸네일 공용. */
+/** 배치들을 실제 3D 씬(그룹)으로 조립. 숨김 항목도 포함(visible=false + extras). GLB·썸네일 공용. */
 function buildScene(items: ResolvedItem[]): { scene: Scene; root: Group } {
   const scene = new Scene();
   const root = new Group();
@@ -31,6 +33,10 @@ function buildScene(items: ResolvedItem[]): { scene: Scene; root: Group } {
     const posG = new Group();
     posG.position.set(it.pos[0] * MM, it.pos[1] * MM, it.pos[2] * MM);
     posG.rotation.set(it.rotDeg[0] * DEG, it.rotDeg[1] * DEG, it.rotDeg[2] * DEG);
+    posG.name = it.ref || it.part.name;
+    // 숨김: 배치는 하되 기본 비표시 + 메타(견적 제외) — GLB extras로 전달
+    posG.visible = !it.hidden;
+    posG.userData = { hidden: !!it.hidden, estimate: !it.hidden, ref: it.ref || it.part.name };
     posG.add(scaleG);
     root.add(posG);
   }
@@ -75,7 +81,8 @@ export async function exportAssemblyGlb(items: ResolvedItem[]): Promise<{ glb: s
   // GLB 먼저(WebGL 불필요) — 실패해도 예외 전파
   const exporter = new GLTFExporter();
   const buf = await new Promise<ArrayBuffer>((res, rej) => {
-    exporter.parse(root, (out) => res(out as ArrayBuffer), (err) => rej(err), { binary: true });
+    // onlyVisible:false — 숨김(visible=false) 노드도 포함해 익스포트(배치 유지)
+    exporter.parse(root, (out) => res(out as ArrayBuffer), (err) => rej(err), { binary: true, onlyVisible: false });
   });
   const glb = 'data:model/gltf-binary;base64,' + abToB64(buf);
   // 썸네일은 WebGL 필요 — 실패해도 GLB는 반환

@@ -94,12 +94,12 @@ export function AssemblyEditor() {
       const lo = [Infinity, Infinity, Infinity]; const hi = [-Infinity, -Infinity, -Infinity];
       const resolved: ResolvedItem[] = [];
       asm.items.forEach((pl, i) => {
-        const p = partMap.get(pl.partId); if (!p || pl.hidden) return;
+        const p = partMap.get(pl.partId); if (!p) return; // 숨김 항목도 배치에 포함
         const sc = scopeFor(pl, i); const sf = scaleFor(pl, sc);
         const pos: [number, number, number] = [num(pl.px, sc), num(pl.py, sc), num(pl.pz, sc)];
         const size = [p.bbox.w * sf[0], p.bbox.h * sf[1], p.bbox.d * sf[2]];
         for (let a = 0; a < 3; a++) { lo[a] = Math.min(lo[a], pos[a]); hi[a] = Math.max(hi[a], pos[a] + size[a]); }
-        resolved.push({ part: p, pos, rotDeg: [num(pl.rx, sc), num(pl.ry, sc), num(pl.rz, sc)], scale: sf });
+        resolved.push({ part: p, pos, rotDeg: [num(pl.rx, sc), num(pl.ry, sc), num(pl.rz, sc)], scale: sf, hidden: pl.hidden, ref: pl.ref });
       });
       const dim = (a: number) => (Number.isFinite(lo[a]) ? Math.max(0, Math.round(hi[a] - lo[a])) : 0);
       setSaveMsg('GLB 모델 생성 중…');
