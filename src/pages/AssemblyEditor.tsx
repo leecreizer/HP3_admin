@@ -22,9 +22,9 @@ export function AssemblyEditor() {
 
   // 외부 파일(.part.json) 불러오기 → 라이브러리에 저장 후 목록 갱신
   const onImportFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
+    const files = Array.from(e.target.files ?? []); // value 초기화 전에 참조 복사(FileList가 비워지는 것 방지)
     e.target.value = '';
-    if (!files?.length) return;
+    if (!files.length) return;
     let ok = 0;
     const read = (f: File) => new Promise<void>((res) => {
       const r = new FileReader();
