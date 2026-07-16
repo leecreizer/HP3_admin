@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, TransformControls } from '@react-three/drei';
 import type { Object3D } from 'three';
-import { loadParts } from '../parts/partStore';
+import { loadParts, upsertPart } from '../parts/partStore';
+import type { Part } from '../parts/types';
 import { loadAssembly, saveAssembly, newPlacement, type Assembly, type Placement } from '../parts/assemblyStore';
 import { PartObject } from '../parts/PartObject';
 import { evalExpr, buildScope } from '../parts/formula';
@@ -16,6 +17,34 @@ export function AssemblyEditor() {
   const [parts, setParts] = useState(loadParts);
   const reloadParts = () => setParts(loadParts());
   const partMap = useMemo(() => new Map(parts.map((p) => [p.id, p])), [parts]);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [impMsg, setImpMsg] = useState('');
+
+  // 외부 파일(.part.json) 불러오기 → 라이브러리에 저장 후 목록 갱신
+  const onImportFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    e.target.value = '';
+    if (!files?.length) return;
+    let ok = 0;
+    const read = (f: File) => new Promise<void>((res) => {
+      const r = new FileReader();
+      r.onload = () => {
+        try {
+          const p = JSON.parse(String(r.result)) as Part;
+          if (p?.profile?.contours?.length && p.extrude) {
+            upsertPart({ ...p, id: p.id || `imp-${Date.now()}-${Math.floor(Math.random() * 1e4)}` });
+            ok++;
+          }
+        } catch { /* skip */ }
+        res();
+      };
+      r.onerror = () => res();
+      r.readAsText(f);
+    });
+    await Promise.all(Array.from(files).map(read));
+    reloadParts();
+    setImpMsg(`${ok}개 불러옴`);
+  };
   const [asm, setAsm] = useState<Assembly>(loadAssembly);
   const [sel, setSel] = useState<string | null>(null);
 
@@ -82,6 +111,9 @@ export function AssemblyEditor() {
             {parts.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.bbox.w}×{p.bbox.h}×{p.bbox.d})</option>)}
           </select>
           <button onClick={reloadParts} title="파츠 모델러에서 저장한 파츠를 다시 불러옵니다">목록 새로고침</button>
+          <button onClick={() => fileRef.current?.click()} title="외부 .part.json 파일에서 파츠 불러오기">파일에서 불러오기</button>
+          <input ref={fileRef} type="file" accept=".json,application/json" multiple onChange={onImportFiles} style={{ display: 'none' }} />
+          {impMsg && <span style={{ color: '#292' }}>{impMsg}</span>}
           <span style={{ color: '#888' }}>저장된 파츠 {parts.length}개 · 팔레트에서 클릭하거나 위 목록에서 선택해 추가</span>
         </div>
         <div style={{ display: 'flex', gap: 12, minHeight: 560 }}>
