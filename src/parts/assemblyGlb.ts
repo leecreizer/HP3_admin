@@ -11,11 +11,11 @@ const MM = 0.001;
 const DEG = Math.PI / 180;
 
 /**
- * 설계 미리보기 축 정렬 행렬(3x3, 행우선). world = M·local
- * 축 매핑(W(x)→깊이, H(y)→폭, T(z)→높이) + 기본 정면(Y -90°)을 합성한 회전.
+ * 축 정렬 행렬(3x3, 행우선). world = M·local
+ * X=W(폭), Y=H(높이), Z=D(깊이) 자연 좌표 → 항등(회전 없음).
  * 에디터 3D 뷰와 GLB 익스포트가 동일 프레임을 쓰도록 공용.
  */
-export const ORIENT3 = [-1, 0, 0, 0, 0, 1, 0, 1, 0];
+export const ORIENT3 = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 
 /** 자식을 설계 축 프레임으로 감싸는 그룹 생성. */
 export function orientedGroup(child: Group): Group {
