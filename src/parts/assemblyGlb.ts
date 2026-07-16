@@ -10,6 +10,23 @@ import type { Part } from './types';
 const MM = 0.001;
 const DEG = Math.PI / 180;
 
+/**
+ * 설계 미리보기 축 정렬 행렬(3x3, 행우선). world = M·local
+ * 축 매핑(W(x)→깊이, H(y)→폭, T(z)→높이) + 기본 정면(Y -90°)을 합성한 회전.
+ * 에디터 3D 뷰와 GLB 익스포트가 동일 프레임을 쓰도록 공용.
+ */
+export const ORIENT3 = [-1, 0, 0, 0, 0, 1, 0, 1, 0];
+
+/** 자식을 설계 축 프레임으로 감싸는 그룹 생성. */
+export function orientedGroup(child: Group): Group {
+  const g = new Group();
+  g.matrixAutoUpdate = false;
+  const m = ORIENT3;
+  g.matrix.set(m[0], m[1], m[2], 0, m[3], m[4], m[5], 0, m[6], m[7], m[8], 0, 0, 0, 0, 1);
+  g.add(child);
+  return g;
+}
+
 /** 해석 완료된 배치 1개 — 파츠 + 위치(mm)·회전(도)·스케일. */
 export interface ResolvedItem {
   part: Part;
@@ -40,17 +57,8 @@ function buildScene(items: ResolvedItem[]): { scene: Scene; root: Group } {
     posG.add(scaleG);
     root.add(posG);
   }
-  // 설계 미리보기 축에 맞춘 재매핑: 조립 W(x)→깊이(Z), H(y)→폭(X), T(z)→높이(Y)
-  // worldX=locY, worldY=locZ, worldZ=locX
-  const oriented = new Group();
-  oriented.matrixAutoUpdate = false;
-  oriented.matrix.set(
-    0, 1, 0, 0,
-    0, 0, 1, 0,
-    1, 0, 0, 0,
-    0, 0, 0, 1,
-  );
-  oriented.add(root);
+  // 설계 미리보기 축 프레임(축 매핑 + 정면 -90)으로 정렬
+  const oriented = orientedGroup(root);
   scene.add(oriented);
   return { scene, root: oriented };
 }
@@ -86,17 +94,20 @@ function renderThumb(scene: Scene, root: Group, size = 256): string {
   } catch { return ''; }
 }
 
-/** 조립을 GLB(data URL)로 익스포트하고 썸네일 PNG(data URL)도 생성. */
-export async function exportAssemblyGlb(items: ResolvedItem[]): Promise<{ glb: string; thumb: string }> {
+/** 조립을 GLB(data URL)로 익스포트, 썸네일 PNG, 그리고 정렬된 실제 크기(mm)도 반환. */
+export async function exportAssemblyGlb(items: ResolvedItem[]): Promise<{ glb: string; thumb: string; size: { w: number; h: number; d: number } }> {
   const { scene, root } = buildScene(items);
-  // GLB 먼저(WebGL 불필요) — 실패해도 예외 전파
+  root.updateMatrixWorld(true);
+  // 정렬(설계 축) 후 실제 크기 = 월드 bbox
+  const box = new Box3().setFromObject(root);
+  const s = box.getSize(new Vector3());
+  const size = { w: Math.max(0, Math.round(s.x / MM)), h: Math.max(0, Math.round(s.y / MM)), d: Math.max(0, Math.round(s.z / MM)) };
+  // GLB (WebGL 불필요)
   const exporter = new GLTFExporter();
   const buf = await new Promise<ArrayBuffer>((res, rej) => {
-    // onlyVisible:false — 숨김(visible=false) 노드도 포함해 익스포트(배치 유지)
     exporter.parse(root, (out) => res(out as ArrayBuffer), (err) => rej(err), { binary: true, onlyVisible: false });
   });
   const glb = 'data:model/gltf-binary;base64,' + abToB64(buf);
-  // 썸네일은 WebGL 필요 — 실패해도 GLB는 반환
   const thumb = renderThumb(scene, root);
-  return { glb, thumb };
+  return { glb, thumb, size };
 }
