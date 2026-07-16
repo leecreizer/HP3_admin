@@ -7,6 +7,8 @@ import type { Part } from '../parts/types';
 import { loadAssembly, saveAssembly, newPlacement, type Assembly, type Placement } from '../parts/assemblyStore';
 import { PartObject } from '../parts/PartObject';
 import { evalExpr, buildScope } from '../parts/formula';
+import { saveAssemblyModel, type AssemblyModel } from '../parts/assemblyModelStore';
+import { loadSwapState, saveSwapState } from '../data/groups';
 
 const MM = 0.001;
 const SNAP = 10; // mm — 기즈모 이동 스냅
@@ -54,8 +56,33 @@ export function AssemblyEditor() {
   };
   const [asm, setAsm] = useState<Assembly>(loadAssembly);
   const [sel, setSel] = useState<string | null>(null);
+  const [modelName, setModelName] = useState('');
+  const [modelKind, setModelKind] = useState('');
+  const [saveMsg, setSaveMsg] = useState('');
+  const swapCats = useMemo(() => loadSwapState().categories, []);
 
   useEffect(() => { saveAssembly(asm); }, [asm]);
+
+  // 조립을 "모델"로 저장 → 교체 그룹(SwapGroup)으로 등록해 상품 모델링 슬롯에서 선택되게 함
+  const saveAsModel = () => {
+    const name = modelName.trim();
+    if (!name) { setSaveMsg('모델 이름을 입력하세요'); return; }
+    if (!asm.items.length) { setSaveMsg('배치가 비어 있습니다'); return; }
+    const kind = modelKind.trim() || '조립';
+    const usedParts = [...new Set(asm.items.map((x) => x.partId))]
+      .map((id) => partMap.get(id)).filter((p): p is NonNullable<typeof p> => !!p);
+    const swap = loadSwapState();
+    const existing = swap.groups.find((g) => g.name === name);
+    const id = existing?.id ?? `am-${Date.now()}-${Math.floor(Math.random() * 1e4)}`;
+    const model: AssemblyModel = { id, name, kind, items: asm.items, parts: usedParts, createdAt: Date.now(), updatedAt: Date.now() };
+    saveAssemblyModel(model);
+    const groups = existing
+      ? swap.groups.map((g) => (g.id === id ? { ...g, name, kind, type: 'normal' as const } : g))
+      : [...swap.groups, { id, name, kind, type: 'normal' as const }];
+    const categories = swap.categories.includes(kind) ? swap.categories : [...swap.categories, kind];
+    saveSwapState({ ...swap, groups, categories });
+    setSaveMsg(existing ? `'${name}' 갱신 · 상품 모델링(${kind})에 반영됨` : `'${name}' 저장 · 상품 모델링(${kind})에 등록됨`);
+  };
 
   // 선택된 배치의 3D 오브젝트(기즈모 부착용)
   const objs = useRef<Map<string, Object3D>>(new Map());
@@ -157,6 +184,16 @@ export function AssemblyEditor() {
           {impMsg && <span style={{ color: '#292' }}>{impMsg}</span>}
           <span style={{ color: '#888' }}>드롭다운 선택 또는 파일 불러오기로 배치에 추가됩니다</span>
         </div>
+        {/* 모델로 저장 → 상품 모델링(교체 그룹) 등록 */}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: '0.85rem', borderTop: '1px solid var(--line,#eee)', paddingTop: 8 }}>
+          <b>모델로 저장</b>
+          <input value={modelName} onChange={(e) => setModelName(e.target.value)} placeholder="모델 이름 (예: 3단 서랍장)" style={{ width: 180 }} />
+          <span>구분</span>
+          <input value={modelKind} onChange={(e) => setModelKind(e.target.value)} placeholder="조립" list="swap-cats" style={{ width: 110 }} />
+          <datalist id="swap-cats">{swapCats.map((c) => <option key={c} value={c} />)}</datalist>
+          <button onClick={saveAsModel}>모델 저장 · 상품 모델링 등록</button>
+          {saveMsg && <span style={{ color: saveMsg.includes('입력') || saveMsg.includes('비어') ? '#c33' : '#292' }}>{saveMsg}</span>}
+        </div>
         <div style={{ display: 'flex', gap: 12, flex: 1, minHeight: 0 }}>
           {/* 3D 실시간 뷰 + 기즈모 */}
           <div style={{ flex: 1, minHeight: 0 }}>
@@ -200,11 +237,7 @@ export function AssemblyEditor() {
                   <div key={pl.id} onClick={() => setSel(pl.id)}
                     style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '3px 4px', borderRadius: 5, cursor: 'pointer',
                       background: sel === pl.id ? 'rgba(255,179,71,0.18)' : undefined, opacity: pl.hidden ? 0.45 : 1 }}>
-                    <input value={pl.ref ?? ''} placeholder={p?.name ?? '(삭제)'} title="이름/정의변수 — 클릭해 수정"
-                      onClick={(e) => e.stopPropagation()} onChange={(e) => setField(pl.id, 'ref', e.target.value)}
-                      style={{ flex: 1, minWidth: 0, fontSize: '0.75rem', border: '1px solid transparent', background: 'transparent', padding: '1px 2px', borderRadius: 3 }}
-                      onFocus={(e) => { e.currentTarget.style.border = '1px solid #ccc'; e.currentTarget.style.background = '#fff'; }}
-                      onBlur={(e) => { e.currentTarget.style.border = '1px solid transparent'; e.currentTarget.style.background = 'transparent'; }} />
+                    <span style={{ flex: 1, minWidth: 0, fontSize: '0.75rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pl.ref?.trim() || p?.name || '(삭제된 파츠)'}</span>
                     <button title="복사" onClick={(e) => { e.stopPropagation(); dupItem(pl.id); }} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.85rem', padding: 0 }}>⧉</button>
                     <button title={pl.hidden ? '표시' : '숨김'} onClick={(e) => { e.stopPropagation(); toggleHide(pl.id); }} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '0.85rem', padding: 0 }}>{pl.hidden ? '🙈' : '👁'}</button>
                     <button title="삭제" onClick={(e) => { e.stopPropagation(); delItem(pl.id); }} style={{ border: 'none', background: 'none', color: '#c33', cursor: 'pointer', fontSize: '0.9rem', padding: 0 }}>×</button>
@@ -222,11 +255,11 @@ export function AssemblyEditor() {
               <div style={{ fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <div><b>{selPart?.name ?? '(삭제된 파츠)'}</b></div>
                 {selPart && <div style={{ color: '#888', fontSize: '0.74rem' }}>크기 {selPart.bbox.w}×{selPart.bbox.h}×{selPart.bbox.d} mm · 평면 {selPart.plane ?? 'XY'}</div>}
-                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                  <span style={lbl}>정의변수</span>
-                  <input value={selItem.ref ?? ''} placeholder="예: 몸통" style={{ width: 100 }}
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span style={lbl}>이름</span>
+                  <input value={selItem.ref ?? ''} placeholder={selPart?.name ?? '예: 몸통'} style={{ width: 120 }}
                     onChange={(e) => setField(selItem.id, 'ref', e.target.value)} />
-                  {selItem.ref?.trim() && <span style={{ color: '#888', fontSize: '0.68rem' }}>다른 파츠에서 {selItem.ref.trim()}.W / .H / .D 로 참조</span>}
+                  {selItem.ref?.trim() && <span style={{ color: '#888', fontSize: '0.68rem' }}>정의변수: {selItem.ref.trim()}.W / .H / .D 로 참조</span>}
                 </div>
                 {(() => {
                   const s = scopeFor(selItem, asm.items.indexOf(selItem));
