@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Profile, Vec2, Corner } from './types';
-import { outlinePoints } from './partGeometry';
+import { outlinePoints, filletCorner } from './partGeometry';
 
 const SNAP = 10; // mm — 놓을 때 격자 스냅 간격
 const ALIGN_PX = 8; // 정렬 스냅 허용 오차(화면 px)
@@ -272,6 +272,20 @@ export function SketchCanvas({ profile, onChange }: { profile: Profile; onChange
               onPointerDown={(e) => startVertexDrag(i, e)}
               style={{ cursor: 'grab' }}
             />
+          );
+        })}
+        {/* 필렛 접점(곡선 시작·끝) 마커 — R로 라운드된 모서리의 곡선 시·종점 */}
+        {verts.map((_, i) => {
+          if ((cs[i].r ?? 0) <= 0 || n < 3) return null;
+          const prev = verts[(i - 1 + n) % n]; const nextv = verts[(i + 1) % n];
+          const arc = filletCorner(prev, verts[i], nextv, cs[i].r);
+          if (arc.length < 2) return null;
+          const t1 = toPx(arc[0]); const t2 = toPx(arc[arc.length - 1]);
+          return (
+            <g key={`tp${i}`} pointerEvents="none">
+              <circle cx={t1[0]} cy={t1[1]} r={4} fill="#fff" stroke="#0a5" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+              <circle cx={t2[0]} cy={t2[1]} r={4} fill="#fff" stroke="#0a5" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+            </g>
           );
         })}
         {/* 점 번호 + 좌표값 라벨 (줌과 무관하게 화면상 크기 유지) */}

@@ -1,7 +1,7 @@
 {
   "name": "hp3-admin",
   "private": true,
-  "version": "0.0.56",
+  "version": "0.0.57",
   "type": "module",
   "scripts": {
     "dev": "node scripts/dev-all.mjs",
