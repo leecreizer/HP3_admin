@@ -9,6 +9,7 @@ import { PartObject } from '../parts/PartObject';
 import { evalExpr, buildScope } from '../parts/formula';
 import { saveAssemblyModel, type AssemblyModel } from '../parts/assemblyModelStore';
 import { loadSwapState, saveSwapState } from '../data/groups';
+import { loadProductsSnapshot, categoryFolders, genContentCode, appendProduct } from '../parts/productLink';
 
 const MM = 0.001;
 const SNAP = 10; // mm — 기즈모 이동 스냅
@@ -60,6 +61,9 @@ export function AssemblyEditor() {
   const [modelKind, setModelKind] = useState('');
   const [saveMsg, setSaveMsg] = useState('');
   const swapCats = useMemo(() => loadSwapState().categories, []);
+  const prodSnap = useMemo(() => loadProductsSnapshot(), []);
+  const catFolders = useMemo(() => (prodSnap ? categoryFolders(prodSnap) : []), [prodSnap]);
+  const [saveFolder, setSaveFolder] = useState('');
 
   useEffect(() => { saveAssembly(asm); }, [asm]);
 
@@ -81,7 +85,34 @@ export function AssemblyEditor() {
       : [...swap.groups, { id, name, kind, type: 'normal' as const }];
     const categories = swap.categories.includes(kind) ? swap.categories : [...swap.categories, kind];
     saveSwapState({ ...swap, groups, categories });
-    setSaveMsg(existing ? `'${name}' 갱신 · 상품 모델링(${kind})에 반영됨` : `'${name}' 저장 · 상품 모델링(${kind})에 등록됨`);
+
+    // 기본 상품 정보 등록 (컨텐츠 관리 카테고리에 연결)
+    let where = '';
+    if (prodSnap && saveFolder) {
+      // 조립 전체 크기(mm) 근사 — 회전 무시, 배치 위치+실치수 범위
+      let lo = [Infinity, Infinity, Infinity]; let hi = [-Infinity, -Infinity, -Infinity];
+      asm.items.forEach((pl, i) => {
+        const p = partMap.get(pl.partId); if (!p) return;
+        const sc = scopeFor(pl, i); const sf = scaleFor(pl, sc);
+        const pos = [num(pl.px, sc), num(pl.py, sc), num(pl.pz, sc)];
+        const size = [p.bbox.w * sf[0], p.bbox.h * sf[1], p.bbox.d * sf[2]];
+        for (let a = 0; a < 3; a++) { lo[a] = Math.min(lo[a], pos[a]); hi[a] = Math.max(hi[a], pos[a] + size[a]); }
+      });
+      const dim = (a: number) => (Number.isFinite(lo[a]) ? Math.max(0, Math.round(hi[a] - lo[a])) : 0);
+      const code = genContentCode(prodSnap);
+      const today = new Date().toISOString().slice(0, 10);
+      const product = {
+        contentCode: code, name, brand: '한샘', productGroup: '', quoteGroup: '', productCode: code,
+        visible: true, permission: '전체', w: dim(0), d: dim(2), h: dim(1),
+        placement: '바닥', placeHeight: 0, attrType: '모델링', modelingType: '설계형',
+        productKind: '', modelKind: kind, modelGroupId: id, thumb: '',
+        folderId: saveFolder, updatedAt: today, updatedBy: '관리자',
+      };
+      appendProduct(prodSnap, product);
+      where = catFolders.find((f) => f.id === saveFolder)?.path ?? saveFolder;
+    }
+    const base = existing ? `'${name}' 갱신 · 상품 모델링(${kind})에 반영됨` : `'${name}' 저장 · 상품 모델링(${kind})에 등록됨`;
+    setSaveMsg(where ? `${base} · 상품 등록 위치: ${where}` : `${base}${prodSnap ? ' · 저장 위치를 선택하면 상품이 등록됩니다' : ' (상품 미등록: 상품 관리를 먼저 여세요)'}`);
   };
 
   // 선택된 배치의 3D 오브젝트(기즈모 부착용)
@@ -189,9 +220,16 @@ export function AssemblyEditor() {
           <b>모델로 저장</b>
           <input value={modelName} onChange={(e) => setModelName(e.target.value)} placeholder="모델 이름 (예: 3단 서랍장)" style={{ width: 180 }} />
           <span>구분</span>
-          <input value={modelKind} onChange={(e) => setModelKind(e.target.value)} placeholder="조립" list="swap-cats" style={{ width: 110 }} />
+          <input value={modelKind} onChange={(e) => setModelKind(e.target.value)} placeholder="조립" list="swap-cats" style={{ width: 90 }} />
           <datalist id="swap-cats">{swapCats.map((c) => <option key={c} value={c} />)}</datalist>
-          <button onClick={saveAsModel}>모델 저장 · 상품 모델링 등록</button>
+          <span>저장 위치</span>
+          {prodSnap ? (
+            <select value={saveFolder} onChange={(e) => setSaveFolder(e.target.value)} style={{ minWidth: 180 }}>
+              <option value="">— 컨텐츠 카테고리 선택 —</option>
+              {catFolders.map((f) => <option key={f.id} value={f.id}>{f.path}</option>)}
+            </select>
+          ) : <span style={{ color: '#c33', fontSize: '0.78rem' }}>상품 관리를 먼저 열어야 등록 가능</span>}
+          <button onClick={saveAsModel}>모델 저장 · 상품 등록</button>
           {saveMsg && <span style={{ color: saveMsg.includes('입력') || saveMsg.includes('비어') ? '#c33' : '#292' }}>{saveMsg}</span>}
         </div>
         <div style={{ display: 'flex', gap: 12, flex: 1, minHeight: 0 }}>
