@@ -10,8 +10,7 @@ import { evalExpr, buildScope } from '../parts/formula';
 import { saveAssemblyModel, type AssemblyModel } from '../parts/assemblyModelStore';
 import { loadSwapState, saveSwapState } from '../data/groups';
 import { loadProductsSnapshot, categoryFolders, genContentCode, appendProduct, productTaxonomy } from '../parts/productLink';
-import { exportAssemblyGlb, ORIENT3, type ResolvedItem } from '../parts/assemblyGlb';
-import type { Group as ThreeGroup } from 'three';
+import { exportAssemblyGlb, type ResolvedItem } from '../parts/assemblyGlb';
 
 const MM = 0.001;
 const SNAP = 10; // mm — 기즈모 이동 스냅
@@ -99,26 +98,25 @@ export function AssemblyEditor() {
       return;
     }
     if (prodSnap && saveFolder) {
-      // GLB용 해석 배치 목록(숨김 포함)
+      // 조립 전체 크기(mm) 근사 + GLB용 해석 배치 목록
+      const lo = [Infinity, Infinity, Infinity]; const hi = [-Infinity, -Infinity, -Infinity];
       const resolved: ResolvedItem[] = [];
       asm.items.forEach((pl, i) => {
-        const p = partMap.get(pl.partId); if (!p) return;
+        const p = partMap.get(pl.partId); if (!p) return; // 숨김 항목도 배치에 포함
         const sc = scopeFor(pl, i); const sf = scaleFor(pl, sc);
-        resolved.push({
-          part: p,
-          pos: [num(pl.px, sc), num(pl.py, sc), num(pl.pz, sc)],
-          rotDeg: [num(pl.rx, sc), num(pl.ry, sc), num(pl.rz, sc)],
-          scale: sf, hidden: pl.hidden, ref: pl.ref,
-        });
+        const pos: [number, number, number] = [num(pl.px, sc), num(pl.py, sc), num(pl.pz, sc)];
+        const size = [p.bbox.w * sf[0], p.bbox.h * sf[1], p.bbox.d * sf[2]];
+        for (let a = 0; a < 3; a++) { lo[a] = Math.min(lo[a], pos[a]); hi[a] = Math.max(hi[a], pos[a] + size[a]); }
+        resolved.push({ part: p, pos, rotDeg: [num(pl.rx, sc), num(pl.ry, sc), num(pl.rz, sc)], scale: sf, hidden: pl.hidden, ref: pl.ref });
       });
+      const dim = (a: number) => (Number.isFinite(lo[a]) ? Math.max(0, Math.round(hi[a] - lo[a])) : 0);
       setSaveMsg('GLB 모델 생성 중…');
-      let glb = ''; let thumb = ''; let osize = { w: 0, h: 0, d: 0 };
-      try { const out = await exportAssemblyGlb(resolved); glb = out.glb; thumb = out.thumb; osize = out.size; }
+      let glb = ''; let thumb = '';
+      try { const out = await exportAssemblyGlb(resolved); glb = out.glb; thumb = out.thumb; }
       catch { /* GLB 실패해도 상품 등록은 진행 */ }
       const code = genContentCode(prodSnap);
       const today = new Date().toISOString().slice(0, 10);
-      // 설계 축 정렬 후 실제 크기(월드 bbox)
-      const W = osize.w, D = osize.d, H = osize.h;
+      const W = dim(0), D = dim(2), H = dim(1);
       const product = {
         // 기본정보(필수 규칙)
         contentCode: code, name, brand: '한샘',
@@ -196,14 +194,6 @@ export function AssemblyEditor() {
     setAsm((a) => ({ ...a, items: [...a.items, copy] })); setSel(copy.id);
   };
   const toggleHide = (id: string) => setItems(asm.items.map((x) => (x.id === id ? { ...x, hidden: !x.hidden } : x)));
-  // 에디터 3D를 설계 축 프레임으로 정렬(익스포트와 동일 방향)
-  const orientRef = (g: ThreeGroup | null) => {
-    if (!g) return;
-    g.matrixAutoUpdate = false;
-    const m = ORIENT3;
-    g.matrix.set(m[0], m[1], m[2], 0, m[3], m[4], m[5], 0, m[6], m[7], m[8], 0, 0, 0, 0, 1);
-    g.updateMatrixWorld(true);
-  };
   const setField = (id: string, k: keyof Placement, v: string) =>
     setItems(asm.items.map((x) => (x.id === id ? { ...x, [k]: v } : x)));
 
@@ -301,24 +291,22 @@ export function AssemblyEditor() {
               <axesHelper args={[0.5]} />
               <gridHelper args={[4, 40, '#555', '#2a2a2a']} />
               <OrbitControls makeDefault />
-              <group ref={orientRef}>
-                {asm.items.map((pl, i) => {
-                  const part = partMap.get(pl.partId);
-                  if (!part || pl.hidden) return null;
-                  const sc = scopeFor(pl, i);
-                  const pos: [number, number, number] = [num(pl.px, sc) * MM, num(pl.py, sc) * MM, num(pl.pz, sc) * MM];
-                  const rot: [number, number, number] = [num(pl.rx, sc) * Math.PI / 180, num(pl.ry, sc) * Math.PI / 180, num(pl.rz, sc) * Math.PI / 180];
-                  const scale = scaleFor(pl, sc);
-                  return (
-                    <group key={pl.id} position={pos} rotation={rot}
-                      ref={(o) => { if (o) objs.current.set(pl.id, o); else objs.current.delete(pl.id); }}>
-                      <group scale={scale}>
-                        <PartObject part={part} selected={sel === pl.id} onSelect={() => setSel(pl.id)} />
-                      </group>
+              {asm.items.map((pl, i) => {
+                const part = partMap.get(pl.partId);
+                if (!part || pl.hidden) return null;
+                const sc = scopeFor(pl, i);
+                const pos: [number, number, number] = [num(pl.px, sc) * MM, num(pl.py, sc) * MM, num(pl.pz, sc) * MM];
+                const rot: [number, number, number] = [num(pl.rx, sc) * Math.PI / 180, num(pl.ry, sc) * Math.PI / 180, num(pl.rz, sc) * Math.PI / 180];
+                const scale = scaleFor(pl, sc);
+                return (
+                  <group key={pl.id} position={pos} rotation={rot}
+                    ref={(o) => { if (o) objs.current.set(pl.id, o); else objs.current.delete(pl.id); }}>
+                    <group scale={scale}>
+                      <PartObject part={part} selected={sel === pl.id} onSelect={() => setSel(pl.id)} />
                     </group>
-                  );
-                })}
-              </group>
+                  </group>
+                );
+              })}
               {selObj && (
                 <TransformControls object={selObj} mode="translate" translationSnap={SNAP * MM} onObjectChange={onGizmo} />
               )}

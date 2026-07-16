@@ -75,7 +75,7 @@ export function newPart(name: string): Part {
     name,
     profile,
     method: 'extrude',
-    rot: [0, 0, 0],
+    plane: 'XY',
     extrude: { depth },
     material: { color: '#d8c5a8' },
     bbox: computeBBox(profile, depth),

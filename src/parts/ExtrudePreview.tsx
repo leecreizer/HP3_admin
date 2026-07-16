@@ -1,24 +1,21 @@
 import { useMemo, useEffect } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
-import { OrbitControls, Html } from '@react-three/drei';
-import { ExtrudeGeometry, Euler, Vector3, ArrowHelper } from 'three';
-import { buildShape, outlinePoints } from './partGeometry';
-import type { Profile } from './types';
+import { OrbitControls } from '@react-three/drei';
+import { ExtrudeGeometry, Euler, Vector3 } from 'three';
+import { buildShape, outlinePoints, planeEuler } from './partGeometry';
+import type { Profile, WorkPlane } from './types';
 
 const MM = 0.001; // mm → m
-const DEG = Math.PI / 180;
-type Rot = [number, number, number];
-const toRad = (r: Rot): Rot => [r[0] * DEG, r[1] * DEG, r[2] * DEG];
 
-function Mesh({ profile, depth, color, rotDeg }: { profile: Profile; depth: number; color: string; rotDeg: Rot }) {
+function Mesh({ profile, depth, color, plane }: { profile: Profile; depth: number; color: string; plane: WorkPlane }) {
   const geom = useMemo(() => {
     const shape = buildShape(profile);
-    // center() 하지 않음 — 도면의 (0,0)이 그대로 로컬 원점이 되도록
+    // center() 하지 않음 — 도면의 (0,0)이 그대로 로컬 원점이 되도록(사용자 요청)
     return new ExtrudeGeometry(shape, { depth, bevelEnabled: false });
   }, [profile, depth]);
   useEffect(() => () => geom.dispose(), [geom]);
   return (
-    <group rotation={toRad(rotDeg)}>
+    <group rotation={planeEuler(plane)}>
       <mesh geometry={geom} scale={MM}>
         <meshStandardMaterial color={color} />
       </mesh>
@@ -27,73 +24,53 @@ function Mesh({ profile, depth, color, rotDeg }: { profile: Profile; depth: numb
 }
 
 /** 단면 실제 범위(mm)로 부품 중심·크기를 구해 카메라/피벗을 맞춘다(원점 유지). */
-function useProfileFrame(profile: Profile, depth: number, rotDeg: Rot) {
+function useProfileFrame(profile: Profile, depth: number, plane: WorkPlane) {
   return useMemo(() => {
     const pts = outlinePoints(profile.contours[0] ?? { closed: true, corners: [] });
     if (pts.length === 0) return { center: new Vector3(), size: 0.5 };
     const xs = pts.map((p) => p[0]); const ys = pts.map((p) => p[1]);
     const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
     const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+    // 로컬 중심(회전 전) → 회전 적용 → 월드 중심
     const local = new Vector3(cx * MM, cy * MM, (depth / 2) * MM);
-    const center = local.applyEuler(new Euler(...toRad(rotDeg)));
+    const center = local.applyEuler(new Euler(...planeEuler(plane)));
     const w = (Math.max(...xs) - Math.min(...xs)) * MM;
     const h = (Math.max(...ys) - Math.min(...ys)) * MM;
     const size = Math.max(w, h, depth * MM, 0.2);
     return { center, size };
-  }, [profile, depth, rotDeg]);
+  }, [profile, depth, plane]);
 }
 
-/** 방향 확인용 축 화살표 + W/H/D 라벨 (X=W빨강, Y=H초록, Z=D파랑). */
-function Axes({ len }: { len: number }) {
-  const arrows = useMemo(() => {
-    const mk = (dir: Vector3, color: number) => new ArrowHelper(dir, new Vector3(0, 0, 0), len, color, len * 0.12, len * 0.07);
-    return [
-      mk(new Vector3(1, 0, 0), 0xff5555),
-      mk(new Vector3(0, 1, 0), 0x55dd55),
-      mk(new Vector3(0, 0, 1), 0x5599ff),
-    ];
-  }, [len]);
-  const lbl = (c: string): React.CSSProperties => ({ color: c, fontSize: 11, fontWeight: 700, pointerEvents: 'none', textShadow: '0 0 3px #000' });
-  return (
-    <>
-      {arrows.map((a, i) => <primitive key={i} object={a} />)}
-      <Html position={[len, 0, 0]}><span style={lbl('#ff7777')}>W(X)</span></Html>
-      <Html position={[0, len, 0]}><span style={lbl('#77e277')}>H(Y)</span></Html>
-      <Html position={[0, 0, len]}><span style={lbl('#77b0ff')}>D(Z)</span></Html>
-    </>
-  );
-}
-
-function Scene({ profile, depth, color, rotDeg }: { profile: Profile; depth: number; color: string; rotDeg: Rot }) {
-  const { center, size } = useProfileFrame(profile, depth, rotDeg);
+function Scene({ profile, depth, color, plane }: { profile: Profile; depth: number; color: string; plane: WorkPlane }) {
+  const { center, size } = useProfileFrame(profile, depth, plane);
   const { camera } = useThree();
-  const rotKey = rotDeg.join(',');
+  // 마운트/평면 변경 시에만 카메라 재배치(편집 중 화면이 튀지 않도록 profile 제외)
   useEffect(() => {
     const d = size * 2.2;
     camera.position.set(center.x + d, center.y + d * 0.8, center.z + d);
     camera.lookAt(center);
     camera.updateProjectionMatrix();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rotKey, camera]);
+  }, [plane, camera]);
   return (
     <>
       <ambientLight intensity={0.6} />
       <directionalLight position={[2, 3, 2]} intensity={1} />
-      <Mesh profile={profile} depth={depth} color={color} rotDeg={rotDeg} />
-      {/* 방향 확인 축 화살표 + W/H/D 라벨 */}
-      <Axes len={Math.max(size, 0.3)} />
+      <Mesh profile={profile} depth={depth} color={color} plane={plane} />
+      {/* 도면 원점(0,0,0) 표시 — X(빨강)/Y(초록)/Z(파랑) */}
+      <axesHelper args={[Math.max(size, 0.3)]} />
       <gridHelper args={[Math.max(2, size * 4), 20, '#555', '#2a2a2a']} />
       <OrbitControls makeDefault target={[center.x, center.y, center.z]} />
     </>
   );
 }
 
-export function ExtrudePreview({ profile, depth, color = '#d8c5a8', rotDeg = [0, 0, 0] }: {
-  profile: Profile; depth: number; color?: string; rotDeg?: Rot;
+export function ExtrudePreview({ profile, depth, color = '#d8c5a8', plane = 'XY' }: {
+  profile: Profile; depth: number; color?: string; plane?: WorkPlane;
 }) {
   return (
     <Canvas camera={{ position: [0.8, 0.8, 0.8], fov: 45 }} style={{ width: '100%', height: '100%', background: '#1a1c20' }}>
-      <Scene profile={profile} depth={depth} color={color} rotDeg={rotDeg} />
+      <Scene profile={profile} depth={depth} color={color} plane={plane} />
     </Canvas>
   );
 }

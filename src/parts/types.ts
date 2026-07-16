@@ -38,10 +38,8 @@ export interface Part {
   name: string;
   profile: Profile;
   method: 'extrude';
-  /** (구버전) 작업 평면. rot이 있으면 무시. */
+  /** 작업 평면(기본 XY=정면). 없으면 XY로 간주. */
   plane?: WorkPlane;
-  /** 파츠 회전값(도) [x,y,z]. 압출 형상의 방향. */
-  rot?: [number, number, number];
   /** 파츠 변수 — 점 좌표 수식에서 참조(#W, #H 등). */
   vars?: PartVar[];
   extrude: { depth: number; bevel?: { size: number; thickness: number } };

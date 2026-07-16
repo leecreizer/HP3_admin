@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { ExtrudeGeometry } from 'three';
-import { buildShape, partEuler } from './partGeometry';
+import { buildShape, planeEuler } from './partGeometry';
 import { resolveProfile } from './formula';
 import type { Part } from './types';
 
@@ -17,7 +17,7 @@ export function PartObject({ part, selected, onSelect }: { part: Part; selected?
   );
   useEffect(() => () => geom.dispose(), [geom]);
   return (
-    <group rotation={partEuler(part)}>
+    <group rotation={planeEuler(part.plane)}>
       <mesh
         geometry={geom}
         scale={MM}
