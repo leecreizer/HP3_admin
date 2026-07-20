@@ -7,7 +7,7 @@ import { AptPlans } from './pages/AptPlans';
 import { Brands } from './pages/Brands';
 import { Dashboard } from './pages/Dashboard';
 import { Floorplans } from './pages/Floorplans';
-import { Products } from './pages/Products';
+import { Products } from './pages/Products';
 import { Design } from './pages/Design';
 import { RoleManager } from './pages/RoleManager';
 import { ModelingLibrary } from './pages/ModelingLibrary';
@@ -193,7 +193,7 @@ export default function App() {
           currentUser={currentUserName}
         />
       );
-      break;
+      break;
     case 'design':
       content = <Design users={contentUsers} currentUserId={null} myGroupIds={myGroupIds} isAdmin={isAdminUser} userName={currentUserName} />;
       break;

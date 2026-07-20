@@ -98,7 +98,7 @@ export const DEFAULT_SUBMENUS: Record<string, MenuConfig[]> = {
   content: [
     { key: 'products', label: '상품 관리', visible: true },
     ...DEFAULT_PRODUCT_SUBMENUS,
-  ],
+  ],
   drawings: [
     { key: 'floorplans', label: '사용자 도면 관리', visible: true },
     { key: 'drawings/apt', label: 'APT 도면 관리', visible: true },
@@ -108,7 +108,7 @@ export const DEFAULT_SUBMENUS: Record<string, MenuConfig[]> = {
 export const DEFAULT_CONFIG: AdminConfig = {
   mainMenu: [
     { key: 'users', label: '사용자 관리', visible: true },
-    { key: 'content', label: '컨텐츠 관리', visible: true },
+    { key: 'content', label: '컨텐츠 관리', visible: true },
     { key: 'drawings', label: '도면 관리', visible: true },
     { key: 'design', label: '설계 미리보기', visible: true },
   ],
