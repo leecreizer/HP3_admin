@@ -63,13 +63,13 @@ export type AdminConfig = {
 
 /** admin 등급이 가질 수 있는 전체 메뉴 키(대시보드+주메뉴+시스템) */
 export const ALL_ADMIN_MENU_KEYS: MenuKey[] = [
-  'dashboard', 'users', 'content-users', 'content', 'brands', 'drawings', 'floorplans', 'products', 'editor', 'parts', 'assembly', 'design', 'settings',
+  'dashboard', 'users', 'content-users', 'content', 'brands', 'drawings', 'floorplans', 'products', 'design', 'settings',
 ];
 
 /** 기본 등급 세트 (설정에서 추가·수정·삭제 가능) */
 export const DEFAULT_ROLES: Role[] = [
   { id: 'role-super', name: '최고관리자', scope: 'admin', menus: [...ALL_ADMIN_MENU_KEYS], builtin: true },
-  { id: 'role-operator', name: '운영자', scope: 'admin', menus: ['dashboard', 'drawings', 'floorplans', 'content', 'products', 'editor', 'parts', 'assembly', 'design'], builtin: true },
+  { id: 'role-operator', name: '운영자', scope: 'admin', menus: ['dashboard', 'drawings', 'floorplans', 'content', 'products', 'design'], builtin: true },
   { id: 'role-viewer', name: '뷰어', scope: 'admin', menus: ['dashboard', 'drawings', 'floorplans'], builtin: true },
   { id: 'role-user', name: '일반', scope: 'service', menus: [], builtin: true },
   { id: 'role-b2b', name: 'B2B', scope: 'service', menus: [], builtin: true },
@@ -99,10 +99,6 @@ export const DEFAULT_SUBMENUS: Record<string, MenuConfig[]> = {
     { key: 'products', label: '상품 관리', visible: true },
     ...DEFAULT_PRODUCT_SUBMENUS,
   ],
-  editor: [
-    { key: 'parts', label: '파츠 모델러', visible: true },
-    { key: 'assembly', label: '조립', visible: true },
-  ],
   drawings: [
     { key: 'floorplans', label: '사용자 도면 관리', visible: true },
     { key: 'drawings/apt', label: 'APT 도면 관리', visible: true },
@@ -113,7 +109,6 @@ export const DEFAULT_CONFIG: AdminConfig = {
   mainMenu: [
     { key: 'users', label: '사용자 관리', visible: true },
     { key: 'content', label: '컨텐츠 관리', visible: true },
-    { key: 'editor', label: '에디터', visible: true },
     { key: 'drawings', label: '도면 관리', visible: true },
     { key: 'design', label: '설계 미리보기', visible: true },
   ],
