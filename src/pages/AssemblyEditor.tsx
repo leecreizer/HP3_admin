@@ -436,19 +436,19 @@ export function AssemblyEditor() {
                   const sf = selPart ? scaleFor(selItem, s) : [1, 1, 1];
                   return (
                     <div>
-                      <div style={{ fontWeight: 600, fontSize: '0.74rem', margin: '4px 0 3px' }}>위치 (mm) <span style={{ color: '#aaa', fontWeight: 400 }}>수식·조건식 가능</span></div>
-                      {axisRow('X Y Z', ['px', 'py', 'pz'])}
-                      <div style={preview}>→ ({rv('px')}, {rv('py')}, {rv('pz')})</div>
-                      <div style={{ fontWeight: 600, fontSize: '0.74rem', margin: '4px 0 3px' }}>회전 (도)</div>
-                      {axisRow('X Y Z', ['rx', 'ry', 'rz'])}
-                      <div style={preview}>→ ({rv('rx')}, {rv('ry')}, {rv('rz')})</div>
-                      <div style={{ fontWeight: 600, fontSize: '0.74rem', margin: '4px 0 3px' }}>크기 (mm) · 폭·높이·두께</div>
+                      <div style={{ fontWeight: 600, fontSize: '0.74rem', margin: '4px 0 3px' }}>크기 (mm) · 폭·높이·두께 <span style={{ color: '#aaa', fontWeight: 400 }}>수식·조건식 가능</span></div>
                       {axisRow('W H T', ['w', 'h', 'd'])}
                       {selPart && (
                         <div style={preview}>
                           실제 {Math.round(selPart.bbox.w * sf[0])}×{Math.round(selPart.bbox.h * sf[1])}×{Math.round(selPart.bbox.d * sf[2])} mm (빈칸=원본 {selPart.bbox.w}×{selPart.bbox.h}×{selPart.bbox.d})
                         </div>
                       )}
+                      <div style={{ fontWeight: 600, fontSize: '0.74rem', margin: '4px 0 3px' }}>위치 (mm)</div>
+                      {axisRow('X Y Z', ['px', 'py', 'pz'])}
+                      <div style={preview}>→ ({rv('px')}, {rv('py')}, {rv('pz')})</div>
+                      <div style={{ fontWeight: 600, fontSize: '0.74rem', margin: '4px 0 3px' }}>회전 (도)</div>
+                      {axisRow('X Y Z', ['rx', 'ry', 'rz'])}
+                      <div style={preview}>→ ({rv('rx')}, {rv('ry')}, {rv('rz')})</div>
                     </div>
                   );
                 })()}
