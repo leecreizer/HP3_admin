@@ -1,5 +1,5 @@
 import type { Part } from './types';
-import type { Placement } from './assemblyStore';
+import type { Placement, DesignVar } from './assemblyStore';
 
 /**
  * 저장된 조립 모델 — 상품 모델링(교체 그룹)에 연계되는 단위.
@@ -12,6 +12,7 @@ export interface AssemblyModel {
   kind: string;            // 상품구분(품목) 슬롯 = SwapGroup.kind
   items: Placement[];      // 배치
   parts: Part[];           // 배치가 참조하는 파츠 정의(임베드)
+  vars?: DesignVar[];      // 설계 변수(기준 W/D/H 포함)
   createdAt: number;
   updatedAt: number;
 }
