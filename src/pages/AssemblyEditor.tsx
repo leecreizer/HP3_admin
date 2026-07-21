@@ -4,7 +4,7 @@ import { OrbitControls, TransformControls } from '@react-three/drei';
 import type { Object3D } from 'three';
 import { loadParts, upsertPart } from '../parts/partStore';
 import type { Part } from '../parts/types';
-import { loadAssembly, saveAssembly, newPlacement, type Assembly, type Placement } from '../parts/assemblyStore';
+import { loadAssembly, saveAssembly, newPlacement, type Assembly, type Placement, type DesignVar, type VarType } from '../parts/assemblyStore';
 import { PartObject } from '../parts/PartObject';
 import { evalExpr, buildScope } from '../parts/formula';
 import { saveAssemblyModel, loadAssemblyModels, type AssemblyModel } from '../parts/assemblyModelStore';
@@ -80,7 +80,7 @@ export function AssemblyEditor() {
     if (!m) return;
     (m.parts ?? []).forEach((p) => { if (!loadParts().some((x) => x.id === p.id)) upsertPart(p); });
     reloadParts();
-    setAsm({ vars: [], items: m.items });
+    setAsm((a) => ({ vars: m.vars && m.vars.length ? m.vars : a.vars, items: m.items }));
     setModelName(m.name); setModelKind(m.kind); setEditingId(m.id);
     setSel(null);
     // 기존 상품이 있으면 분류/위치 프리필(신규 등록칸 채우기용)
@@ -103,7 +103,7 @@ export function AssemblyEditor() {
     // 불러온 모델(editingId) 우선 → 같은 이름 그룹 → 신규
     const id = editingId ?? byName?.id ?? `am-${Date.now()}-${Math.floor(Math.random() * 1e4)}`;
     const isUpdate = !!(editingId || byName);
-    const model: AssemblyModel = { id, name, kind, items: asm.items, parts: usedParts, createdAt: Date.now(), updatedAt: Date.now() };
+    const model: AssemblyModel = { id, name, kind, items: asm.items, parts: usedParts, vars: asm.vars, createdAt: Date.now(), updatedAt: Date.now() };
     saveAssemblyModel(model);
     const groups = swap.groups.some((g) => g.id === id)
       ? swap.groups.map((g) => (g.id === id ? { ...g, name, kind, type: 'normal' as const } : g))
@@ -141,11 +141,8 @@ export function AssemblyEditor() {
       // 상품 크기 = 전체 기준 치수(#W/#D/#H)
       const W = baseW, D = baseD, H = baseH;
       const opSize = { minW: W, maxW: W, gapW: 0, minD: D, maxD: D, gapD: 0, minH: H, maxH: H, gapH: 0 };
-      const vars = [
-        { name: 'W', value: String(W), type: '고정값' as const },
-        { name: 'D', value: String(D), type: '고정값' as const },
-        { name: 'H', value: String(H), type: '고정값' as const },
-      ];
+      // 상품 변수정의 = 설계 변수 그대로(노출이름·변수명·유형·값·노출)
+      const vars = asm.vars.map((v) => ({ name: v.name.replace(/^#/, ''), label: v.label, value: v.value, type: v.type, expose: v.expose, options: v.options }));
       if (existingProduct) {
         // 기존 상품 갱신 (분류·위치·코드 유지)
         const code = existingProduct.contentCode;
@@ -223,15 +220,25 @@ export function AssemblyEditor() {
     const dm = (a: number) => (Number.isFinite(lo[a]) ? Math.max(0, Math.round(hi[a] - lo[a])) : 0);
     return { w: dm(0), h: dm(1), d: dm(2) };
   })();
-  // 전체 기준 치수(#W/#D/#H) — 명시값 우선, 없으면 배치 bbox 자동
-  const dimVal = (expr: string | undefined, fallback: number) => (expr?.trim() ? (evalExpr(expr, {}) ?? fallback) : fallback);
-  const baseW = dimVal(asm.dims?.w, bboxNoBase.w);
-  const baseD = dimVal(asm.dims?.d, bboxNoBase.d);
-  const baseH = dimVal(asm.dims?.h, bboxNoBase.h);
-  const baseScope = { W: baseW, D: baseD, H: baseH };
-  // 최종 배치 스코프 = 참조 + 기준치수 + 로컬(로컬 우선)
-  const scopeFor = (pl: Placement, i: number): Record<string, number> => ({ ...crossScope, ...baseScope, ...localScope(pl, i) });
-  const setDims = (k: 'w' | 'd' | 'h', v: string) => setAsm((a) => ({ ...a, dims: { w: a.dims?.w ?? '', d: a.dims?.d ?? '', h: a.dims?.h ?? '', [k]: v } }));
+  // 설계 변수(상품 변수정의 형식) → 값 스코프. 순서대로 평가(뒤 변수는 앞 변수 참조 가능).
+  const designScope0: Record<string, number> = {};
+  for (const v of asm.vars) {
+    const key = v.name.replace(/^#/, '').trim();
+    if (!key) continue;
+    const n = evalExpr(v.value, designScope0);
+    if (n != null) designScope0[key] = n;
+  }
+  // 기준 치수: 변수 W/D/H 값이 있으면 그것, 없으면 배치 bbox 자동
+  const baseW = designScope0.W ?? bboxNoBase.w;
+  const baseD = designScope0.D ?? bboxNoBase.d;
+  const baseH = designScope0.H ?? bboxNoBase.h;
+  const designScope: Record<string, number> = { ...designScope0, W: baseW, D: baseD, H: baseH };
+  // 최종 배치 스코프 = 참조 + 설계변수(기준치수 포함) + 로컬(로컬 우선)
+  const scopeFor = (pl: Placement, i: number): Record<string, number> => ({ ...crossScope, ...designScope, ...localScope(pl, i) });
+  const setAsmVars = (vars: DesignVar[]) => setAsm((a) => ({ ...a, vars }));
+  const setVarField = (i: number, patch: Partial<DesignVar>) => setAsmVars(asm.vars.map((v, k) => (k === i ? { ...v, ...patch } : v)));
+  const addDesignVar = () => setAsmVars([...asm.vars, { name: `V${asm.vars.length + 1}`, label: '', value: '0', type: '고정값', expose: false }]);
+  const delDesignVar = (i: number) => setAsmVars(asm.vars.filter((_, k) => k !== i));
 
   const setItems = (items: Placement[]) => setAsm((a) => ({ ...a, items }));
   const addPart = (partId: string) => {
@@ -342,26 +349,48 @@ export function AssemblyEditor() {
           {saveMsg && <span style={{ color: saveMsg.includes('입력') || saveMsg.includes('비어') ? '#c33' : '#292' }}>{saveMsg}</span>}
         </div>
         <div style={{ display: 'flex', gap: 12, flex: 1, minHeight: 0 }}>
-          {/* 전체 기준 치수 (배치 수식에서 #W/#D/#H) */}
-          <div style={{ width: 150, borderRight: '1px solid var(--line,#eee)', paddingRight: 10 }}>
-            <div style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: 6 }}>기준 치수 (mm)</div>
-            <div style={{ fontSize: '0.7rem', color: '#888', marginBottom: 8 }}>전체 모델 기준 · 배치 수식에서 #W/#D/#H 로 참조</div>
-            {([['w', 'W(폭)'], ['d', 'D(깊이)'], ['h', 'H(높이)']] as const).map(([k, lb]) => {
-              const auto = k === 'w' ? bboxNoBase.w : k === 'd' ? bboxNoBase.d : bboxNoBase.h;
-              const resolved = k === 'w' ? baseW : k === 'd' ? baseD : baseH;
-              return (
-                <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 5 }}>
-                  <span style={{ width: 44, fontSize: '0.76rem', color: 'var(--text-2)' }}>{lb}</span>
-                  <input value={asm.dims?.[k] ?? ''} placeholder={String(auto)} style={{ width: 70 }}
-                    onChange={(e) => setDims(k, e.target.value)} />
-                  <span style={{ fontSize: '0.68rem', color: '#888' }}>={Math.round(resolved)}</span>
-                </div>
-              );
-            })}
-            <button style={{ fontSize: '0.74rem', marginTop: 2 }}
-              onClick={() => setAsm((a) => ({ ...a, dims: { w: String(bboxNoBase.w), d: String(bboxNoBase.d), h: String(bboxNoBase.h) } }))}
-              title="현재 배치 크기(bbox)로 기준 치수 채우기">배치기준 자동</button>
-            <div style={{ fontSize: '0.66rem', color: '#aaa', marginTop: 6 }}>빈칸=배치 bbox 자동 · 파츠 원본치수는 #pW/#pD/#pH</div>
+          {/* 설계 변수 (상품 변수정의 형식) — 기준 치수 W/D/H 포함 */}
+          <div style={{ width: 300, borderRight: '1px solid var(--line,#eee)', paddingRight: 10, overflowY: 'auto', minHeight: 0 }}>
+            <div style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: 4 }}>설계 변수</div>
+            <div style={{ fontSize: '0.66rem', color: '#888', marginBottom: 6 }}>상품 변수정의와 동일 · W/D/H=전체 기준(빈값=배치 자동). 배치 수식에서 #변수명 참조</div>
+            <table style={{ borderCollapse: 'collapse', fontSize: '0.72rem', width: '100%' }}>
+              <thead><tr>
+                <th style={{ textAlign: 'left', color: 'var(--text-3)', fontWeight: 600, padding: '1px 2px' }}>노출이름</th>
+                <th style={{ textAlign: 'left', color: 'var(--text-3)', fontWeight: 600, padding: '1px 2px' }}>변수명</th>
+                <th style={{ textAlign: 'left', color: 'var(--text-3)', fontWeight: 600, padding: '1px 2px' }}>유형</th>
+                <th style={{ textAlign: 'left', color: 'var(--text-3)', fontWeight: 600, padding: '1px 2px' }}>값</th>
+                <th style={{ color: 'var(--text-3)', fontWeight: 600, padding: '1px 2px' }}>노출</th>
+                <th />
+              </tr></thead>
+              <tbody>
+                {asm.vars.map((v, i) => {
+                  const isBase = ['W', 'D', 'H'].includes(v.name.replace(/^#/, ''));
+                  const resolved = designScope[v.name.replace(/^#/, '')];
+                  return (
+                    <tr key={i}>
+                      <td style={{ padding: '1px 2px' }}><input value={v.label ?? ''} placeholder={isBase ? '' : '노출명'} style={{ width: 52 }} onChange={(e) => setVarField(i, { label: e.target.value })} /></td>
+                      <td style={{ padding: '1px 2px' }}><input value={v.name} disabled={isBase} title={isBase ? '기준 치수는 이름 고정' : ''} style={{ width: 42 }} onChange={(e) => setVarField(i, { name: e.target.value })} /></td>
+                      <td style={{ padding: '1px 2px' }}>
+                        <select value={v.type} style={{ width: 58 }} onChange={(e) => setVarField(i, { type: e.target.value as VarType })}>
+                          <option value="고정값">고정값</option>
+                          <option value="수식">수식</option>
+                          <option value="조건식">조건식</option>
+                          <option value="선택">선택</option>
+                        </select>
+                      </td>
+                      <td style={{ padding: '1px 2px' }}>
+                        <input value={v.value} placeholder={isBase ? String(bboxNoBase[v.name.replace(/^#/, '').toLowerCase() as 'w' | 'h' | 'd'] ?? '') : ''} style={{ width: 56 }} onChange={(e) => setVarField(i, { value: e.target.value })} />
+                        {resolved != null && <span style={{ color: '#888', marginLeft: 2 }}>={Math.round(resolved)}</span>}
+                      </td>
+                      <td style={{ textAlign: 'center', padding: '1px 2px' }}><input type="checkbox" checked={!!v.expose} onChange={(e) => setVarField(i, { expose: e.target.checked })} /></td>
+                      <td style={{ padding: '1px 2px' }}>{!isBase && <button onClick={() => delDesignVar(i)} style={{ color: '#c33', border: 'none', background: 'none', cursor: 'pointer' }}>×</button>}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <button onClick={addDesignVar} style={{ fontSize: '0.74rem', marginTop: 4 }}>+ 변수 추가</button>
+            <div style={{ fontSize: '0.64rem', color: '#aaa', marginTop: 4 }}>파츠 원본치수는 #pW/#pD/#pH</div>
           </div>
           {/* 3D 실시간 뷰 + 기즈모 */}
           <div style={{ flex: 1, minHeight: 0 }}>
