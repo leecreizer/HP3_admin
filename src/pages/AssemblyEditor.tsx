@@ -7,9 +7,9 @@ import type { Part } from '../parts/types';
 import { loadAssembly, saveAssembly, newPlacement, type Assembly, type Placement } from '../parts/assemblyStore';
 import { PartObject } from '../parts/PartObject';
 import { evalExpr, buildScope } from '../parts/formula';
-import { saveAssemblyModel, type AssemblyModel } from '../parts/assemblyModelStore';
+import { saveAssemblyModel, loadAssemblyModels, type AssemblyModel } from '../parts/assemblyModelStore';
 import { loadSwapState, saveSwapState } from '../data/groups';
-import { loadProductsSnapshot, categoryFolders, genContentCode, appendProduct, productTaxonomy } from '../parts/productLink';
+import { loadProductsSnapshot, categoryFolders, genContentCode, appendProduct, writeProducts, findProductByGroup, productTaxonomy } from '../parts/productLink';
 import { exportAssemblyGlb, type ResolvedItem } from '../parts/assemblyGlb';
 
 const MM = 0.001;
@@ -69,8 +69,26 @@ export function AssemblyEditor() {
   const [pGroup, setPGroup] = useState('');       // 상품군
   const [pQuote, setPQuote] = useState('');        // 견적그룹
   const [pKind, setPKind] = useState('');          // 상품구분
+  const [savedModels, setSavedModels] = useState(loadAssemblyModels);
+  const [editingId, setEditingId] = useState<string | null>(null); // 불러온 조립 모델 id(재저장 시 갱신)
 
   useEffect(() => { saveAssembly(asm); }, [asm]);
+
+  // 저장된 조립 모델 불러오기 → 편집 상태로 로드(임베드 파츠를 라이브러리에 병합해 해석 가능케)
+  const loadModel = (mid: string) => {
+    const m = loadAssemblyModels().find((x) => x.id === mid);
+    if (!m) return;
+    (m.parts ?? []).forEach((p) => { if (!loadParts().some((x) => x.id === p.id)) upsertPart(p); });
+    reloadParts();
+    setAsm({ vars: [], items: m.items });
+    setModelName(m.name); setModelKind(m.kind); setEditingId(m.id);
+    setSel(null);
+    // 기존 상품이 있으면 분류/위치 프리필(신규 등록칸 채우기용)
+    const snap = loadProductsSnapshot();
+    const prod = snap ? findProductByGroup(snap, m.id) : null;
+    if (prod) { setPGroup(prod.productGroup || ''); setPQuote(prod.quoteGroup || ''); setPKind(prod.productKind || ''); setSaveFolder(prod.folderId || ''); }
+    setSaveMsg(`'${m.name}' 불러옴 — 수정 후 저장하면 갱신됩니다`);
+  };
 
   // 조립을 "모델"로 저장 → 교체 그룹(SwapGroup)으로 등록해 상품 모델링 슬롯에서 선택되게 함
   const saveAsModel = async () => {
@@ -81,28 +99,34 @@ export function AssemblyEditor() {
     const usedParts = [...new Set(asm.items.map((x) => x.partId))]
       .map((id) => partMap.get(id)).filter((p): p is NonNullable<typeof p> => !!p);
     const swap = loadSwapState();
-    const existing = swap.groups.find((g) => g.name === name);
-    const id = existing?.id ?? `am-${Date.now()}-${Math.floor(Math.random() * 1e4)}`;
+    const byName = swap.groups.find((g) => g.name === name);
+    // 불러온 모델(editingId) 우선 → 같은 이름 그룹 → 신규
+    const id = editingId ?? byName?.id ?? `am-${Date.now()}-${Math.floor(Math.random() * 1e4)}`;
+    const isUpdate = !!(editingId || byName);
     const model: AssemblyModel = { id, name, kind, items: asm.items, parts: usedParts, createdAt: Date.now(), updatedAt: Date.now() };
     saveAssemblyModel(model);
-    const groups = existing
+    const groups = swap.groups.some((g) => g.id === id)
       ? swap.groups.map((g) => (g.id === id ? { ...g, name, kind, type: 'normal' as const } : g))
       : [...swap.groups, { id, name, kind, type: 'normal' as const }];
     const categories = swap.categories.includes(kind) ? swap.categories : [...swap.categories, kind];
     saveSwapState({ ...swap, groups, categories });
+    setSavedModels(loadAssemblyModels());
+    setEditingId(id);
 
-    // 기본 상품 정보 등록 (컨텐츠 관리 카테고리에 연결) + 실제 GLB 모델링 에셋
+    // 상품 반영 — 기존 상품(modelGroupId 일치)이면 갱신, 없으면 신규 등록(분류·위치 필요)
+    const snap = loadProductsSnapshot();
     let where = '';
-    if (prodSnap && saveFolder && !(pGroup && pQuote && pKind)) {
-      setSaveMsg('상품 규칙 필수: 상품군·견적그룹·상품구분을 선택하세요');
-      return;
-    }
-    if (prodSnap && saveFolder) {
-      // 조립 전체 크기(mm) 근사 + GLB용 해석 배치 목록
+    if (snap) {
+      const existingProduct = findProductByGroup(snap, id);
+      if (!existingProduct && (!saveFolder || !(pGroup && pQuote && pKind))) {
+        setSaveMsg(`'${name}' 모델 저장됨 · 신규 상품 등록하려면 저장위치·상품군·견적그룹·상품구분을 선택하세요`);
+        return;
+      }
+      // GLB용 해석 배치 + 전체 크기
       const lo = [Infinity, Infinity, Infinity]; const hi = [-Infinity, -Infinity, -Infinity];
       const resolved: ResolvedItem[] = [];
       asm.items.forEach((pl, i) => {
-        const p = partMap.get(pl.partId); if (!p) return; // 숨김 항목도 배치에 포함
+        const p = partMap.get(pl.partId); if (!p) return;
         const sc = scopeFor(pl, i); const sf = scaleFor(pl, sc);
         const pos: [number, number, number] = [num(pl.px, sc), num(pl.py, sc), num(pl.pz, sc)];
         const size = [p.bbox.w * sf[0], p.bbox.h * sf[1], p.bbox.d * sf[2]];
@@ -112,37 +136,46 @@ export function AssemblyEditor() {
       const dim = (a: number) => (Number.isFinite(lo[a]) ? Math.max(0, Math.round(hi[a] - lo[a])) : 0);
       setSaveMsg('GLB 모델 생성 중…');
       let glb = ''; let thumb = '';
-      try { const out = await exportAssemblyGlb(resolved); glb = out.glb; thumb = out.thumb; }
-      catch { /* GLB 실패해도 상품 등록은 진행 */ }
-      const code = genContentCode(prodSnap);
+      try { const out = await exportAssemblyGlb(resolved); glb = out.glb; thumb = out.thumb; } catch { /* GLB 실패해도 진행 */ }
       const today = new Date().toISOString().slice(0, 10);
       const W = dim(0), D = dim(2), H = dim(1);
-      const product = {
-        // 기본정보(필수 규칙)
-        contentCode: code, name, brand: '한샘',
-        productGroup: pGroup, quoteGroup: pQuote, productKind: pKind, productCode: code,
-        modelKind: kind, visible: true, permission: '전체',
-        w: W, d: D, h: H, placement: '바닥', placeHeight: 0, nonStandard: false,
-        attrType: '모델링', modelingType: '설계형',
-        // 설계규칙(운영 사이즈·변수) — 조립 크기 기반 기본값
-        opSize: { minW: W, maxW: W, gapW: 0, minD: D, maxD: D, gapD: 0, minH: H, maxH: H, gapH: 0 },
-        vars: [
-          { name: 'W', value: String(W), type: '고정값' as const },
-          { name: 'D', value: String(D), type: '고정값' as const },
-          { name: 'H', value: String(H), type: '고정값' as const },
-        ],
-        modelingSlots: [], styleIds: [], filterValues: [],
-        // 모델링 연계 + 에셋
-        modelGroupId: id, thumb: '', thumbUrl: thumb || undefined,
-        assets: glb ? [{ id: `as-${code}`, name: `${name}.glb`, type: '모델링', url: glb }] : undefined,
-        modelUrl: glb || undefined,
-        folderId: saveFolder, updatedAt: today, updatedBy: '관리자',
-      };
-      appendProduct(prodSnap, product);
-      where = (catFolders.find((f) => f.id === saveFolder)?.path ?? saveFolder) + (glb ? ' · GLB 에셋 포함' : ' · (GLB 생성 실패, 메타만)');
+      const opSize = { minW: W, maxW: W, gapW: 0, minD: D, maxD: D, gapD: 0, minH: H, maxH: H, gapH: 0 };
+      const vars = [
+        { name: 'W', value: String(W), type: '고정값' as const },
+        { name: 'D', value: String(D), type: '고정값' as const },
+        { name: 'H', value: String(H), type: '고정값' as const },
+      ];
+      if (existingProduct) {
+        // 기존 상품 갱신 (분류·위치·코드 유지)
+        const code = existingProduct.contentCode;
+        const updated = {
+          ...existingProduct, name, modelKind: kind, w: W, d: D, h: H, opSize, vars,
+          thumbUrl: thumb || existingProduct.thumbUrl,
+          assets: glb ? [{ id: `as-${code}`, name: `${name}.glb`, type: '모델링', url: glb }] : existingProduct.assets,
+          modelUrl: glb || existingProduct.modelUrl, updatedAt: today, updatedBy: '관리자',
+        };
+        writeProducts(snap, snap.products.map((p: typeof existingProduct) => (p === existingProduct ? updated : p)));
+        where = `기존 상품 갱신 (${existingProduct.name})`;
+      } else {
+        const code = genContentCode(snap);
+        const product = {
+          contentCode: code, name, brand: '한샘',
+          productGroup: pGroup, quoteGroup: pQuote, productKind: pKind, productCode: code,
+          modelKind: kind, visible: true, permission: '전체',
+          w: W, d: D, h: H, placement: '바닥', placeHeight: 0, nonStandard: false,
+          attrType: '모델링', modelingType: '설계형',
+          opSize, vars, modelingSlots: [], styleIds: [], filterValues: [],
+          modelGroupId: id, thumb: '', thumbUrl: thumb || undefined,
+          assets: glb ? [{ id: `as-${code}`, name: `${name}.glb`, type: '모델링', url: glb }] : undefined,
+          modelUrl: glb || undefined,
+          folderId: saveFolder, updatedAt: today, updatedBy: '관리자',
+        };
+        appendProduct(snap, product);
+        where = (catFolders.find((f) => f.id === saveFolder)?.path ?? saveFolder) + (glb ? ' · GLB 포함' : ' · (GLB 실패)');
+      }
     }
-    const base = existing ? `'${name}' 갱신 · 상품 모델링(${kind})에 반영됨` : `'${name}' 저장 · 상품 모델링(${kind})에 등록됨`;
-    setSaveMsg(where ? `${base} · 상품 등록 위치: ${where}` : `${base}${prodSnap ? ' · 저장 위치를 선택하면 상품이 등록됩니다' : ' (상품 미등록: 상품 관리를 먼저 여세요)'}`);
+    const base = isUpdate ? `'${name}' 갱신` : `'${name}' 저장`;
+    setSaveMsg(where ? `${base} · 상품: ${where}` : `${base}${snap ? ' · 저장 위치 선택 시 상품 등록' : ' (상품 관리를 먼저 여세요)'}`);
   };
 
   // 선택된 배치의 3D 오브젝트(기즈모 부착용)
@@ -247,8 +280,14 @@ export function AssemblyEditor() {
         </div>
         {/* 모델로 저장 → 상품 모델링(교체 그룹) 등록 */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: '0.85rem', borderTop: '1px solid var(--line,#eee)', paddingTop: 8 }}>
-          <b>모델로 저장</b>
-          <input value={modelName} onChange={(e) => setModelName(e.target.value)} placeholder="모델 이름 (예: 3단 서랍장)" style={{ width: 180 }} />
+          <b>모델</b>
+          <select value={editingId ?? ''} onChange={(e) => { if (e.target.value) loadModel(e.target.value); }} style={{ minWidth: 150 }} title="저장된 조립 모델 불러와 수정">
+            <option value="">— 저장된 조립 불러오기 —</option>
+            {savedModels.map((m) => <option key={m.id} value={m.id}>{m.name} ({m.kind})</option>)}
+          </select>
+          {editingId && <button onClick={() => { setEditingId(null); setSaveMsg('신규 모드'); }} title="새 조립으로 전환(불러오기 해제)">새로</button>}
+          <span>이름</span>
+          <input value={modelName} onChange={(e) => setModelName(e.target.value)} placeholder="모델 이름 (예: 3단 서랍장)" style={{ width: 160 }} />
           <span>구분</span>
           <input value={modelKind} onChange={(e) => setModelKind(e.target.value)} placeholder="조립" list="swap-cats" style={{ width: 90 }} />
           <datalist id="swap-cats">{swapCats.map((c) => <option key={c} value={c} />)}</datalist>
