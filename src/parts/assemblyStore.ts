@@ -16,6 +16,8 @@ export interface Placement {
 export interface Assembly {
   vars: { name: string; expr: string }[];
   items: Placement[];
+  /** 전체 모델링 기준 치수(mm) — 배치 수식에서 #W/#D/#H로 참조, 등록 상품 크기 기준. 빈값=배치 bbox 자동 */
+  dims?: { w: string; d: string; h: string };
 }
 
 const KEY = 'hp3-assembly';
@@ -27,10 +29,10 @@ export function loadAssembly(): Assembly {
       const items: Placement[] = r.items.map((it: Placement) => ({
         ...it, w: it.w ?? '', h: it.h ?? '', d: it.d ?? '', // 구버전 배치: 크기 빈값(=원본)
       }));
-      return { vars: r.vars ?? [], items };
+      return { vars: r.vars ?? [], items, dims: r.dims ?? { w: '', d: '', h: '' } };
     }
   } catch { /* ignore */ }
-  return { vars: [], items: [] };
+  return { vars: [], items: [], dims: { w: '', d: '', h: '' } };
 }
 
 export function saveAssembly(a: Assembly): void {

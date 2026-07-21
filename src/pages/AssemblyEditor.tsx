@@ -122,23 +122,24 @@ export function AssemblyEditor() {
         setSaveMsg(`'${name}' 모델 저장됨 · 신규 상품 등록하려면 저장위치·상품군·견적그룹·상품구분을 선택하세요`);
         return;
       }
-      // GLB용 해석 배치 + 전체 크기
-      const lo = [Infinity, Infinity, Infinity]; const hi = [-Infinity, -Infinity, -Infinity];
+      // GLB용 해석 배치
       const resolved: ResolvedItem[] = [];
       asm.items.forEach((pl, i) => {
         const p = partMap.get(pl.partId); if (!p) return;
         const sc = scopeFor(pl, i); const sf = scaleFor(pl, sc);
-        const pos: [number, number, number] = [num(pl.px, sc), num(pl.py, sc), num(pl.pz, sc)];
-        const size = [p.bbox.w * sf[0], p.bbox.h * sf[1], p.bbox.d * sf[2]];
-        for (let a = 0; a < 3; a++) { lo[a] = Math.min(lo[a], pos[a]); hi[a] = Math.max(hi[a], pos[a] + size[a]); }
-        resolved.push({ part: p, pos, rotDeg: [num(pl.rx, sc), num(pl.ry, sc), num(pl.rz, sc)], scale: sf, hidden: pl.hidden, ref: pl.ref });
+        resolved.push({
+          part: p,
+          pos: [num(pl.px, sc), num(pl.py, sc), num(pl.pz, sc)],
+          rotDeg: [num(pl.rx, sc), num(pl.ry, sc), num(pl.rz, sc)],
+          scale: sf, hidden: pl.hidden, ref: pl.ref,
+        });
       });
-      const dim = (a: number) => (Number.isFinite(lo[a]) ? Math.max(0, Math.round(hi[a] - lo[a])) : 0);
       setSaveMsg('GLB 모델 생성 중…');
       let glb = ''; let thumb = '';
       try { const out = await exportAssemblyGlb(resolved); glb = out.glb; thumb = out.thumb; } catch { /* GLB 실패해도 진행 */ }
       const today = new Date().toISOString().slice(0, 10);
-      const W = dim(0), D = dim(2), H = dim(1);
+      // 상품 크기 = 전체 기준 치수(#W/#D/#H)
+      const W = baseW, D = baseD, H = baseH;
       const opSize = { minW: W, maxW: W, gapW: 0, minD: D, maxD: D, gapD: 0, minH: H, maxH: H, gapH: 0 };
       const vars = [
         { name: 'W', value: String(W), type: '고정값' as const },
@@ -183,10 +184,10 @@ export function AssemblyEditor() {
   const [selObj, setSelObj] = useState<Object3D | null>(null);
   useEffect(() => { setSelObj(sel ? objs.current.get(sel) ?? null : null); }, [sel, asm.items]);
 
-  // 배치의 로컬 스코프 = 그 배치의 변수 + 원본 파츠 치수(W/H/D) + 순번(i)
+  // 배치 로컬 스코프 = 배치 변수 + 파츠 원본 치수(#pW/#pH/#pD) + 순번(#i)
   const localScope = (pl: Placement, i: number): Record<string, number> => {
     const p = partMap.get(pl.partId);
-    return buildScope(pl.vars, { W: p?.bbox.w ?? 0, H: p?.bbox.h ?? 0, D: p?.bbox.d ?? 0, i });
+    return buildScope(pl.vars, { pW: p?.bbox.w ?? 0, pH: p?.bbox.h ?? 0, pD: p?.bbox.d ?? 0, i });
   };
   // 배치 크기(mm) → 파츠 원본 bbox 대비 스케일. 빈값이면 원본(스케일 1).
   const scaleFor = (pl: Placement, sc: Record<string, number>): [number, number, number] => {
@@ -197,8 +198,7 @@ export function AssemblyEditor() {
     const tdp = pl.d.trim() ? num(pl.d, sc) : bd;
     return [tw / bw, th / bh, tdp / bd];
   };
-  // 배치 간 참조 스코프: 정의변수(ref)를 가진 배치의 실제 W/H/D를 "ref.W/.H/.D"로 공개.
-  // (자기 로컬 스코프로만 해석 → 순환 참조 방지)
+  // 배치 간 참조 스코프: 정의변수(ref) 배치의 실제 W/H/D를 "ref.W/.H/.D"로 공개.
   const crossScope: Record<string, number> = {};
   asm.items.forEach((pl, i) => {
     const ref = pl.ref?.trim();
@@ -209,8 +209,29 @@ export function AssemblyEditor() {
     crossScope[`${ref}.H`] = Math.round((p?.bbox.h ?? 0) * sf[1]);
     crossScope[`${ref}.D`] = Math.round((p?.bbox.d ?? 0) * sf[2]);
   });
-  // 최종 배치 스코프 = 참조 스코프 + 로컬 스코프(로컬이 우선)
-  const scopeFor = (pl: Placement, i: number): Record<string, number> => ({ ...crossScope, ...localScope(pl, i) });
+  // 배치 bbox(기준치수 미적용) — 기준 치수 자동값·순환 방지용
+  const bboxNoBase = (() => {
+    const lo = [Infinity, Infinity, Infinity]; const hi = [-Infinity, -Infinity, -Infinity];
+    asm.items.forEach((pl, i) => {
+      const p = partMap.get(pl.partId); if (!p) return;
+      const sc = { ...crossScope, ...localScope(pl, i) };
+      const sf = scaleFor(pl, sc);
+      const pos = [num(pl.px, sc), num(pl.py, sc), num(pl.pz, sc)];
+      const size = [p.bbox.w * sf[0], p.bbox.h * sf[1], p.bbox.d * sf[2]];
+      for (let a = 0; a < 3; a++) { lo[a] = Math.min(lo[a], pos[a]); hi[a] = Math.max(hi[a], pos[a] + size[a]); }
+    });
+    const dm = (a: number) => (Number.isFinite(lo[a]) ? Math.max(0, Math.round(hi[a] - lo[a])) : 0);
+    return { w: dm(0), h: dm(1), d: dm(2) };
+  })();
+  // 전체 기준 치수(#W/#D/#H) — 명시값 우선, 없으면 배치 bbox 자동
+  const dimVal = (expr: string | undefined, fallback: number) => (expr?.trim() ? (evalExpr(expr, {}) ?? fallback) : fallback);
+  const baseW = dimVal(asm.dims?.w, bboxNoBase.w);
+  const baseD = dimVal(asm.dims?.d, bboxNoBase.d);
+  const baseH = dimVal(asm.dims?.h, bboxNoBase.h);
+  const baseScope = { W: baseW, D: baseD, H: baseH };
+  // 최종 배치 스코프 = 참조 + 기준치수 + 로컬(로컬 우선)
+  const scopeFor = (pl: Placement, i: number): Record<string, number> => ({ ...crossScope, ...baseScope, ...localScope(pl, i) });
+  const setDims = (k: 'w' | 'd' | 'h', v: string) => setAsm((a) => ({ ...a, dims: { w: a.dims?.w ?? '', d: a.dims?.d ?? '', h: a.dims?.h ?? '', [k]: v } }));
 
   const setItems = (items: Placement[]) => setAsm((a) => ({ ...a, items }));
   const addPart = (partId: string) => {
@@ -321,6 +342,27 @@ export function AssemblyEditor() {
           {saveMsg && <span style={{ color: saveMsg.includes('입력') || saveMsg.includes('비어') ? '#c33' : '#292' }}>{saveMsg}</span>}
         </div>
         <div style={{ display: 'flex', gap: 12, flex: 1, minHeight: 0 }}>
+          {/* 전체 기준 치수 (배치 수식에서 #W/#D/#H) */}
+          <div style={{ width: 150, borderRight: '1px solid var(--line,#eee)', paddingRight: 10 }}>
+            <div style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: 6 }}>기준 치수 (mm)</div>
+            <div style={{ fontSize: '0.7rem', color: '#888', marginBottom: 8 }}>전체 모델 기준 · 배치 수식에서 #W/#D/#H 로 참조</div>
+            {([['w', 'W(폭)'], ['d', 'D(깊이)'], ['h', 'H(높이)']] as const).map(([k, lb]) => {
+              const auto = k === 'w' ? bboxNoBase.w : k === 'd' ? bboxNoBase.d : bboxNoBase.h;
+              const resolved = k === 'w' ? baseW : k === 'd' ? baseD : baseH;
+              return (
+                <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 5 }}>
+                  <span style={{ width: 44, fontSize: '0.76rem', color: 'var(--text-2)' }}>{lb}</span>
+                  <input value={asm.dims?.[k] ?? ''} placeholder={String(auto)} style={{ width: 70 }}
+                    onChange={(e) => setDims(k, e.target.value)} />
+                  <span style={{ fontSize: '0.68rem', color: '#888' }}>={Math.round(resolved)}</span>
+                </div>
+              );
+            })}
+            <button style={{ fontSize: '0.74rem', marginTop: 2 }}
+              onClick={() => setAsm((a) => ({ ...a, dims: { w: String(bboxNoBase.w), d: String(bboxNoBase.d), h: String(bboxNoBase.h) } }))}
+              title="현재 배치 크기(bbox)로 기준 치수 채우기">배치기준 자동</button>
+            <div style={{ fontSize: '0.66rem', color: '#aaa', marginTop: 6 }}>빈칸=배치 bbox 자동 · 파츠 원본치수는 #pW/#pD/#pH</div>
+          </div>
           {/* 3D 실시간 뷰 + 기즈모 */}
           <div style={{ flex: 1, minHeight: 0 }}>
             <Canvas camera={{ position: [1.2, 1, 1.2], fov: 45 }} style={{ width: '100%', height: '100%', background: '#1a1c20' }}
@@ -412,7 +454,7 @@ export function AssemblyEditor() {
                 })()}
                 {/* 배치 전용 변수 */}
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: '0.74rem', margin: '6px 0 3px' }}>변수 <span style={{ color: '#888', fontWeight: 400 }}>· 위/회전/크기 수식에서 #이름 (내장 #W/#H/#D=원본치수, #i=순번)</span></div>
+                  <div style={{ fontWeight: 600, fontSize: '0.74rem', margin: '6px 0 3px' }}>변수 <span style={{ color: '#888', fontWeight: 400 }}>· 수식에서 #이름 (내장 #W/#D/#H=전체기준, #pW/#pD/#pH=파츠원본, #i=순번, 다른배치 이름.W)</span></div>
                   {(() => {
                     const sc = scopeFor(selItem, asm.items.indexOf(selItem));
                     return (selItem.vars ?? []).map((v, i) => {
