@@ -57,8 +57,20 @@ export function genContentCode(s: any): string {
   return code;
 }
 
-/** 스냅샷에 상품을 추가 저장(다른 필드·__v 보존). */
+/** 상품 배열을 저장(다른 필드·__v 보존). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function writeProducts(s: any, products: any[]): void {
+  localStorage.setItem(PKEY, JSON.stringify({ ...s, products, __v: PVER }));
+}
+
+/** 스냅샷에 상품을 추가 저장. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function appendProduct(s: any, product: any): void {
-  localStorage.setItem(PKEY, JSON.stringify({ ...s, products: [...s.products, product], __v: PVER }));
+  writeProducts(s, [...s.products, product]);
+}
+
+/** modelGroupId로 기존 상품 찾기(조립 모델 재수정 시 갱신 대상). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function findProductByGroup(s: any, groupId: string): any | undefined {
+  return (s.products ?? []).find((p: { modelGroupId?: string }) => p.modelGroupId === groupId);
 }
