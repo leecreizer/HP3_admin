@@ -22,8 +22,13 @@ edit('src/config.ts', (s) => s
 edit('src/App.tsx', (s) => s
   .replace(/\nimport \{ PartEditor \} from '\.\/pages\/PartEditor';/g, '')
   .replace(/\nimport \{ AssemblyEditor \} from '\.\/pages\/AssemblyEditor';/g, '')
+  .replace(/\nimport \{ ModelingStudio \} from '\.\/pages\/ModelingStudio';/g, '')
+  .replace(/\nimport \{ PmStudio \} from '\.\/pages\/PmStudio';/g, '')
   // 라우팅 case (editor/parts/assembly) — case 'editor'부터 assembly break;까지
   .replace(/\n[ \t]*case 'editor':[\s\S]*?\n[ \t]*case 'assembly':[\s\S]*?\n[ \t]*break;/g, '')
 );
+
+// 컨텐츠 라이브러리의 에디터 진입 버튼도 숨김
+edit('src/pm/editorFlag.ts', (s) => s.replace('export const MODELING_EDITOR_ENABLED = true;', 'export const MODELING_EDITOR_ENABLED = false;'));
 
 console.log('[strip-editor] 완료');

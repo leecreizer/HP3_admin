@@ -96,6 +96,7 @@ export const DEFAULT_SUBMENUS: Record<string, MenuConfig[]> = {
     { key: 'users/roles', label: '어드민 권한 관리', visible: true },
   ],
   content: [
+    { key: 'content/library', label: '컨텐츠 라이브러리', visible: true },
     { key: 'products', label: '상품 관리', visible: true },
     ...DEFAULT_PRODUCT_SUBMENUS,
   ],

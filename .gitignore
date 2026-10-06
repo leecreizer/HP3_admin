@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Python 캐시 (scripts/*.py 생성기)
+__pycache__/
