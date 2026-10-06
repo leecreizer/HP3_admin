@@ -8,13 +8,13 @@ import { Brands } from './pages/Brands';
 import { Dashboard } from './pages/Dashboard';
 import { Floorplans } from './pages/Floorplans';
 import { Products } from './pages/Products';
-import { PartEditor } from './pages/PartEditor';
-import { AssemblyEditor } from './pages/AssemblyEditor';
+import { PmStudio } from './pages/PmStudio';
 import { Design } from './pages/Design';
 import { RoleManager } from './pages/RoleManager';
 import { ModelingLibrary } from './pages/ModelingLibrary';
 import { StyleLibrary } from './pages/StyleLibrary';
 import { Settings } from './pages/Settings';
+import { ContentLibrary } from './pages/content/ContentLibrary';
 import { Users, loadUsers, userKind } from './pages/Users';
 
 const FIXED_TITLE: Partial<Record<MenuKey, string>> = {
@@ -124,6 +124,7 @@ export default function App() {
   const SUB_TITLE: Record<string, string> = {
     'users/operators': '어드민 사용자 관리',
     'content-users': '홈플래너 사용자 관리',
+    'content/library': '컨텐츠 라이브러리',
     'products': '상품 관리',
     'brands': '브랜드 관리',
     'floorplans': '사용자 도면 관리',
@@ -182,7 +183,8 @@ export default function App() {
       content = <Brands brands={brands} setBrands={setBrands} groups={groups} setGroups={setGroups} dirty={orgDirty} onSave={saveOrg} />;
       break;
     case 'content':
-      content = <PagePlaceholder title="컨텐츠 관리" />;
+      // 컨텐츠 관리 대메뉴·하위 ‘컨텐츠 라이브러리’ — 쿠지알러 기업 상품 라이브러리 구조
+      content = <ContentLibrary userName={currentUserName} />;
       break;
     case 'products':
       if (active === 'products/modeling') { content = <ModelingLibrary />; break; }
@@ -198,10 +200,9 @@ export default function App() {
       break;
     case 'editor':
     case 'parts':
-      content = active === 'assembly' ? <AssemblyEditor /> : <PartEditor />;
-      break;
     case 'assembly':
-      content = <AssemblyEditor />;
+      // 파라메트릭 모델 에디터 — 쿠지알러 参数化模型编辑器를 참고해 새로 만든 에디터 (src/pm · src/pages/pm)
+      content = <PmStudio userName={currentUserName} />;
       break;
     case 'design':
       content = <Design users={contentUsers} currentUserId={null} myGroupIds={myGroupIds} isAdmin={isAdminUser} userName={currentUserName} />;

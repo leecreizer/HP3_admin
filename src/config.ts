@@ -96,12 +96,12 @@ export const DEFAULT_SUBMENUS: Record<string, MenuConfig[]> = {
     { key: 'users/roles', label: '어드민 권한 관리', visible: true },
   ],
   content: [
+    { key: 'content/library', label: '컨텐츠 라이브러리', visible: true },
     { key: 'products', label: '상품 관리', visible: true },
     ...DEFAULT_PRODUCT_SUBMENUS,
   ],
   editor: [
-    { key: 'parts', label: '파츠 모델러', visible: true },
-    { key: 'assembly', label: '조립', visible: true },
+    { key: 'parts', label: '파라메트릭 모델 에디터', visible: true },
   ],
   drawings: [
     { key: 'floorplans', label: '사용자 도면 관리', visible: true },
