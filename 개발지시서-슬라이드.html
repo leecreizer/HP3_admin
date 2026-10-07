@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>HomePlanner3 Admin — 개발 지시서 슬라이드</title>
+<style>
+  :root{
+    --ink:#1e2a3a;--ink2:#2c3b50;--text:#2a3646;--text2:#5d6c7e;--text3:#93a1b1;
+    --line:#e3e8ee;--bg1:#cfdae3;--bg2:#aebfcc;--card:#ffffff;--accent:#3a6ea5;
+    --moss:#5e8a72;--clay:#c77e5e;--sand:#ab8a4c;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;}
+  body{
+    font-family:"Pretendard Variable",Pretendard,-apple-system,"Malgun Gothic",sans-serif;
+    color:var(--text);
+    background:radial-gradient(120% 90% at 12% 0%, #e2e9ef 0%, transparent 55%),
+      linear-gradient(150deg,var(--bg1) 0%,var(--bg2) 100%);
+    background-attachment:fixed;
+    overflow:hidden;
+  }
+  .deck{height:100vh;display:grid;place-items:center;padding:40px;}
+  .slide{
+    display:none;width:min(1000px,94vw);height:min(640px,86vh);
+    background:var(--card);border-radius:24px;
+    box-shadow:0 30px 70px -25px rgba(30,42,58,.45);
+    padding:54px 60px;overflow:auto;position:relative;
+    border:1px solid rgba(255,255,255,.7);
+  }
+  .slide.active{display:block;animation:fade .35s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+  .eyebrow{font-family:"Space Grotesk",monospace;font-size:.8rem;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:14px;display:block;}
+  h1{font-size:2.6rem;line-height:1.15;color:var(--ink);letter-spacing:-.02em;}
+  h2{font-size:1.9rem;color:var(--ink);letter-spacing:-.02em;margin-bottom:20px;border-bottom:2px solid var(--ink);padding-bottom:12px;}
+  h3{font-size:1.05rem;color:var(--ink2);margin:18px 0 8px;}
+  p.lead{font-size:1.05rem;color:var(--text2);margin-top:18px;line-height:1.6;}
+  ul{list-style:none;}
+  li{position:relative;padding-left:22px;margin:9px 0;font-size:1rem;line-height:1.55;}
+  li::before{content:"";position:absolute;left:2px;top:.62em;width:7px;height:7px;border-radius:2px;background:var(--accent);}
+  li.warn::before{background:var(--clay);}
+  li b{color:var(--ink);font-weight:700;}
+  code{font-family:"Space Grotesk",Consolas,monospace;background:#eef2f6;padding:1px 6px;border-radius:5px;font-size:.86em;color:var(--ink2);}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px 36px;}
+  .chip{display:inline-block;background:#eef2f6;color:var(--ink2);border-radius:8px;padding:4px 11px;margin:3px 4px 3px 0;font-size:.85rem;font-weight:600;}
+  table{border-collapse:collapse;width:100%;margin-top:14px;font-size:.9rem;}
+  th,td{border:1px solid var(--line);padding:7px 11px;text-align:left;}
+  th{background:#f4f7f9;color:var(--ink);}
+  .tag-ok{color:var(--moss);font-weight:700;}.tag-no{color:var(--text3);}
+  .title-slide{background:linear-gradient(150deg,#23344a,#16202e);color:#fff;border:none;}
+  .title-slide .eyebrow{color:#8fb4d8;}
+  .title-slide h1{color:#fff;}
+  .title-slide p{color:#c7d3df;margin-top:20px;font-size:1.1rem;}
+  .title-slide .meta{position:absolute;bottom:48px;left:60px;font-family:"Space Grotesk",monospace;color:#8fb4d8;font-size:.85rem;letter-spacing:.05em;}
+  /* 컨트롤 */
+  .hud{position:fixed;bottom:22px;left:0;right:0;display:flex;align-items:center;justify-content:center;gap:18px;z-index:10;}
+  .hud button{background:rgba(255,255,255,.85);border:1px solid rgba(255,255,255,.7);color:var(--ink);
+    width:42px;height:42px;border-radius:50%;font-size:1.1rem;cursor:pointer;box-shadow:0 8px 20px -10px rgba(30,42,58,.4);transition:.15s;}
+  .hud button:hover{background:#fff;transform:translateY(-2px);}
+  .counter{font-family:"Space Grotesk",monospace;color:var(--ink2);background:rgba(255,255,255,.85);
+    padding:8px 16px;border-radius:20px;font-size:.85rem;font-weight:600;min-width:74px;text-align:center;}
+  .progress{position:fixed;top:0;left:0;height:4px;background:var(--accent);transition:width .3s;z-index:11;}
+  .hint{position:fixed;top:16px;right:22px;color:var(--ink2);font-size:.78rem;background:rgba(255,255,255,.75);padding:5px 12px;border-radius:14px;}
+</style></head>
+<body>
+<div class="progress" id="prog"></div>
+<div class="hint">← → 방향키 · F 전체화면</div>
+<div class="deck" id="deck">
+
+  <!-- 1 -->
+  <section class="slide title-slide active">
+    <span class="eyebrow">HANSSEM · HomePlanner3</span>
+    <h1>관리자 페이지<br/>상세 개발 지시서</h1>
+    <p>프로토타입 기준 페이지별 기능 도출 · 데이터 모델 · API · 규칙</p>
+    <div class="meta">2026-06-16 · 프로토타입: localhost:5173 · 데이터 mock(localStorage)</div>
+  </section>
+
+  <!-- 2 목차 -->
+  <section class="slide">
+    <span class="eyebrow">Overview</span>
+    <h2>구성 / 목차</h2>
+    <div class="cols">
+      <ul>
+        <li><b>공통 사양</b> — 레이아웃·디자인·공통 컴포넌트</li>
+        <li><b>대시보드</b> — KPI·렌더 추이·큐</li>
+        <li><b>도면 관리</b> — 도면 목록·도면별 렌더 갤러리</li>
+        <li><b>사용자 관리</b> — 그룹 트리·사용자 CRUD</li>
+      </ul>
+      <ul>
+        <li><b>브랜드 관리</b> — 브랜드·그룹 연동</li>
+        <li><b>상품 관리</b> — 리스트·폴더·등록/편집·하위 4메뉴</li>
+        <li><b>설정</b> — 메뉴·상단바 구성</li>
+        <li><b>종합</b> — 데이터 모델·권한·연동·백로그</li>
+      </ul>
+    </div>
+    <p class="lead">각 페이지는 <b>화면 구성 → 기능 도출 → 데이터 모델 → API → 규칙 → 인수조건</b> 순으로 정리.</p>
+  </section>
+
+  <!-- 3 공통 -->
+  <section class="slide">
+    <span class="eyebrow">Common · 01</span>
+    <h2>공통 사양</h2>
+    <h3>레이아웃 셸</h3>
+    <ul>
+      <li>좌 사이드바(266/104px) · 상단바(72px) · 메인(1fr), 높이 <code>100vh</code> 고정</li>
+      <li><b>상단바·사이드바 고정</b>, 리스트는 <b>툴바·테이블 헤더 sticky</b> + 내부 스크롤</li>
+    </ul>
+    <h3>디자인 시스템 · 공통 컴포넌트</h3>
+    <ul>
+      <li>CSS 변수 팔레트 + Pretendard / Space Grotesk(숫자)</li>
+      <li><code>Pagination</code>(20/50/100) · <code>useSort/ThSort</code> · <code>AssetViewer</code>(three.js)</li>
+      <li class="warn">상태 영속화는 현재 <b>localStorage</b> → 실제 <b>API+DB로 교체</b></li>
+    </ul>
+  </section>
+
+  <!-- 4 대시보드 -->
+  <section class="slide">
+    <span class="eyebrow">Page · 02</span>
+    <h2>대시보드 <code>/dashboard</code></h2>
+    <div class="cols">
+      <div>
+        <h3>화면</h3>
+        <ul>
+          <li>KPI 4종(오늘 렌더·DAU·평균시간·실패율)</li>
+          <li>렌더 처리 추이(14일) · 렌더 큐</li>
+          <li>최근 완료 렌더 테이블(정렬)</li>
+        </ul>
+      </div>
+      <div>
+        <h3>기능 · API</h3>
+        <ul>
+          <li><code>GET /dashboard/kpis</code> 증감 포함</li>
+          <li><code>/render-trend</code> · <code>/renders/queue</code></li>
+          <li>큐 10초 폴링 or WebSocket</li>
+          <li>리포트 내보내기(CSV)</li>
+        </ul>
+      </div>
+    </div>
+    <p class="lead">실패율 = <code>fail/(done+fail)</code> 당일 누계 · 평균시간은 성공 건만.</p>
+  </section>
+
+  <!-- 5 도면 -->
+  <section class="slide">
+    <span class="eyebrow">Page · 03</span>
+    <h2>도면 관리 <code>/floorplans</code></h2>
+    <div class="cols">
+      <div>
+        <h3>기능</h3>
+        <ul>
+          <li>목록: 검색·상태탭·정렬·카드 그리드</li>
+          <li><b>도면별 렌더 이미지 갤러리</b>(공간 탭)</li>
+          <li>렌더 삭제 / 도면·렌더 생성 <span class="chip">미구현</span></li>
+        </ul>
+      </div>
+      <div>
+        <h3>모델 · API</h3>
+        <ul>
+          <li><code>Floorplan</code> 1—N <code>RenderImage</code></li>
+          <li><code>GET /floorplans/{id}/renders?room=</code></li>
+          <li><code>POST .../renders</code> → 비동기 큐</li>
+        </ul>
+      </div>
+    </div>
+    <p class="lead">렌더 이미지는 <b>반드시 해당 도면에 종속</b>. 상태 <code>public·review·draft</code>.</p>
+  </section>
+
+  <!-- 6 사용자 -->
+  <section class="slide">
+    <span class="eyebrow">Page · 04</span>
+    <h2>사용자 관리 <code>/users</code></h2>
+    <div class="cols">
+      <div>
+        <h3>기능</h3>
+        <ul>
+          <li>좌 <b>그룹 트리</b>(브랜드&gt;그룹) 범위 필터</li>
+          <li>검색·상태필터·전컬럼 정렬·페이지네이션</li>
+          <li>추가/수정 모달 · 일괄 삭제 · 그룹 일괄 추가</li>
+          <li>그룹 추가·이름변경·삭제·드래그 이동</li>
+        </ul>
+      </div>
+      <div>
+        <h3>규칙</h3>
+        <ul>
+          <li class="warn"><b>필수: 이름·사번·조직</b> (이메일 선택)</li>
+          <li>User ↔ Group <b>N:M</b>, 브랜드는 그룹에서 도출</li>
+          <li>그룹/브랜드 변경 = <b>브랜드 관리와 연동</b></li>
+          <li>그룹 삭제 → 사용자 유지·소속만 해제</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 브랜드 -->
+  <section class="slide">
+    <span class="eyebrow">Page · 05</span>
+    <h2>브랜드 관리 <code>/brands</code></h2>
+    <ul>
+      <li>브랜드(파트너사) 추가·인라인 수정·삭제, 그룹 추가·삭제</li>
+      <li><b>브랜드 삭제 시 하위 그룹 cascade</b> + 사용자 소속 자동 해제(confirm)</li>
+      <li>브랜드명 <b>유일성</b> 보장</li>
+      <li><b>사용자 관리 그룹 · 상품 컨텐츠 권한과 동일 데이터 연동</b></li>
+    </ul>
+    <p class="lead">API: <code>GET/POST/PUT/DELETE /brands</code>, <code>DELETE ?cascade=true</code>, <code>/brands/{id}/groups</code></p>
+  </section>
+
+  <!-- 8 상품 개요 -->
+  <section class="slide">
+    <span class="eyebrow">Page · 06 — 핵심</span>
+    <h2>상품 관리 <code>/products</code> · 개요</h2>
+    <p class="lead">메인 리스트 + 하위 4메뉴로 구성된 가장 복잡한 페이지.</p>
+    <div class="cols">
+      <ul>
+        <li><b>메인</b> — 폴더 트리 + 상품 테이블</li>
+        <li><b>상품군·구분 관리</b> <code>/catalog</code></li>
+        <li><b>모델 관리</b> <code>/models</code></li>
+      </ul>
+      <ul>
+        <li><b>노출 필드 관리</b> <code>/fields</code></li>
+        <li><b>필터 관리</b> <code>/filters</code></li>
+        <li>등록 모달 · 3패널 편집 화면</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 9 상품 폴더/리스트 -->
+  <section class="slide">
+    <span class="eyebrow">Page · 06a</span>
+    <h2>상품 — 폴더 & 리스트</h2>
+    <div class="cols">
+      <div>
+        <h3>폴더 트리</h3>
+        <ul>
+          <li><b>미분류 루트 고정</b>(삭제·이동·이름변경 불가)</li>
+          <li><code>+새폴더</code> = 선택 폴더 하위 생성</li>
+          <li><b>이동은 드래그&드롭만</b>(앞/하위)</li>
+          <li>삭제 시 상품은 상위로, 하위폴더 있으면 차단</li>
+        </ul>
+      </div>
+      <div>
+        <h3>리스트</h3>
+        <ul>
+          <li>검색·속성구분 탭·폴더필터·정렬</li>
+          <li>노출 토글 · 폴더 일괄 이동 · 삭제</li>
+          <li>컬럼: 상품명·브랜드·상품군·모델·품목·견적·코드·노출·배치·사이즈·속성</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 10 상품 등록/편집 -->
+  <section class="slide">
+    <span class="eyebrow">Page · 06b</span>
+    <h2>상품 — 등록 / 편집</h2>
+    <h3>기본정보(등록·편집 동일)</h3>
+    <p>
+      <span class="chip">상품명</span><span class="chip">브랜드</span><span class="chip">견적그룹</span>
+      <span class="chip">상품군</span><span class="chip">상품구분(군 종속)</span><span class="chip">컨텐츠코드</span>
+      <span class="chip">상품코드</span><span class="chip">컨텐츠권한(그룹)</span><span class="chip">노출</span>
+      <span class="chip">속성구분</span><span class="chip">크기</span><span class="chip">배치위치·높이</span>
+      <span class="chip">스펙URL</span><span class="chip">mallURL</span><span class="chip">필터</span>
+    </p>
+    <ul>
+      <li>3패널: <b>썸네일·에셋 / 기본정보 / 운영정보</b>, <b>나가기 시 원복</b></li>
+      <li>에셋 확장자 자동인식 + three.js 미리보기</li>
+      <li class="warn">AssetBundle은 <b>서버 glTF 변환 필요</b> · 운영정보 조합 매핑 <b>미정</b></li>
+    </ul>
+  </section>
+
+  <!-- 11 상품 하위메뉴 -->
+  <section class="slide">
+    <span class="eyebrow">Page · 06c</span>
+    <h2>상품 — 하위 메뉴 4종</h2>
+    <ul>
+      <li><b>상품군·구분 관리</b> — 상품군 + 품목(구분) 추가/이름변경/삭제, 상품 동기화</li>
+      <li><b>모델 관리</b> — 상품군별 모델(시리즈) 관리</li>
+      <li><b>노출 필드 관리</b> — DB 필드 정의(현재값=기본세팅) + 저장 · builtin 삭제불가</li>
+      <li><b>필터 관리</b> — 그룹+옵션 2단. <b>‘상품 구분·모델 구분’은 읽기전용</b>(각 메뉴에서만 수정)</li>
+    </ul>
+    <p class="lead">상품군·모델·필터는 서로 파생·연동되는 단일 출처로 관리.</p>
+  </section>
+
+  <!-- 12 설정 -->
+  <section class="slide">
+    <span class="eyebrow">Page · 07</span>
+    <h2>설정 <code>/settings</code></h2>
+    <ul>
+      <li><b>좌측 메뉴 관리</b> — 순서·이름·표시·추가·삭제(사이드바 드래그와 동일 데이터)</li>
+      <li><b>상품관리 하위메뉴</b> — 순서·이름변경·표시(키 고정)</li>
+      <li><b>상부 메뉴</b> — 브랜드명/부제·검색창·알림·관리자 정보</li>
+      <li>삭제한 기본 메뉴는 <code>removedMenus</code>로 부활 방지</li>
+    </ul>
+    <p class="lead">실제로는 <b>조직/관리자 단위 서버 저장</b> + 권한별 기본값.</p>
+  </section>
+
+  <!-- 13 데이터 모델 -->
+  <section class="slide">
+    <span class="eyebrow">Summary · 08</span>
+    <h2>데이터 모델 종합</h2>
+    <ul>
+      <li><b>Brand</b> 1—N <b>Group</b> N—M <b>User</b> (그룹·브랜드·상품권한 공유)</li>
+      <li><b>Floorplan</b> 1—N <b>RenderImage</b></li>
+      <li><b>ProductFolder</b>(self, 미분류 루트) 1—N <b>Product</b></li>
+      <li><b>ProductGroup</b> 1—N <b>Kind(품목)</b> · 1—N <b>Model</b></li>
+      <li><b>FilterGroup</b> 1—N <b>Option</b> (+파생: 상품/모델 구분 read-only)</li>
+      <li>Product.permission → <code>'전체' | Group.id</code></li>
+    </ul>
+  </section>
+
+  <!-- 14 권한 -->
+  <section class="slide">
+    <span class="eyebrow">Summary · 09</span>
+    <h2>권한(롤) 매트릭스 <span style="font-size:.9rem;color:var(--text3)">— 확정 필요</span></h2>
+    <table>
+      <thead><tr><th>기능</th><th>운영자</th><th>B2B</th><th>일반</th></tr></thead>
+      <tbody>
+        <tr><td>어드민 접근</td><td class="tag-ok">✅</td><td class="tag-no">❌</td><td class="tag-no">❌</td></tr>
+        <tr><td>대시보드 조회</td><td class="tag-ok">✅</td><td class="tag-no">—</td><td class="tag-no">—</td></tr>
+        <tr><td>사용자·브랜드·그룹 관리</td><td class="tag-ok">✅</td><td class="tag-no">—</td><td class="tag-no">—</td></tr>
+        <tr><td>상품 등록·편집·삭제</td><td class="tag-ok">✅</td><td class="tag-no">—</td><td class="tag-no">—</td></tr>
+        <tr><td>설정 변경</td><td class="tag-ok">✅</td><td class="tag-no">—</td><td class="tag-no">—</td></tr>
+      </tbody>
+    </table>
+    <p class="lead">어드민은 <b>운영자 전용</b> 가정. 세분화(읽기전용 운영자 등) 시 확장.</p>
+  </section>
+
+  <!-- 15 연동/백로그 -->
+  <section class="slide">
+    <span class="eyebrow">Summary · 10</span>
+    <h2>연동 & 미구현 백로그</h2>
+    <div class="cols">
+      <div>
+        <h3>외부 연동</h3>
+        <ul>
+          <li>HP3(Unity) ↔ Snapit(Gemini) 렌더 파이프라인</li>
+          <li>AssetBundle → 서버 glTF 변환</li>
+          <li>기준정보(상품코드·견적·스펙) 동기화</li>
+        </ul>
+      </div>
+      <div>
+        <h3>백로그 ⚠️</h3>
+        <ul>
+          <li class="warn">인증·권한별 메뉴 노출</li>
+          <li class="warn">mock → 실제 API/DB</li>
+          <li class="warn">도면/렌더 생성, 에셋 서버 저장</li>
+          <li class="warn">운영정보 조합 매핑 · 통계 페이지</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 16 마무리 -->
+  <section class="slide title-slide">
+    <span class="eyebrow">Run</span>
+    <h1>프로토타입 실행 &<br/>참고 문서</h1>
+    <p><code style="background:rgba(255,255,255,.12);color:#dce6f0">npm run dev → http://localhost:5173</code></p>
+    <p>상세 지시서: <code style="background:rgba(255,255,255,.12);color:#dce6f0">docs/개발지시서.html</code> · 원본 <code style="background:rgba(255,255,255,.12);color:#dce6f0">docs/개발지시서.md</code></p>
+    <div class="meta">페이지: Dashboard · Floorplans · Users · Brands · Products · Settings</div>
+  </section>
+
+</div>
+
+<div class="hud">
+  <button id="prev" aria-label="이전">‹</button>
+  <span class="counter" id="counter">1 / 16</span>
+  <button id="next" aria-label="다음">›</button>
+</div>
+
+<script>
+  const slides = [...document.querySelectorAll('.slide')];
+  let cur = 0;
+  const counter = document.getElementById('counter');
+  const prog = document.getElementById('prog');
+  function show(n){
+    cur = Math.max(0, Math.min(slides.length-1, n));
+    slides.forEach((s,i)=>s.classList.toggle('active', i===cur));
+    counter.textContent = (cur+1)+' / '+slides.length;
+    prog.style.width = ((cur+1)/slides.length*100)+'%';
+  }
+  document.getElementById('next').onclick = ()=>show(cur+1);
+  document.getElementById('prev').onclick = ()=>show(cur-1);
+  document.addEventListener('keydown', e=>{
+    if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown') show(cur+1);
+    else if(e.key==='ArrowLeft'||e.key==='PageUp') show(cur-1);
+    else if(e.key==='Home') show(0);
+    else if(e.key==='End') show(slides.length-1);
+    else if(e.key==='f'||e.key==='F'){ if(!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); }
+  });
+  show(0);
+</script>
+</body></html>

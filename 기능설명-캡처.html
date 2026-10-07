@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>HomePlanner3 Admin — 페이지별 기능 설명 (캡처)</title>
+<style>
+  :root{--ink:#1e2a3a;--ink2:#2c3b50;--text:#2a3646;--text2:#5d6c7e;--line:#e3e8ee;--bg:#f4f7f9;--accent:#e8543a;--accent2:#3a6ea5;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Pretendard Variable",Pretendard,-apple-system,"Malgun Gothic",sans-serif;color:var(--text);
+    line-height:1.65;background:#eef2f6;padding:40px 20px 120px;}
+  .wrap{max-width:1080px;margin:0 auto;}
+  header.top{text-align:center;margin-bottom:36px;}
+  header.top h1{font-size:2rem;color:var(--ink);letter-spacing:-.02em;}
+  header.top p{color:var(--text2);margin-top:8px;}
+  .toc{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px 24px;margin-bottom:32px;
+    display:flex;flex-wrap:wrap;gap:8px 18px;}
+  .toc a{color:var(--accent2);font-size:.92rem;font-weight:600;text-decoration:none;}
+  .toc a:hover{text-decoration:underline;}
+  section.page{background:#fff;border:1px solid var(--line);border-radius:18px;padding:30px 32px;margin-bottom:30px;
+    box-shadow:0 12px 30px -20px rgba(30,42,58,.35);scroll-margin-top:20px;}
+  .ph{display:flex;align-items:baseline;gap:12px;border-bottom:2px solid var(--ink);padding-bottom:12px;margin-bottom:20px;}
+  .ph .num{font-family:"Space Grotesk",monospace;font-size:1.1rem;font-weight:700;color:var(--accent);}
+  .ph h2{font-size:1.45rem;color:var(--ink);letter-spacing:-.01em;}
+  .ph code{font-family:"Space Grotesk",Consolas,monospace;background:var(--bg);padding:2px 8px;border-radius:6px;font-size:.85rem;color:var(--ink2);}
+  .body{display:grid;grid-template-columns:1.25fr 1fr;gap:28px;align-items:start;}
+  @media(max-width:880px){.body{grid-template-columns:1fr;}}
+  .shot{border:1px solid var(--line);border-radius:12px;overflow:hidden;position:sticky;top:16px;}
+  .shot img{width:100%;display:block;}
+  ol.legend{list-style:none;counter-reset:none;}
+  ol.legend li{position:relative;padding:8px 8px 8px 42px;margin-bottom:6px;border-radius:10px;font-size:.95rem;}
+  ol.legend li:nth-child(odd){background:#fafcfd;}
+  ol.legend li .b{position:absolute;left:8px;top:8px;width:24px;height:24px;border-radius:50%;
+    background:var(--accent);color:#fff;font:700 13px/24px "Space Grotesk",sans-serif;text-align:center;}
+  ol.legend li b{color:var(--ink);}
+  ol.legend li .api{display:block;font-size:.8rem;color:var(--text2);font-family:"Space Grotesk",monospace;margin-top:2px;}
+  .warn{color:#b5502f;font-weight:600;}
+  .note{margin-top:14px;font-size:.85rem;color:var(--text2);background:var(--bg);border-left:3px solid var(--accent2);padding:8px 14px;border-radius:0 8px 8px 0;}
+</style></head>
+<body><div class="wrap">
+
+<header class="top">
+  <h1>페이지별 기능 설명 — 화면 캡처 + 번호 주석</h1>
+  <p>각 캡처의 빨간 번호 ●를 아래 설명 항목과 대조하세요. (프로토타입 localhost:5173 / 데이터 mock)</p>
+</header>
+
+<nav class="toc">
+  <a href="#p1">01 대시보드</a>
+  <a href="#p2">02 도면 목록</a>
+  <a href="#p3">03 도면 상세</a>
+  <a href="#p4">04 사용자 관리</a>
+  <a href="#p5">05 브랜드 관리</a>
+  <a href="#p6">06 상품 리스트</a>
+  <a href="#p7">07 상품 편집</a>
+  <a href="#p8">08 상품군·구분</a>
+  <a href="#p9">09 설정</a>
+</nav>
+
+<!-- 01 -->
+<section class="page" id="p1">
+  <div class="ph"><span class="num">01</span><h2>대시보드</h2><code>/dashboard</code></div>
+  <div class="body">
+    <div class="shot"><img src="captures/01-dashboard.png" alt="대시보드 캡처"/></div>
+    <ol class="legend">
+      <li><span class="b">1</span><b>좌측 사이드바</b> — 페이지 메뉴. 드래그 순서변경, 접기/펼치기. <span class="api">권한별 노출(예정)</span></li>
+      <li><span class="b">2</span><b>상단바</b> — 검색·알림·로그인 사용자 정보. <span class="api">GET /auth/session</span></li>
+      <li><span class="b">3</span><b>리포트 내보내기</b> — 현재 기준 CSV/엑셀. <span class="api">GET /dashboard/report.csv</span></li>
+      <li><span class="b">4</span><b>KPI 4종</b> — 오늘 렌더·DAU·평균시간·실패율 + 증감. <span class="api">GET /dashboard/kpis</span></li>
+      <li><span class="b">5</span><b>렌더 처리 추이</b> — 최근 14일 완료/실패 라인. <span class="api">GET /dashboard/render-trend</span></li>
+      <li><span class="b">6</span><b>렌더 큐</b> — 처리중/대기/완료/실패 실시간. <span class="api">GET /renders/queue (폴링/WS)</span></li>
+      <li><span class="b">7</span><b>최근 완료 렌더</b> — 컬럼 정렬 테이블.</li>
+    </ol>
+  </div>
+</section>
+
+<!-- 02 -->
+<section class="page" id="p2">
+  <div class="ph"><span class="num">02</span><h2>도면 관리 · 목록</h2><code>/floorplans</code></div>
+  <div class="body">
+    <div class="shot"><img src="captures/02-floorplans-list.png" alt="도면 목록 캡처"/></div>
+    <ol class="legend">
+      <li><span class="b">1</span><b>검색</b> — 단지명·평형·도면ID.</li>
+      <li><span class="b">2</span><b>상태 필터 탭</b> — 전체/공개/검수중/임시저장.</li>
+      <li><span class="b">3</span><b>정렬</b> — 최신수정/이름/평형 큰 순.</li>
+      <li><span class="b">4</span><b>도면 카드</b> — 썸네일 클릭 시 상세 진입.</li>
+      <li><span class="b">5</span><b>상태 배지</b> — public/review/draft.</li>
+      <li><span class="b">6</span><b>렌더 수</b> — 도면별 생성된 렌더 이미지 개수.</li>
+      <li><span class="b">7</span><b>도면 등록</b> <span class="warn">미구현</span> — 업로드 모달 필요. <span class="api">POST /floorplans</span></li>
+    </ol>
+  </div>
+</section>
+
+<!-- 03 -->
+<section class="page" id="p3">
+  <div class="ph"><span class="num">03</span><h2>도면 관리 · 상세</h2><code>/floorplans/{id}</code></div>
+  <div class="body">
+    <div class="shot"><img src="captures/03-floorplan-detail.png" alt="도면 상세 캡처"/></div>
+    <ol class="legend">
+      <li><span class="b">1</span><b>목록으로</b> — 도면 목록 복귀.</li>
+      <li><span class="b">2</span><b>도면 메타</b> — ID·단지·평형·수정일·렌더수.</li>
+      <li><span class="b">3</span><b>공간 필터 탭</b> — 해당 도면 렌더의 room별 자동 구성.</li>
+      <li><span class="b">4</span><b>렌더 이미지 카드</b> — 스타일·생성일·소요시간. <span class="api">GET /floorplans/{id}/renders</span></li>
+      <li><span class="b">5</span><b>렌더 삭제</b> — <span class="api">DELETE /renders/{id}</span></li>
+      <li><span class="b">6</span><b>렌더 생성</b> <span class="warn">미구현</span> — 비동기 큐 등록. <span class="api">POST /floorplans/{id}/renders</span></li>
+    </ol>
+    <p class="note">렌더 이미지는 반드시 선택한 도면에 종속되어 표시됩니다.</p>
+  </div>
+</section>
+
+<!-- 04 -->
+<section class="page" id="p4">
+  <div class="ph"><span class="num">04</span><h2>사용자 관리</h2><code>/users</code></div>
+  <div class="body">
+    <div class="shot"><img src="captures/04-users.png" alt="사용자 관리 캡처"/></div>
+    <ol class="legend">
+      <li><span class="b">1</span><b>요약 KPI</b> — 전체/활성/휴면/차단.</li>
+      <li><span class="b">2</span><b>그룹 트리</b> — 브랜드&gt;그룹 범위필터. 트리에서 그룹 추가·이름변경·삭제·드래그 이동. <span class="warn">브랜드 관리와 연동</span></li>
+      <li><span class="b">3</span><b>검색</b> — 이름·이메일·ID.</li>
+      <li><span class="b">4</span><b>상태 필터</b> — 전체/활성/휴면/차단.</li>
+      <li><span class="b">5</span><b>그룹 일괄 추가</b> — 선택 사용자 → 그룹. <span class="api">POST /groups/{id}/members</span></li>
+      <li><span class="b">6</span><b>사용자 테이블</b> — 전 컬럼 정렬 + 페이지네이션(브랜드/사번/조직/권한/그룹/가입·종료일/렌더/상태).</li>
+      <li><span class="b">7</span><b>행 수정·삭제</b> — 모달 편집.</li>
+      <li><span class="b">8</span><b>사용자 추가</b> — <span class="warn">필수: 이름·사번·조직</b></span> (이메일 선택). <span class="api">POST /users</span></li>
+    </ol>
+  </div>
+</section>
+
+<!-- 05 -->
+<section class="page" id="p5">
+  <div class="ph"><span class="num">05</span><h2>브랜드 관리</h2><code>/brands</code></div>
+  <div class="body">
+    <div class="shot"><img src="captures/05-brands.png" alt="브랜드 관리 캡처"/></div>
+    <ol class="legend">
+      <li><span class="b">1</span><b>브랜드명 인라인 편집</b> — <span class="api">PUT /brands/{id}</span></li>
+      <li><span class="b">2</span><b>소속 그룹 태그</b> — × 로 그룹 삭제(사용자 소속만 해제).</li>
+      <li><span class="b">3</span><b>그룹 추가</b> — 브랜드 하위. <span class="api">POST /brands/{id}/groups</span></li>
+      <li><span class="b">4</span><b>브랜드 삭제</b> — 하위 그룹 cascade(confirm). <span class="api">DELETE /brands/{id}?cascade=true</span></li>
+      <li><span class="b">5</span><b>새 브랜드 추가</b> — 이름 유일성 보장. <span class="api">POST /brands</span></li>
+    </ol>
+    <p class="note">브랜드/그룹은 사용자 관리·상품 컨텐츠 권한과 동일 데이터로 연동됩니다.</p>
+  </div>
+</section>
+
+<!-- 06 -->
+<section class="page" id="p6">
+  <div class="ph"><span class="num">06</span><h2>상품 관리 · 리스트</h2><code>/products</code></div>
+  <div class="body">
+    <div class="shot"><img src="captures/06-products-list.png" alt="상품 리스트 캡처"/></div>
+    <ol class="legend">
+      <li><span class="b">1</span><b>상품 하위 메뉴</b> — 상품군·구분 / 모델 / 노출 필드 / 필터.</li>
+      <li><span class="b">2</span><b>폴더 트리</b> — 미분류 루트 고정. 펼침/접힘, 이름변경(✏️), 삭제(🗑️). <span class="warn">이동은 드래그&드롭만</span></li>
+      <li><span class="b">3</span><b>+ 새 폴더</b> — 선택 폴더 하위에 생성.</li>
+      <li><span class="b">4</span><b>검색</b> — 상품명·컨텐츠코드·상품코드.</li>
+      <li><span class="b">5</span><b>속성구분 탭</b> — 전체/배치형·설계형 모델링/텍스쳐/머터리얼(카운트).</li>
+      <li><span class="b">6</span><b>폴더 이동</b> — 선택 상품 일괄 이동.</li>
+      <li><span class="b">7</span><b>정렬 헤더</b> — 전 컬럼 정렬 + 페이지네이션(헤더 sticky 고정).</li>
+      <li><span class="b">8</span><b>노출 토글</b> — 인라인 노출여부. <span class="api">PATCH /products/{code}/visible</span></li>
+      <li><span class="b">9</span><b>행 수정·삭제</b> — 편집화면 진입 / 삭제.</li>
+      <li><span class="b">10</span><b>상품 등록</b> — 등록 모달(기본정보=편집과 동일). <span class="api">POST /products</span></li>
+    </ol>
+  </div>
+</section>
+
+<!-- 07 -->
+<section class="page" id="p7">
+  <div class="ph"><span class="num">07</span><h2>상품 관리 · 편집 화면</h2><code>3패널</code></div>
+  <div class="body">
+    <div class="shot"><img src="captures/07-product-edit.png" alt="상품 편집 캡처"/></div>
+    <ol class="legend">
+      <li><span class="b">1</span><b>썸네일 · 에셋</b> — 400×400 썸네일 업로드 + 에셋(확장자 자동인식, three.js 미리보기). <span class="warn">AssetBundle은 서버 glTF 변환 필요</span></li>
+      <li><span class="b">2</span><b>기본 정보</b> — 상품명·브랜드·견적그룹·상품군·상품구분(군 종속)·코드·권한·노출·속성구분·크기·배치위치/높이·스펙/mall URL·필터.</li>
+      <li><span class="b">3</span><b>컨텐츠 운영 정보</b> — 상품군+상품구분 조합별 항목. <span class="warn">조합 매핑 미정(발주처 제공 예정)</span></li>
+      <li><span class="b">4</span><b>나가기</b> — 저장 전 변경(에셋·썸네일 포함) 전부 원복.</li>
+      <li><span class="b">5</span><b>저장</b> — <span class="api">PUT /products/{contentCode}</span></li>
+    </ol>
+  </div>
+</section>
+
+<!-- 08 -->
+<section class="page" id="p8">
+  <div class="ph"><span class="num">08</span><h2>상품 관리 · 상품군·구분 관리</h2><code>/products/catalog</code></div>
+  <div class="body">
+    <div class="shot"><img src="captures/08-products-catalog.png" alt="상품군 구분 관리 캡처"/></div>
+    <ol class="legend">
+      <li><span class="b">1</span><b>관리 모달</b> — 상품군 + 상품구분(품목) 통합 관리.</li>
+      <li><span class="b">2</span><b>상품군 추가</b> — <span class="api">POST /product-groups</span></li>
+      <li><span class="b">3</span><b>상품군명 편집</b> — 변경 시 관련 상품 동기화.</li>
+      <li><span class="b">4</span><b>상품구분 칩</b> — 품목 추가/이름변경/삭제. 필터의 ‘상품 구분’ 파생목록과 연동.</li>
+    </ol>
+    <p class="note">모델 관리·노출 필드 관리·필터 관리도 같은 패턴(목록 + 추가/수정/삭제 + 저장). 필터의 ‘상품/모델 구분’은 읽기전용.</p>
+  </div>
+</section>
+
+<!-- 09 -->
+<section class="page" id="p9">
+  <div class="ph"><span class="num">09</span><h2>설정</h2><code>/settings</code></div>
+  <div class="body">
+    <div class="shot"><img src="captures/09-settings.png" alt="설정 캡처"/></div>
+    <ol class="legend">
+      <li><span class="b">1</span><b>메뉴 순서</b> — ▲▼ 이동(사이드바 드래그와 동일).</li>
+      <li><span class="b">2</span><b>메뉴 이름</b> — 인라인 변경.</li>
+      <li><span class="b">3</span><b>표시 토글</b> — 메뉴 노출 on/off.</li>
+      <li><span class="b">4</span><b>메뉴 추가</b> — 커스텀 메뉴(준비중 페이지 연결).</li>
+      <li><span class="b">5</span><b>상품관리 하위메뉴 관리</b> — 순서·이름·표시(키 고정).</li>
+      <li><span class="b">6</span><b>상부 메뉴 관리</b> — 브랜드명/부제·검색창·알림·관리자 정보.</li>
+      <li><span class="b">7</span><b>기본값으로 되돌리기</b> — DEFAULT_CONFIG 복원.</li>
+    </ol>
+    <p class="note">현재 localStorage 저장 → 실제로는 조직/관리자 단위 서버 저장 + 권한별 기본값 필요. <span class="api">GET/PUT /admin/config</span></p>
+  </div>
+</section>
+
+</div></body></html>
