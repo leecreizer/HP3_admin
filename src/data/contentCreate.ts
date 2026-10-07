@@ -18,9 +18,10 @@ import type { ToolType } from '../pm/modelTypes';
  *  tilePattern  타일 배열 패턴 업로드 (vc/commodity/upload/tilepattern) — 붙임 방식 템플릿 + 칸별 타일
  *  waterjet     워터젯 패턴 업로드 (decoration-cms/upload/medallion) — DXF 영역 + 영역별 재질
  *  shaped       비정형 상품 업로드 (vc/commodity/upload/shapedtile) — 이미지 + 형상(육각형·별·둥근 사각·CAD)으로 자르기
+ *  paving       파라메트릭 편집기 (/cloud/tool/h5/decoration-param-editor) — 타일·포설 방식·매개변수로 방안 만들기
  *  unverified   쿠지알러 화면을 아직 열어 보지 않은 카드 — 생성 조건을 지어내지 않고 안내만 한다
  */
-export type CreateKind = 'paramModel' | 'material' | 'model3d' | 'profile' | 'modelCutting' | 'virtualModel' | 'pattern' | 'hybrid' | 'tile' | 'border' | 'tilePattern' | 'waterjet' | 'shaped' | 'unverified';
+export type CreateKind = 'paramModel' | 'material' | 'model3d' | 'profile' | 'modelCutting' | 'virtualModel' | 'pattern' | 'hybrid' | 'tile' | 'border' | 'tilePattern' | 'waterjet' | 'shaped' | 'paving' | 'unverified';
 
 export type CreatePortal = {
   /** 쿠지알러 uploadPortals id */
@@ -73,7 +74,7 @@ export const CREATE_PORTALS: Record<string, CreatePortal[]> = {
     P({ id: 9, title: '타일 배열 패턴', origin: '拼砖样式', desc: '타일·대리석 배열(拼砖) 패턴', kind: 'tilePattern', lib: 4, link: '/vc/commodity/upload/tilepattern' }),
     P({ id: 10, title: '워터젯 패턴', origin: '水刀拼花', desc: '워터젯 인레이 상품', kind: 'waterjet', lib: 4, link: '/pub/saas/decoration-cms/upload/medallion' }),
     P({ id: 11, title: '비정형 상품', origin: '异型产品', desc: '직사각형이 아닌 타일·마루', kind: 'shaped', lib: 4, link: '/vc/commodity/upload/shapedtile' }),
-    unverified(12, '파라메트릭 편집기', '参数化编辑器', '다중 타일 조합·띠 조합·보더·아트월 방안 업로드', '/cloud/tool/h5/decoration-param-editor'),
+    P({ id: 12, title: '파라메트릭 편집기', origin: '参数化编辑器', desc: '다중 타일 조합·띠 조합·보더·아트월 방안 업로드', kind: 'paving', lib: 5, link: '/cloud/tool/h5/decoration-param-editor' }),
   ],
   linewallboard: [
     unverified(13, '몰딩/벽판', '线条/墙板', '몰딩·일체형 벽판 업로드', '/vc/commodity/upload/fdprofile'),

@@ -19,6 +19,8 @@ import {
   ImportExportModal, LibraryManageModal, Modal, NewLibraryModal, QuickEditModal, SettingsModal,
 } from './ContentModals';
 import { CreatePage } from './CreatePages';
+import { PavingEditor } from './paving/PavingEditor';
+import { pavingItemPatch } from './paving/pavingUtil';
 import type { CreateOpts, NewItemDraft } from './createTypes';
 
 /**
@@ -111,6 +113,8 @@ export function ContentLibrary({ userName }: { userName: string }) {
   /** 컨텐츠 제작 카드의 생성 화면 / 파라메트릭 모델 에디터 */
   const [creating, setCreating] = useState<{ tab: BizTab; portal: CreatePortal } | null>(null);
   const [editorReq, setEditorReq] = useState<ModelOpenRequest | null>(null);
+  /** 파라메트릭 편집기로 고치는 방안 상품 id */
+  const [pavingEdit, setPavingEdit] = useState<string | null>(null);
   const [folderMenu, setFolderMenu] = useState<{ id: string | null; lib: number; x: number; y: number } | null>(null);
   const { confirm, confirmDialog } = useConfirm();
 
@@ -504,6 +508,7 @@ export function ContentLibrary({ userName }: { userName: string }) {
                           : <>
                             <button className="link-mini" onClick={() => setModal({ k: 'quick', id: i.id })}>빠른 편집</button>
                             {MODELING_EDITOR_ENABLED && i.model3d?.kind === 'param' && <button className="link-mini" onClick={() => editModel(i)}>모델 편집</button>}
+                            {i.paving && <button className="link-mini" onClick={() => setPavingEdit(i.id)}>방안 편집</button>}
                           </>}
                       </td>
                     </tr>
@@ -583,7 +588,8 @@ export function ContentLibrary({ userName }: { userName: string }) {
         return <DetailModal key={it.id} item={it} path={path} related={related} history={st.history[it.id] ?? []} customFields={st.customFields}
           onClose={() => setModal(null)} onEdit={() => setModal({ k: 'quick', id: it.id })} onOpen={(id) => setModal({ k: 'detail', id })}
           onPatch={(p, action) => patchItems([it.id], () => p, action)}
-          onEditModel={MODELING_EDITOR_ENABLED && it.model3d?.kind === 'param' ? () => editModel(it) : undefined} />;
+          onEditModel={MODELING_EDITOR_ENABLED && it.model3d?.kind === 'param' ? () => editModel(it) : undefined}
+          onEditPaving={it.paving ? () => { setModal(null); setPavingEdit(it.id); } : undefined} />;
       })()}
       {modal?.k === 'batch' && <BatchEditModal field={modal.field} count={ids.length} brands={st.brands} onClose={() => setModal(null)}
         onApply={(fn) => { const label = BATCH_FIELDS.find((f) => f.key === modal.field)!.label; patchItems(ids, fn, `일괄 편집: ${label}`); done(`${ids.length}개 상품의 ${label}을(를) 바꿨습니다`); }} />}
@@ -685,9 +691,24 @@ export function ContentLibrary({ userName }: { userName: string }) {
         }} />}
       {creating && <CreatePage tab={creating.tab} portal={creating.portal} st={st} onClose={() => setCreating(null)}
         onCreate={(drafts, msg, opts) => addDrafts(drafts, msg, creating.portal.title, opts)}
+        onUpdate={(id, p, action) => patchItems([id], () => p, action)}
         onReveal={(id) => { const it = allItems.find((i) => i.id === id); setCreating(null); if (it) showMade(it, '올린 상품입니다 — 상단 ‘저장’으로 영구 반영'); }} />}
       {editorReq && <PmEditorOverlay request={editorReq} userName={userName} onClose={() => setEditorReq(null)} onDone={(r) => onModelDone(r)}
         onAddItems={(d, msg) => createItems(d, msg, '단면 그리기', { silent: true })} />}
+      {pavingEdit && (() => {
+        const it = allItems.find((i) => i.id === pavingEdit);
+        if (!it?.paving) return null;
+        return <PavingEditor key={it.id} init={it.paving} name={it.name} itemId={it.id} folder={it.folder}
+          tiles={{ tree: trees[4] ?? [], items: allItems.filter((x) => x.lib === 4 && !x.deletedAt) }} saveTree={trees[it.lib] ?? []}
+          onClose={() => setPavingEdit(null)}
+          onSave={(r) => {
+            const p = pavingItemPatch(r);
+            if (r.asNew) return createItems([{ ...p, name: r.name, lib: it.lib }], `‘${r.name}’ 파라메트릭 방안을 만들었습니다`, '파라메트릭 편집기', { silent: true })[0]?.id;
+            const id = r.id ?? it.id;
+            patchItems([id], () => p, '파라메트릭 편집기: 방안 저장');
+            return id;
+          }} />;
+      })()}
 
       {confirmDialog}
       {toast && <div className="cl-toast" role="status">{toast}</div>}

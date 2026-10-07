@@ -8,6 +8,7 @@ import {
 import { CREATE_PORTALS, type CreateKind, type CreatePortal } from '../../data/contentCreate';
 import { AssetViewer } from '../../components/AssetViewer';
 import { MODELING_EDITOR_ENABLED } from '../../pm/editorFlag';
+import { PV_TYPES } from '../../data/paving';
 
 /* ───────────────────────── 공통 셸 ───────────────────────── */
 
@@ -279,7 +280,7 @@ export function AddToModal({ kind, options, count, onClose, onApply }: { kind: '
 /* ───────────────────────── 컨텐츠 제작 ───────────────────────── */
 
 const SHAPED_NAME = { hexagon: '육각형', star: '네 꼭지 별', radius: '둥근 모서리 사각', custom: '사용자 정의' } as const;
-const CARD_ICON: Record<CreateKind, string> = { paramModel: '⬢', material: '▣', model3d: '◈', profile: '⌇', modelCutting: '✂', virtualModel: '⚙', pattern: '▦', hybrid: '◐', tile: '▤', border: '⌜', tilePattern: '▩', waterjet: '✺', shaped: '⬡', unverified: '▢' };
+const CARD_ICON: Record<CreateKind, string> = { paramModel: '⬢', material: '▣', model3d: '◈', profile: '⌇', modelCutting: '✂', virtualModel: '⚙', pattern: '▦', hybrid: '◐', tile: '▤', border: '⌜', tilePattern: '▩', waterjet: '✺', shaped: '⬡', paving: '⊞', unverified: '▢' };
 
 /**
  * 컨텐츠 제작(쿠지알러 创建素材) — 업무 탭별 카드. 카드를 누르면 쿠지알러처럼 그 카드의 생성 화면이 열린다
@@ -609,11 +610,13 @@ function Row({ k, v }: { k: string; v: ReactNode }) {
   return <div className="cl-dl"><dt>{k}</dt><dd>{v === '' || v == null ? '-' : v}</dd></div>;
 }
 
-export function DetailModal({ item, path, related, history, customFields, onClose, onEdit, onPatch, onOpen, onEditModel }: {
+export function DetailModal({ item, path, related, history, customFields, onClose, onEdit, onPatch, onOpen, onEditModel, onEditPaving }: {
   item: Item; path: string[]; related: Item[]; history: ItemHistory[]; customFields: CustomField[];
   onClose: () => void; onEdit: () => void; onPatch: (p: Partial<Item>, action: string) => void; onOpen: (id: string) => void;
   /** 파라메트릭 모델 상품 — 에디터로 모델 설정 */
   onEditModel?: () => void;
+  /** 파라메트릭 방안 상품 — 파라메트릭 편집기로 방안 편집 */
+  onEditPaving?: () => void;
 }) {
   const [panel, setPanel] = useState<null | 'history' | 'related' | 'size' | 'cover'>(null);
   const [menu, setMenu] = useState(false);
@@ -645,6 +648,7 @@ export function DetailModal({ item, path, related, history, customFields, onClos
           {item.border && <p className="cl-model-tag">⌜ 보더 패턴 · 보더 타일 {item.border.edge.name}{item.border.cornerTile ? ` · 코너 타일 ${item.border.cornerTile.name}` : ' · 코너 없음'}</p>}
           {item.shaped && <p className="cl-model-tag">⬡ 비정형 상품 · {SHAPED_NAME[item.shaped.kind]}{item.shaped.params ? ` · 직선 변 ${item.shaped.params.straight}mm · 호 높이 ${item.shaped.params.arc}mm` : ''}{item.shaped.kind === 'radius' && item.shaped.params ? ` · 짝 맞는 작은 타일 ${item.shaped.params.side}mm` : ''}{item.shaped.cad ? ` · CAD ${item.shaped.cad.name}` : ''} · 면 {item.shaped.faces.length}장 · 줄눈 {item.shaped.gapWidth}mm</p>}
           {item.medallion && <p className="cl-model-tag">✺ 워터젯 패턴 · 영역 {item.medallion.regions}개 · 구멍 {item.medallion.fills.filter((f) => f === 'hollow').length}개 · {item.medallion.w}×{item.medallion.h} mm</p>}
+          {item.paving && <p className="cl-model-tag">⊞ 파라메트릭 방안 · {PV_TYPES.find((t) => t.v === item.paving!.type)?.name ?? '방안'} · 캔버스 {item.modelSize} · 포설 방식 {item.paving.nodes.filter((n) => n.kind === 'paving').length}개 · 매개변수 {item.paving.params.length}개{item.paving.label ? ' · 표기 미리보기 있음' : ''}</p>}
           {item.tilePattern && <p className="cl-model-tag">▩ 타일 배열 패턴 · {item.tilePattern.template} · 타일 {Object.keys(item.tilePattern.tiles).length}종</p>}
           {(item.tile?.pbr ?? item.shaped?.pbr) && <p className="cl-model-tag">◍ 실시간 재질 세부 조정 · 바꾼 값 {Object.keys((item.tile?.pbr ?? item.shaped?.pbr)!.values).length}개</p>}
           {item.tile && <p className="cl-model-tag">▤ 타일 상품 · 줄눈 {item.tile.gapWidth}mm {item.tile.gapColor}{item.tile.faces ? ` · 면 ${item.tile.faces.length}장` : ''}{item.tile.order ? ` · 맞춤 배열 ${item.tile.order.rows}×${item.tile.order.cols}` : ''}</p>}
@@ -655,6 +659,7 @@ export function DetailModal({ item, path, related, history, customFields, onClos
                 <button onClick={() => { setPanel('cover'); setMenu(false); }}>표지 설정</button>
                 <button onClick={() => { setPanel('size'); setMenu(false); }}>모델 크기 수정</button>
                 <button disabled title="에디터 연동 후 사용">모델 분할</button>
+                {onEditPaving && <button onClick={() => { setMenu(false); onEditPaving(); }}>방안 편집 (파라메트릭 편집기)</button>}
                 {onEditModel
                   ? <button onClick={() => { setMenu(false); onEditModel(); }}>모델 설정 (에디터)</button>
                   : <button disabled title={MODELING_EDITOR_ENABLED ? '파라메트릭 모델 상품만 에디터로 편집할 수 있습니다' : '에디터 미사용'}>모델 설정</button>}
@@ -662,6 +667,7 @@ export function DetailModal({ item, path, related, history, customFields, onClos
                 <button disabled title="에디터 연동 후 사용">범례 태그</button>
               </div>}
             </div>
+            {onEditPaving && <button className="btn-ghost" onClick={onEditPaving}>방안 편집</button>}
             <button className="btn-ghost" onClick={() => onPatch({ kupinshow: !item.kupinshow }, item.kupinshow ? '3D 쇼룸 해제' : '3D 쇼룸 생성')}>{item.kupinshow ? '3D 쇼룸 해제' : '3D 쇼룸 생성'}</button>
             <button className="btn-ghost" onClick={() => setPanel(panel === 'related' ? null : 'related')}>관련 상품</button>
             <button className="btn-ghost" onClick={() => setPanel(panel === 'history' ? null : 'history')}>작업 이력</button>
