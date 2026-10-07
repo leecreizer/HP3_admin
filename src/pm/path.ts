@@ -145,17 +145,27 @@ function arcPoints(a: V2, b: V2, r: number, clockwise: boolean, minor: boolean):
   return out;
 }
 
+/** 원호 휨값 — bulge = tan(중심각/4), 반시계 + (DXF 와 같은 표기). arcPoints 와 같은 원호 */
+function arcBulge(a: V2, b: V2, r: number, clockwise: boolean, minor: boolean): number {
+  const c = len(sub(b, a));
+  if (!(c > 1e-9) || !(r > 0)) return 0;
+  const half = Math.asin(Math.min(1, c / (2 * Math.max(r, c / 2))));
+  const sweep = minor ? 2 * half : 2 * Math.PI - 2 * half;
+  return Math.tan(((clockwise ? -1 : 1) * sweep) / 4);
+}
+
+type Corner = { inEnd: V2; outStart: V2; fill: V2[]; bulge: number };
+const lineOf = (lines: NumLine[], i: number, n: number): NumLine => lines[(i + n) % n] ?? { type: 0, radius: 0, clockwise: false, minor: true };
+
 /**
- * 꼭짓점 처리(둥근 모서리 · 모따기)와 원호 선을 펼친 꺾은선.
+ * 꼭짓점마다 들어오는 끝·나가는 시작 (둥근 모서리·모따기로 깎인 위치)과 그 사이 — fill 은 펼친 점, bulge 는 그 사이 원호 휨(모따기 0).
  * 둥근 모서리·모따기는 그 꼭짓점에 닿는 두 선이 직선일 때만 적용한다.
  */
-export function expandNumPath(pts: NumPoint[], lines: NumLine[], closed: boolean): V2[] {
+function cornersOf(pts: NumPoint[], lines: NumLine[], closed: boolean): Corner[] {
   const n = pts.length;
-  if (n < 2) return pts.map((p) => [p.x, p.y]);
   const P = (i: number): V2 => [pts[(i + n) % n].x, pts[(i + n) % n].y];
-  const lineAt = (i: number): NumLine => lines[(i + n) % n] ?? { type: 0, radius: 0, clockwise: false, minor: true };
-  // 각 꼭짓점의 들어오는 끝·나가는 시작 (둥근 모서리·모따기로 깎인 위치)
-  const corner: { inEnd: V2; outStart: V2; fill: V2[] }[] = [];
+  const lineAt = (i: number) => lineOf(lines, i, n);
+  const corner: Corner[] = [];
   for (let i = 0; i < n; i++) {
     const cur = P(i);
     const hasPrev = closed || i > 0, hasNext = closed || i < n - 1;
@@ -167,7 +177,7 @@ export function expandNumPath(pts: NumPoint[], lines: NumLine[], closed: boolean
       const l1 = len(sub(prev, cur)), l2 = len(sub(next, cur));
       if (p.type === 2 && (p.a > 0 || p.b > 0)) {
         const da = Math.min(p.a, l1), db = Math.min(p.b, l2);
-        corner.push({ inEnd: [cur[0] + u1[0] * da, cur[1] + u1[1] * da], outStart: [cur[0] + u2[0] * db, cur[1] + u2[1] * db], fill: [] });
+        corner.push({ inEnd: [cur[0] + u1[0] * da, cur[1] + u1[1] * da], outStart: [cur[0] + u2[0] * db, cur[1] + u2[1] * db], fill: [], bulge: 0 });
         continue;
       }
       if (p.type === 1 && p.radius > 0) {
@@ -182,13 +192,22 @@ export function expandNumPath(pts: NumPoint[], lines: NumLine[], closed: boolean
           const cross = u1[0] * u2[1] - u1[1] * u2[0];
           // A→B 방향으로 볼 때 모서리 쪽이 오른쪽이면 반시계… 꼭짓점이 바깥쪽에 오도록 짧은 호
           const cw = cross > 0;
-          corner.push({ inEnd: A, outStart: B, fill: arcPoints(A, B, r, cw, true).slice(0, -1) });
+          corner.push({ inEnd: A, outStart: B, fill: arcPoints(A, B, r, cw, true).slice(0, -1), bulge: arcBulge(A, B, r, cw, true) });
           continue;
         }
       }
     }
-    corner.push({ inEnd: cur, outStart: cur, fill: [] });
+    corner.push({ inEnd: cur, outStart: cur, fill: [], bulge: 0 });
   }
+  return corner;
+}
+
+/** 꼭짓점 처리(둥근 모서리 · 모따기)와 원호 선을 펼친 꺾은선 */
+export function expandNumPath(pts: NumPoint[], lines: NumLine[], closed: boolean): V2[] {
+  const n = pts.length;
+  if (n < 2) return pts.map((p) => [p.x, p.y]);
+  const lineAt = (i: number) => lineOf(lines, i, n);
+  const corner = cornersOf(pts, lines, closed);
   const out: V2[] = [];
   const segs = closed ? n : n - 1;
   for (let i = 0; i < n; i++) {
@@ -206,6 +225,28 @@ export function expandNumPath(pts: NumPoint[], lines: NumLine[], closed: boolean
   for (const p of out) { const q = clean[clean.length - 1]; if (!q || Math.abs(q[0] - p[0]) > 1e-7 || Math.abs(q[1] - p[1]) > 1e-7) clean.push(p); }
   if (closed && clean.length > 2) { const a = clean[0], z = clean[clean.length - 1]; if (Math.abs(a[0] - z[0]) < 1e-7 && Math.abs(a[1] - z[1]) < 1e-7) clean.pop(); }
   return clean;
+}
+
+/**
+ * expandNumPath 와 같은 닫힌 윤곽을 ‘구간’으로 — 점과, 각 점에서 다음 점까지의 휨(bulge, 직선 0).
+ * 원호 선·둥근 모서리는 펼치지 않고 원호 한 구간으로 남긴다 (몰딩 단면은 구간 = 면).
+ */
+export function expandNumArcs(pts: NumPoint[], lines: NumLine[]): { pts: V2[]; bulges: number[] } {
+  const n = pts.length;
+  if (n < 2) return { pts: pts.map((p) => [p.x, p.y]), bulges: pts.map(() => 0) };
+  const corner = cornersOf(pts, lines, true);
+  const P: V2[] = [], B: number[] = [];
+  const same = (a: V2, b: V2) => Math.abs(a[0] - b[0]) < 1e-7 && Math.abs(a[1] - b[1]) < 1e-7;
+  // 같은 자리 점이 이어지면 길이 0 구간 — 앞 점에 다음 구간의 휨을 넘긴다
+  const push = (p: V2, b: number) => { const q = P[P.length - 1]; if (q && same(q, p)) { B[B.length - 1] = b; return; } P.push(p); B.push(b); };
+  for (let i = 0; i < n; i++) {
+    const c = corner[i], ln = lineOf(lines, i, n);
+    const lb = ln.type === 1 && ln.radius > 0 ? arcBulge(c.outStart, corner[(i + 1) % n].inEnd, ln.radius, ln.clockwise, ln.minor) : 0;
+    if (c.outStart !== c.inEnd) push(c.inEnd, c.bulge);
+    push(c.outStart, lb);
+  }
+  while (P.length > 2 && same(P[0], P[P.length - 1])) { P.pop(); B.pop(); }
+  return { pts: P, bulges: B };
 }
 
 export const signedArea = (pts: V2[]) => {
