@@ -174,7 +174,7 @@ export function KSelect({ value, options, onChange, placeholder = '선택하세�
  * 루트 줄의 체크박스는 눌러도 변화가 없고(쿠지알러와 같음), ‘미분류’는 목록에 없다(아무것도 안 고르면 미분류).
  * 고른 폴더는 ‘상위/하위’ 경로를 ‘、’로 이어 보여 준다.
  */
-export function FolderChecks({ tree, rootLabel, value, onChange, placeholder }: { tree: Folder[]; rootLabel: string; value: string[]; onChange: (ids: string[]) => void; placeholder: string }) {
+export function FolderChecks({ tree, rootLabel, value, onChange, placeholder, label = '소속 분류' }: { tree: Folder[]; rootLabel: string; value: string[]; onChange: (ids: string[]) => void; placeholder: string; label?: string }) {
   const [open, setOpen] = useState(false);
   const [exp, setExp] = useState<Set<string>>(() => new Set(['__root']));
   const ref = useOutside(open, () => setOpen(false));
@@ -196,7 +196,7 @@ export function FolderChecks({ tree, rootLabel, value, onChange, placeholder }: 
   };
   return (
     <div className="cl-ks" ref={ref}>
-      <button type="button" className={`cl-ks-btn${text ? '' : ' ph-strong'}`} aria-haspopup="tree" aria-expanded={open} aria-label="소속 분류" onClick={() => setOpen((o) => !o)}>
+      <button type="button" className={`cl-ks-btn${text ? '' : ' ph-strong'}`} aria-haspopup="tree" aria-expanded={open} aria-label={label} onClick={() => setOpen((o) => !o)}>
         <span>{text || placeholder}</span><span aria-hidden="true">{open ? '▴' : '▾'}</span>
       </button>
       {open && (
