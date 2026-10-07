@@ -10,6 +10,7 @@ import type { PathLine, PathPoint, PlankShape, PmNode, PmPath } from '../../pm/t
 import { Confirm, Fx, Unverified } from './ui';
 import { pointOnSegment, shiftExpr, snapPoint } from '../../pm/snap';
 import { previewOf } from './ctx';
+import { SECTION_TEMPLATES } from '../../pm/sections';
 
 /**
  * 2D 윤곽 편집(编辑轮廓) · 경로 편집(编辑路径) — 쿠지알러 화면(05-profile-editor) 배치:
@@ -39,9 +40,13 @@ function withPath(d: Doc, t: Target, p: PmPath): Doc {
 /** 자 눈금 간격 — 화면에서 50px 이상 */
 const tickStep = (scale: number) => [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000].find((s) => s * scale >= 50) ?? 10000;
 
-export function ProfileEditor({ ev, node, param, kind, closedDefault, title, onSave, onClose }: {
+export function ProfileEditor({ ev, node, param, kind, closedDefault, title, onSave, onClose, section, onValidate }: {
   ev: PmEval; node: PmNode; param: string; kind: 'plank' | 'line'; closedDefault: boolean; title: string;
   onSave: (value: string) => void; onClose: () => void;
+  /** 단면 그리기 — 몰딩 단면 템플릿 · 닫힌 경로 고정 · 300mm 몰딩 3D 미리보기 (CAD 없이 단면 만들기) */
+  section?: boolean;
+  /** 저장 전 검사 — 문구를 돌려주면 저장하지 않고 알림 */
+  onValidate?: (value: string) => string | null;
 }) {
   const initial = useMemo<Doc>(() => {
     const raw = node.params[param] ?? '';
@@ -60,7 +65,9 @@ export function ProfileEditor({ ev, node, param, kind, closedDefault, title, onS
   /** 점 끌기 중 직각 가이드 */
   const [guide, setGuide] = useState<{ lines: [V2, V2][]; marks: V2[][] } | null>(null);
   const [tool, setTool] = useState<'select' | 'draw'>('select');
-  const [tpl, setTpl] = useState<'custom' | 'rect'>('custom');
+  const [tpl, setTpl] = useState<string>('custom');
+  /** 단면 템플릿 입력값 — ‘템플릿.칸’ → 글자 */
+  const [secVals, setSecVals] = useState<Record<string, string>>({});
   const [rect, setRect] = useState<{ anchor: RectAnchor; x: string; y: string; w: string; h: string }>({ anchor: 'lb', x: '0', y: '0', w: '#W', h: '#D' });
   const [confirmExit, setConfirmExit] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -108,7 +115,9 @@ export function ProfileEditor({ ev, node, param, kind, closedDefault, title, onS
   // 화면 맞춤
   const fitView = () => {
     const pts: V2[] = [...outlineNum.points.map((p) => [p.x, p.y] as V2), ...nums.holes.flatMap((h) => h.points.map((p) => [p.x, p.y] as V2))];
-    const b = pts.length ? bounds(pts) : { x0: -300, y0: -300, x1: 300, y1: 300 };
+    fitTo(pts.length ? bounds(pts) : { x0: -300, y0: -300, x1: 300, y1: 300 });
+  };
+  const fitTo = (b: { x0: number; y0: number; x1: number; y1: number }) => {
     const el = svgRef.current?.getBoundingClientRect();
     const w = el?.width ?? box.w, h = el?.height ?? box.h;
     setBox({ w, h });
@@ -302,20 +311,45 @@ export function ProfileEditor({ ev, node, param, kind, closedDefault, title, onS
       setMsg(`DXF 에서 점 ${pts.length}개를 가져왔습니다 — 좌표가 숫자이니 필요한 곳을 #W 같은 변수 수식으로 바꾸세요`);
     } catch (e) { setMsg(`DXF 를 읽지 못했습니다: ${(e as Error).message}`); }
   };
+  /** 단면 템플릿 적용 — 숫자(mm)로 몰딩 단면을 바로 그리고 화면을 맞춘다 */
+  const applySection = () => {
+    const t = SECTION_TEMPLATES.find((x) => x.key === tpl);
+    if (!t) return;
+    const vals: Record<string, number> = {};
+    for (const f of t.fields) {
+      const n = Number(secVals[`${t.key}.${f.k}`] ?? f.v);
+      if (!(n > 0)) { setMsg(`${f.label}은(는) 0보다 큰 숫자여야 합니다`); return; }
+      vals[f.k] = n;
+    }
+    const p = t.build(vals);
+    push(withPath(doc, { k: 'outline' }, p));
+    setTarget({ k: 'outline' });
+    setSel([]);
+    setTpl('custom');
+    const pts = polyOf(num(p, '윤곽점'));
+    if (pts.length) fitTo(bounds(pts));
+    setMsg(`${t.name} 단면을 그렸습니다 — 점을 끌거나 ‘그리기’로 고칠 수 있습니다`);
+  };
   const applyTemplate = () => {
     const p = rectPath(rect.x, rect.y, rect.w, rect.h, rect.anchor);
     push(withPath(doc, target, p));
     setTpl('custom');
     setMsg('사각형을 그렸습니다');
   };
-  const save = () => { onSave(kind === 'plank' ? stringifyPlankPath(doc) : stringifyLinePath(doc.outline)); onClose(); };
+  const save = () => {
+    const out = kind === 'plank' ? stringifyPlankPath(doc) : stringifyLinePath(section ? { ...doc.outline, closed: true } : doc.outline);
+    const bad = onValidate?.(out);
+    if (bad) { setMsg(bad); return; }
+    onSave(out);
+    onClose();
+  };
 
   const step = tickStep(v.scale);
   const ticksX: number[] = [], ticksY: number[] = [];
   for (let x = Math.ceil(toMm(0, 0)[0] / step) * step; x <= toMm(box.w, 0)[0]; x += step) ticksX.push(x);
   for (let y = Math.ceil(toMm(0, box.h)[1] / step) * step; y <= toMm(0, 0)[1]; y += step) ticksY.push(y);
-  const thick = kind === 'plank' ? ev.numParam(node, 'thickness', 18) : 0;
-  const shapeKey = kind === 'plank' ? JSON.stringify([outlineNum, nums.holes, thick]) : '';
+  const thick = kind === 'plank' ? ev.numParam(node, 'thickness', 18) : section ? 300 : 0;
+  const shapeKey = kind === 'plank' || section ? JSON.stringify([outlineNum, nums.holes, thick]) : '';
 
   const selP = selPt != null ? path.points[selPt] : null;
   const lineIdx = selPt != null && selPt < path.lines.length ? selPt : null;
@@ -325,7 +359,7 @@ export function ProfileEditor({ ev, node, param, kind, closedDefault, title, onS
     <div className="pm-modal-bg">
       <div className="pm-modal pm-pe" role="dialog" aria-modal="true" aria-label={title}>
         <header>
-          <div><b>{title}</b><small>{node.name}{kind === 'plank' ? ` · 두께 ${thick}` : ''} — 좌표는 수식(#W, #D …) 그대로 저장됩니다</small></div>
+          <div><b>{title}</b><small>{section ? '단면(mm) — 왼쪽 아래가 (0,0). 오른쪽 단면 템플릿에서 시작하거나 ‘그리기’로 점을 찍으세요 · 3D 미리보기는 300mm 몰딩' : `${node.name}${kind === 'plank' ? ` · 두께 ${thick}` : ''} — 좌표는 수식(#W, #D …) 그대로 저장됩니다`}</small></div>
           <button className="pm-icon" title="실행 취소" aria-label="실행 취소" disabled={hist.i === 0} onClick={() => setHist((h) => ({ ...h, i: Math.max(0, h.i - 1) }))}>↶</button>
           <button className="pm-icon" title="다시 실행" aria-label="다시 실행" disabled={hist.i >= hist.list.length - 1} onClick={() => setHist((h) => ({ ...h, i: Math.min(h.list.length - 1, h.i + 1) }))}>↷</button>
           <button className="pm-btn" onClick={() => (dirty ? setConfirmExit(true) : onClose())}>나가기</button>
@@ -369,7 +403,7 @@ export function ProfileEditor({ ev, node, param, kind, closedDefault, title, onS
               {ticksX.map((x) => <g key={`tx${x}`}><line x1={sx(x)} x2={sx(x)} y1={10} y2={18} stroke="#9aa2ad" /><text x={sx(x) + 2} y={9} fontSize={9} fill="#7a8494">{x}</text></g>)}
               {ticksY.map((y) => <g key={`ty${y}`}><line y1={sy(y)} y2={sy(y)} x1={10} x2={18} stroke="#9aa2ad" /><text x={1} y={sy(y) - 2} fontSize={9} fill="#7a8494">{y}</text></g>)}
             </svg>
-            {kind === 'plank' && shapeKey && (
+            {shapeKey && (
               <PreviewPanel shapeKey={shapeKey} />
             )}
             <div className="pm-pe-zoom">
@@ -385,7 +419,7 @@ export function ProfileEditor({ ev, node, param, kind, closedDefault, title, onS
             <button className={tool === 'select' ? 'on' : ''} title="선택 — 점 끌기: 이동(직각 스냅) · 선 클릭: 점 추가 · 점 오른쪽 클릭: 삭제" onClick={() => setTool('select')}><i>⌖</i>선택</button>
             <button className={tool === 'draw' ? 'on' : ''} title="그리기 — 캔버스를 누르면 꼭짓점 추가" onClick={() => setTool('draw')}><i>✎</i>그리기</button>
             <hr />
-            <button className={target.k === 'outline' ? 'on' : ''} title={kind === 'plank' ? '외곽 윤곽' : '경로'} onClick={() => { setTarget({ k: 'outline' }); setSelPt(null); }}><i>▢</i>{kind === 'plank' ? '윤곽' : '경로'}</button>
+            <button className={target.k === 'outline' ? 'on' : ''} title={kind === 'plank' ? '외곽 윤곽' : '경로'} onClick={() => { setTarget({ k: 'outline' }); setSelPt(null); }}><i>▢</i>{kind === 'plank' ? '윤곽' : section ? '단면' : '경로'}</button>
             {doc.holes.map((_, i) => <button key={`h${i}`} className={target.k === 'hole' && target.i === i ? 'on' : ''} onClick={() => { setTarget({ k: 'hole', i }); setSelPt(null); }}><i>◯</i>구멍{i + 1}</button>)}
             {doc.slots.map((_, i) => <button key={`s${i}`} className={target.k === 'slot' && target.i === i ? 'on' : ''} onClick={() => { setTarget({ k: 'slot', i }); setSelPt(null); }}><i>▭</i>홈{i + 1}</button>)}
             {kind === 'plank' && <>
@@ -397,15 +431,15 @@ export function ProfileEditor({ ev, node, param, kind, closedDefault, title, onS
 
           <aside className="pm-pe-side">
             <div className="top">
-              <select className="pm-sel" value={tpl} onChange={(e) => setTpl(e.target.value as 'custom' | 'rect')} aria-label="형상 템플릿">
+              <select className="pm-sel" value={tpl} onChange={(e) => setTpl(e.target.value)} aria-label={section ? '단면 템플릿' : '형상 템플릿'}>
                 <option value="custom">사용자 정의 형상</option>
-                <option value="rect">사각형</option>
+                {section ? SECTION_TEMPLATES.map((t) => <option key={t.key} value={t.key}>{t.name}</option>) : <option value="rect">사각형</option>}
               </select>
               <button className="pm-icon" title="경로 복사" aria-label="경로 복사" onClick={copyPath}>⧉</button>
               <button className="pm-icon" title="도형 붙여넣기" aria-label="도형 붙여넣기" onClick={pastePath}>📋</button>
               <label className="pm-icon" title="CAD(DXF) 가져오기" aria-label="DXF 가져오기" style={{ cursor: 'pointer' }}>⇪<input type="file" accept=".dxf" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void importDxf(f); e.target.value = ''; }} /></label>
             </div>
-            {tpl === 'rect' && (
+            {!section && tpl === 'rect' && (
               <div className="pm-pe-tpl">
                 <span className="pm-hint">사각형 — 기준점 · 위치 · 폭 · 높이 (현재 대상의 점을 바꿉니다) <Unverified text="기준 방식 목록 미확인" /></span>
                 <div className="pm-row2"><span>기준점</span>
@@ -419,8 +453,22 @@ export function ProfileEditor({ ev, node, param, kind, closedDefault, title, onS
                 <button className="pm-btn blue" onClick={applyTemplate}>적용</button>
               </div>
             )}
+            {section && tpl !== 'custom' && (() => {
+              const t = SECTION_TEMPLATES.find((x) => x.key === tpl);
+              return t ? (
+                <div className="pm-pe-tpl">
+                  <span className="pm-hint">{t.name} — {t.desc} (mm · 지금 단면을 바꿉니다)</span>
+                  {t.fields.map((f) => (
+                    <div className="pm-row2" key={f.k}><span>{f.label}</span>
+                      <div><input className="pm-in" inputMode="decimal" aria-label={`${t.name} ${f.label}`} value={secVals[`${t.key}.${f.k}`] ?? String(f.v)}
+                        onChange={(e) => setSecVals((s) => ({ ...s, [`${t.key}.${f.k}`]: e.target.value }))} onKeyDown={(e) => { if (e.key === 'Enter') applySection(); }} /></div></div>
+                  ))}
+                  <button className="pm-btn blue" onClick={applySection}>적용</button>
+                </div>
+              ) : null;
+            })()}
             <div className="pm-pe-pts">
-              {kind === 'line' && target.k === 'outline' && (
+              {kind === 'line' && !section && target.k === 'outline' && (
                 <label className="pm-check"><input type="checkbox" checked={path.closed} onChange={(e) => push(withPath(doc, target, { ...path, closed: e.target.checked }))} />닫힌 경로</label>
               )}
               {target.k === 'slot' && (
@@ -545,7 +593,7 @@ function loadPrevSize(): PrevBox {
 }
 
 /**
- * 오른쪽 위 3D 미리보기 창 — 윤곽을 두께만큼 세운 판.
+ * 오른쪽 위 3D 미리보기 창 — 윤곽을 두께만큼 세운 판(단면 그리기는 단면을 300mm 세운 몰딩).
  * 왼쪽 아래 모서리를 끌어 창 크기 조절(크기는 이 브라우저에 기억), 휠 · ＋/− 로 확대·축소, 끌어서 회전, ⛶ 로 처음 시점.
  */
 function PreviewPanel({ shapeKey }: { shapeKey: string }) {
@@ -607,7 +655,7 @@ function PlankPreview({ shapeKey, cmd }: { shapeKey: string; cmd: ZoomCmd }) {
     const [o, hs, th] = JSON.parse(shapeKey) as [NumPathOut, NumPathOut[], number];
     const outline = polyOf(o);
     const b = bounds(outline);
-    return { geo: plankGeometry(outline, hs.map(polyOf), Math.max(th, 1)), pb: b, pr: Math.max(b.x1 - b.x0, b.y1 - b.y0, 10), t: th };
+    return { geo: plankGeometry(outline, hs.map(polyOf), Math.max(th, 1)), pb: b, pr: Math.max(b.x1 - b.x0, b.y1 - b.y0, th, 10), t: th };
   }, [shapeKey]);
   useEffect(() => () => geo.dispose(), [geo]);
   return (

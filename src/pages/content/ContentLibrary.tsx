@@ -13,12 +13,13 @@ import type { CreatePortal } from '../../data/contentCreate';
 import { putAsset } from '../../data/assetStore';
 import { MODELING_EDITOR_ENABLED } from '../../pm/editorFlag';
 import type { ModelOpenRequest, ModelResult } from '../../pm/link';
-import { PmEditorOverlay } from '../PmStudio';
+import { PmEditorOverlay } from '../pm/PmEditorOverlay';
 import {
   AddToModal, AuthorizeModal, BatchEditModal, CreateMaterialModal, DetailModal, FolderPickModal,
   ImportExportModal, LibraryManageModal, Modal, NewLibraryModal, QuickEditModal, SettingsModal,
 } from './ContentModals';
-import { CreatePage, type NewItemDraft } from './CreatePages';
+import { CreatePage } from './CreatePages';
+import type { CreateOpts, NewItemDraft } from './createTypes';
 
 /**
  * 컨텐츠 라이브러리 — 쿠지알러 ‘기업 상품 라이브러리(企业商品库)’ 분석을 바탕으로 만든 HP3 상품·소재 관리 화면.
@@ -107,7 +108,7 @@ export function ContentLibrary({ userName }: { userName: string }) {
     | { k: 'addTo'; kind: 'package' | 'style' } | { k: 'filter' | 'columns' | 'settings' | 'io' | 'libManage' | 'create' | 'authorize' | 'newLib' | 'newFolder' }
     | { k: 'renameFolder' | 'coverFolder'; id: string } | { k: 'subFolder'; parent: string | null };
   const [modal, setModal] = useState<ModalState>(null);
-  /** 소재 만들기 카드의 생성 화면 / 파라메트릭 모델 에디터 */
+  /** 컨텐츠 제작 카드의 생성 화면 / 파라메트릭 모델 에디터 */
   const [creating, setCreating] = useState<{ tab: BizTab; portal: CreatePortal } | null>(null);
   const [editorReq, setEditorReq] = useState<ModelOpenRequest | null>(null);
   const [folderMenu, setFolderMenu] = useState<{ id: string | null; lib: number; x: number; y: number } | null>(null);
@@ -206,14 +207,18 @@ export function ContentLibrary({ userName }: { userName: string }) {
   };
   const crumbs = folderId ? findFolderPath(tree, folderId) ?? [] : [];
 
-  /* ── 소재 만들기 ── */
+  /* ── 컨텐츠 제작 ── */
   const showMade = (item: Item, msg: string) => {
     setTabKey(tabOfLib(item.lib).key); openFolder(item.lib, item.folder);
     setToast(msg);
   };
-  /** 업로드 화면 결과 — 폴더를 정하지 않은 소재는 그 라이브러리의 ‘미분류’로 */
-  const addDrafts = (drafts: NewItemDraft[], msg: string, via: string) => {
-    if (!st) return;
+  /**
+   * 업로드 화면 결과 — 폴더를 정하지 않은 소재는 그 라이브러리의 ‘미분류’로.
+   * keep(계속 올리기): 화면을 닫지 않음 / detail(완료): 새 상품 상세를 연다
+   */
+  const addDrafts = (drafts: NewItemDraft[], msg: string, via: string, opts?: CreateOpts): string[] => createItems(drafts, msg, via, opts).map((i) => i.id);
+  const createItems = (drafts: NewItemDraft[], msg: string, via: string, opts?: CreateOpts): Item[] => {
+    if (!st) return [];
     let s = st;
     const made: Item[] = [];
     for (const d of drafts) {
@@ -223,10 +228,16 @@ export function ContentLibrary({ userName }: { userName: string }) {
     }
     const now = Date.now();
     const history = { ...s.history };
-    for (const i of made) history[i.id] = [{ at: now, by: userName, action: `소재 만들기: ${via}` }];
+    for (const i of made) history[i.id] = [{ at: now, by: userName, action: `컨텐츠 제작: ${via}` }];
     setSt(withItems({ ...s, history }, [...made, ...itemsOf(s)]));
+    if (opts?.silent) return made;
+    if (opts?.keep) { setToast(`${msg} — 이어서 올릴 수 있습니다 (상단 ‘저장’으로 영구 반영)`); return made; }
     setCreating(null);
-    if (made[0]) showMade(made[0], `${msg} — 상단 ‘저장’으로 영구 반영`);
+    if (made[0]) {
+      showMade(made[0], `${msg} — 상단 ‘저장’으로 영구 반영`);
+      if (opts?.detail) setModal({ k: 'detail', id: made[0].id });
+    }
+    return made;
   };
   /** 에디터 ‘저장 후 입고’ — 모델 유형 선택에서 고른 라이브러리의 ‘미분류’에 상품을 만들거나 갱신 */
   const onModelDone = async (r: ModelResult) => {
@@ -380,7 +391,7 @@ export function ContentLibrary({ userName }: { userName: string }) {
           <button className="btn-ghost" onClick={() => setModal({ k: 'io' })}>가져오기/내보내기</button>
           <button className="btn-ghost" onClick={() => setModal({ k: 'libManage' })}>라이브러리 관리</button>
           <button className="btn-ghost" onClick={() => setModal({ k: 'settings' })}>설정</button>
-          <button className="btn-primary" style={{ marginLeft: 0 }} onClick={() => setModal({ k: 'create' })}>＋ 소재 만들기</button>
+          <button className="btn-primary" style={{ marginLeft: 0 }} onClick={() => setModal({ k: 'create' })}>＋ 컨텐츠 제작</button>
         </div>
       </div>
 
@@ -497,7 +508,7 @@ export function ContentLibrary({ userName }: { userName: string }) {
                       </td>
                     </tr>
                   ))}
-                  {!pageItems.length && <tr><td colSpan={visibleCols.length + 2} className="empty-row">{trash ? '휴지통이 비어 있습니다.' : <>상품이 없습니다. <b>＋ 소재 만들기</b> 또는 <b>가져오기</b>로 추가하세요.</>}</td></tr>}
+                  {!pageItems.length && <tr><td colSpan={visibleCols.length + 2} className="empty-row">{trash ? '휴지통이 비어 있습니다.' : <>상품이 없습니다. <b>＋ 컨텐츠 제작</b> 또는 <b>가져오기</b>로 추가하세요.</>}</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -673,8 +684,10 @@ export function ContentLibrary({ userName }: { userName: string }) {
           else setCreating({ tab: t, portal: p });
         }} />}
       {creating && <CreatePage tab={creating.tab} portal={creating.portal} st={st} onClose={() => setCreating(null)}
-        onCreate={(drafts, msg) => addDrafts(drafts, msg, creating.portal.title)} />}
-      {editorReq && <PmEditorOverlay request={editorReq} userName={userName} onClose={() => setEditorReq(null)} onDone={(r) => onModelDone(r)} />}
+        onCreate={(drafts, msg, opts) => addDrafts(drafts, msg, creating.portal.title, opts)}
+        onReveal={(id) => { const it = allItems.find((i) => i.id === id); setCreating(null); if (it) showMade(it, '올린 상품입니다 — 상단 ‘저장’으로 영구 반영'); }} />}
+      {editorReq && <PmEditorOverlay request={editorReq} userName={userName} onClose={() => setEditorReq(null)} onDone={(r) => onModelDone(r)}
+        onAddItems={(d, msg) => createItems(d, msg, '단면 그리기', { silent: true })} />}
 
       {confirmDialog}
       {toast && <div className="cl-toast" role="status">{toast}</div>}

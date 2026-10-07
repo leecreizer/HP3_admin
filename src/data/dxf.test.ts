@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseDxfProfile } from './dxf';
+import { parseDxfLoops, parseDxfProfile } from './dxf';
 
 const dxf = (entities: string[], header = '') =>
   ['0', 'SECTION', '2', 'HEADER', ...(header ? header.split('\n') : []), '0', 'ENDSEC', '0', 'SECTION', '2', 'ENTITIES', ...entities, '0', 'ENDSEC', '0', 'EOF'].join('\n');
@@ -43,5 +43,34 @@ describe('DXF 몰딩 프로파일', () => {
 
   it('닫힌 윤곽이 없으면 오류', () => {
     expect(() => parseDxfProfile(dxf(lw([[0, 0], [10, 0], [10, 10]], false)))).toThrow(/닫힌 윤곽/);
+  });
+});
+
+describe('DXF 워터젯 — 닫힌 영역 전부', () => {
+  it('사각형 안에 원 → 고리 2개, 좌하단 0,0 기준', () => {
+    const r = parseDxfLoops(dxf([...lw([[10, 10], [110, 10], [110, 60], [10, 60]]), '0', 'CIRCLE', '10', '60', '20', '35', '40', '10']), { gapTol: 0.5, minGap: 0.2 });
+    expect(r.loops).toHaveLength(2);
+    expect(r.w).toBe(100);
+    expect(r.h).toBe(50);
+  });
+
+  it('틈 허용치 — 0.3mm 벌어진 선은 0.5 면 잇고 0.1 이면 못 잇는다', () => {
+    const line = (x1: number, y1: number, x2: number, y2: number) => ['0', 'LINE', '10', `${x1}`, '20', `${y1}`, '11', `${x2}`, '21', `${y2}`];
+    const segs = [...line(0, 0, 50, 0), ...line(50, 0, 50, 50), ...line(50, 50, 0, 50), ...line(0, 50, 0, 0.3)];
+    expect(parseDxfLoops(dxf(segs), { gapTol: 0.5, minGap: 0.2 }).loops).toHaveLength(1);
+    expect(() => parseDxfLoops(dxf(segs), { gapTol: 0.1, minGap: 0.2 })).toThrow();
+  });
+
+  it('최소 간격보다 좁은 고리는 버린다', () => {
+    const r = parseDxfLoops(dxf([...lw([[0, 0], [40, 0], [40, 40], [0, 40]]), ...lw([[5, 5], [30, 5], [30, 5.1], [5, 5.1]])]), { gapTol: 0.5, minGap: 0.2 });
+    expect(r.loops).toHaveLength(1);
+  });
+
+  it('온 타원 ELLIPSE 는 닫힌 고리 — 넓이 ≈ πab', () => {
+    const r = parseDxfLoops(dxf(['0', 'ELLIPSE', '10', '0', '20', '0', '11', '40', '21', '0', '40', '0.5', '41', '0', '42', String(Math.PI * 2)]), { gapTol: 0.5, minGap: 0.2 });
+    expect(r.loops).toHaveLength(1);
+    expect(Math.abs(Math.abs(area(r.loops[0])) - Math.PI * 40 * 20) / (Math.PI * 800)).toBeLessThan(0.01);
+    expect(r.w).toBeCloseTo(80, 0);
+    expect(r.h).toBeCloseTo(40, 0);
   });
 });

@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { loadContentState, type ContentState, type Item } from '../../data/contentLibrary';
+import { profileThumb } from '../../data/dxf';
+import type { NewItemDraft } from '../content/createTypes';
 import { TOOLTYPE_LABEL } from '../../pm/modelTypes';
-import { makeCatalog, allItems } from '../../pm/catalog';
+import { makeCatalog, allItems, profileLibs } from '../../pm/catalog';
 import { DEFS, INSERT_KEYS, defaultParams, elementDef, toolElements, type ElementDef } from '../../pm/defs';
 import { fmt } from '../../pm/expr';
 import { buildModel } from '../../pm/geometry';
 import { exportGlb } from '../../pm/glb';
 import type { ModelOpenRequest, ModelResult } from '../../pm/link';
-import { registerToLibrary } from '../../pm/register';
 import { PmEval, uid } from '../../pm/resolve';
 import { loadModel, newModel, saveModel, withVersion } from '../../pm/store';
 import type { PmModel, PmNode, PmVersion } from '../../pm/types';
@@ -80,16 +81,18 @@ const typing = (e: KeyboardEvent) => {
 
 
 /**
- * 파라메트릭 모델 에디터 — 쿠지알러 参数化模型编辑器를 참고해 홈플래너3 어드민에 새로 만든 에디터(기존 에디터를 대체).
+ * 파라메트릭 모델 에디터 — 쿠지알러 参数化模型编辑器를 참고해 홈플래너3 어드민에 새로 만든 에디터. 컨텐츠 라이브러리에서만 연다(PmEditorOverlay).
  *  상단: 실행 취소 · 다시 실행 · 비우기 | 변수&속성 · 도구 · 조작 · 검증 · 플러그인 | 변수 위치 검색 | 새 기능 · 도움말 · 파일 · 설정
  *  왼쪽: 파라미터 설정 · 요소 라이브러리 · 부품 라이브러리   가운데: 3D/2D · 구조 탐색 · 모델 진단   오른쪽: 속성
  */
-export function PmEditor({ request, userName = 'HP3 관리자', onClose, onRegister }: {
+export function PmEditor({ request, userName = 'HP3 관리자', onClose, onRegister, onAddItems }: {
   request?: ModelOpenRequest;
   userName?: string;
   onClose?: () => void;
-  /** 컨텐츠 라이브러리에서 연 경우 — ‘저장 후 입고’ 결과를 그 화면이 반영 (없으면 저장본에 직접 입고) */
-  onRegister?: (r: ModelResult) => void | Promise<void>;
+  /** ‘저장 후 입고’ 결과를 컨텐츠 라이브러리가 반영 */
+  onRegister: (r: ModelResult) => void | Promise<void>;
+  /** 단면 그리기 — 컨텐츠 라이브러리에 상품을 넣고 만든 상품을 돌려줌 */
+  onAddItems?: (drafts: NewItemDraft[], msg: string) => Item[];
 }) {
   const [hist, setHist] = useState<{ list: PmModel[]; labels: string[]; i: number } | null>(() => {
     if (request?.mode === 'edit') { const m = loadModel(request.id); if (m) return { list: [m], labels: ['열기'], i: 0 }; }
@@ -246,8 +249,7 @@ export function PmEditor({ request, userName = 'HP3 관리자', onClose, onRegis
         kind: 'param', id: s!.id, name: s!.name, tooltype: s!.tooltype, lib: s!.lib, categoryId: s!.categoryId, category: s!.category,
         thumb: s!.preview ?? out.thumb, glb: out.glb, bbox: { w: Math.round(size.x), d: Math.round(size.y), h: Math.round(size.z) },
       };
-      if (onRegister) await onRegister(r);
-      else setToastMsg(await registerToLibrary(r, userName));
+      await onRegister(r);
     } catch (e) { setToastMsg(`입고 실패: ${(e as Error).message}`); }
     finally { setBusy(''); }
   };
@@ -312,6 +314,15 @@ export function PmEditor({ request, userName = 'HP3 관리자', onClose, onRegis
     model, ev, catalog,
     openFormula: (o) => setFormula(o),
     toast: (m) => setToastMsg(m),
+    addProfile: onAddItems ? (name, shape) => {
+      const lib = profileLibs(model.tooltype)[0] ?? 7;
+      const made = onAddItems([{ name, lib, img: profileThumb(shape), profile: shape, size: `${shape.w} X ${shape.h} mm` }], `‘${name}’ 단면을 그려 몰딩 라이브러리에 넣었습니다`);
+      const it = made[0];
+      if (!it) return undefined;
+      setContent((c) => (c ? { ...c, items: [it, ...c.items] } : c));
+      setToastMsg(`‘${name}’ 단면(${shape.w}×${shape.h}mm)을 몰딩 라이브러리에 넣고 골랐습니다 — 컨텐츠 라이브러리 상단 ‘저장’으로 영구 반영`);
+      return it.id;
+    } : undefined,
   } : null;
 
   const searchHits = search.trim() && model ? model.vars.filter((v) => v.name.toLowerCase().includes(search.trim().toLowerCase()) || v.label.toLowerCase().includes(search.trim().toLowerCase())).slice(0, 20) : [];

@@ -1,9 +1,9 @@
-"""쿠지알러 조회 덤프 → HP3 ‘소재 만들기’ 정적 데이터.
+"""쿠지알러 조회 덤프 → HP3 ‘컨텐츠 제작’ 정적 데이터.
 
 출력
   src/pm/modelTypes.json         — 파라메트릭 모델 ‘모델 유형 선택(选择模型类别)’ 창:
                                       도구 종류(tooltype)별 프론트/백엔드 라이브러리와 실제 분류(真分类) 트리
-  src/data/materialCategories.json  — 재질 텍스처 ‘재질 분류(材质分类)’ 2단계 목록
+  src/data/materialCategories.json  — 재질 텍스처 ‘재질 분류(材质分类)’ 2단계 목록 (재질마다 재질 공 이미지 img)
 
 입력(로그인한 브라우저에서 읽기 전용 GET 으로 받아 둔 덤프)
   editor-prodcats.json — editor/api/site/custommodel/prodcats   (position 별 분류 트리)
@@ -229,7 +229,8 @@ def main():
         if g is None:
             g = {'name': MAT_BASE_KO.get(base, base), 'zh': base, 'items': []}
             groups.append(g)
-        g['items'].append({'id': m['obsPtextureId'], 'name': material_name(m['name'], missing), 'zh': m['name'].strip()})
+        # img = 장면 렌더(재질 공) — 쿠지알러 재질 단계식 고르기의 26px 아이콘 원본
+        g['items'].append({'id': m['obsPtextureId'], 'name': material_name(m['name'], missing), 'zh': m['name'].strip(), 'img': m.get('sceneImage', '')})
 
     if missing:
         sys.exit('번역 없음: ' + '、'.join(sorted(missing)))

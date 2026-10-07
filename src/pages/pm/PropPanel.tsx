@@ -5,6 +5,7 @@ import { fmt, renameRef } from '../../pm/expr';
 import { materialLibs, profileLibs } from '../../pm/catalog';
 import type { PmArray, PmModel, PmNode } from '../../pm/types';
 import { ItemPicker, ModelPicker } from './pickers';
+import { SectionDraw } from './SectionDraw';
 import { Fx, Sec, Unverified } from './ui';
 import { previewOf, usePm } from './ctx';
 
@@ -19,8 +20,9 @@ function ParamField({ node, pd, onChange, onEditPath, items, tool, childVars }: 
   node: PmNode; pd: ParamDef; onChange: (v: string) => void; onEditPath: (r: PathEditReq) => void; items: Item[]; tool: PmModel['tooltype'];
   childVars?: { name: string; label: string }[];
 }) {
-  const { ev, model } = usePm();
+  const { ev, model, addProfile } = usePm();
   const [pick, setPick] = useState(false);
+  const [draw, setDraw] = useState(false);
   const raw = node.params[pd.name] ?? pd.value ?? '';
   const value = raw === 'None' ? '' : raw;
   const label = pd.label;
@@ -101,10 +103,18 @@ function ParamField({ node, pd, onChange, onEditPath, items, tool, childVars }: 
               <option value="pick">선택</option><option value="ref">윤곽 변수</option>
             </select>
             {ref ? <div><Fx title={label} value={value} onChange={onChange} preview={pv.text} error={pv.error} /></div>
-              : <button className="pm-btn" onClick={() => setPick(true)} title={value}>{prof?.name ?? (value ? '쿠지알러 기본 단면' : '고르기')}</button>}
+              : <div className="pm-shape-pick">
+                <button className="pm-btn" onClick={() => setPick(true)} title={value}>{prof?.name ?? (value ? '쿠지알러 기본 단면' : '고르기')}</button>
+                {addProfile && <button className="pm-btn" title={prof ? '단면 그리기 — 이 단면에서 시작해 고친 뒤 새 몰딩 단면으로' : '단면 그리기 — CAD 없이 단면을 그려 바로 씁니다'} aria-label={`${label} 단면 그리기`} onClick={() => setDraw(true)}>✎</button>}
+              </div>}
           </div>
-          {!ref && !prof && <span className="pm-hint">쿠지알러 기본 단면은 형상 데이터를 받을 수 없어 18×18 사각형으로 그립니다. 컨텐츠 라이브러리 몰딩(DXF 단면)을 고르세요.</span>}
+          {!ref && !prof && <span className="pm-hint">쿠지알러 기본 단면은 형상 데이터를 받을 수 없어 18×18 사각형으로 그립니다. 컨텐츠 라이브러리 몰딩(DXF 단면)을 고르거나{addProfile ? ' ✎ 로 단면을 그리세요.' : ' 컨텐츠 라이브러리에서 에디터를 열면 단면을 그릴 수 있습니다.'}</span>}
           {pick && <ItemPicker title="단면(몰딩) 고르기" items={items} libs={profileLibs(tool)} filter={(i) => !!i.profile} value={value} onClose={() => setPick(false)} onPick={(id) => onChange(id)} />}
+          {draw && addProfile && (() => {
+            const cur = items.find((i) => i.id === value)?.profile;
+            return <SectionDraw init={cur ? { path: cur.path, points: cur.points } : undefined} onClose={() => setDraw(false)}
+              onDone={(name, shape) => { const id = addProfile(name, shape); setDraw(false); if (id) onChange(id); }} />;
+          })()}
         </>
       );
     }

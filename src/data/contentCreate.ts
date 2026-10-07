@@ -1,7 +1,7 @@
 import type { ToolType } from '../pm/modelTypes';
 
 /**
- * 소재 만들기(创建素材) 카드 — 쿠지알러 bgs/dynamic-config 의 업무 탭별 uploadPortals 를 그대로 옮긴 것.
+ * 컨텐츠 제작(쿠지알러 创建素材) 카드 — 쿠지알러 bgs/dynamic-config 의 업무 탭별 uploadPortals 를 그대로 옮긴 것.
  * HANSSEM 계정 화면에 보이는 카드만(권한 없는 ‘参数化轮廓’·‘参数化模型(rfa)’·‘填充图片/纹理’·‘墙裙配置’ 제외), 쿠지알러 순서대로.
  *
  * kind = 카드를 누르면 열리는 쿠지알러 화면 종류
@@ -12,9 +12,15 @@ import type { ToolType } from '../pm/modelTypes';
  *  modelCutting 3D 모델 분할 도구 (/vc/modelcutting?tooltype=)
  *  virtualModel 가상 모델 업로드 — 이미지 (customized-cms/upload-virtualmodel)
  *  pattern      프린트 패턴 업로드 (customized-cms/upload-pattern)
+ *  hybrid       혼합 재질 업로드 (vc/commodity/upload/hybridmaterial) — 흑백 마스크 + 영역별 재질
+ *  tile         타일 상품 업로드 (vc/commodity/upload/tile) — 타일 상품·다면 타일 상품
+ *  border       보더 패턴 업로드 (vc/commodity/upload/tileboundrystyle) — 보더 타일 + 코너 타일
+ *  tilePattern  타일 배열 패턴 업로드 (vc/commodity/upload/tilepattern) — 붙임 방식 템플릿 + 칸별 타일
+ *  waterjet     워터젯 패턴 업로드 (decoration-cms/upload/medallion) — DXF 영역 + 영역별 재질
+ *  shaped       비정형 상품 업로드 (vc/commodity/upload/shapedtile) — 이미지 + 형상(육각형·별·둥근 사각·CAD)으로 자르기
  *  unverified   쿠지알러 화면을 아직 열어 보지 않은 카드 — 생성 조건을 지어내지 않고 안내만 한다
  */
-export type CreateKind = 'paramModel' | 'material' | 'model3d' | 'profile' | 'modelCutting' | 'virtualModel' | 'pattern' | 'unverified';
+export type CreateKind = 'paramModel' | 'material' | 'model3d' | 'profile' | 'modelCutting' | 'virtualModel' | 'pattern' | 'hybrid' | 'tile' | 'border' | 'tilePattern' | 'waterjet' | 'shaped' | 'unverified';
 
 export type CreatePortal = {
   /** 쿠지알러 uploadPortals id */
@@ -56,17 +62,17 @@ const unverified = (id: number, title: string, origin: string, desc: string, lin
 export const CREATE_PORTALS: Record<string, CreatePortal[]> = {
   general: [
     P({ id: 1, title: '3D 모델', origin: '3D模型', desc: '3DsMax·SketchUp 파일 업로드', kind: 'model3d', bz: '', lib: 1, link: '/pub/saas/brandgoods/model/uploader' }),
-    P({ id: 2, title: '재질 텍스처', origin: '材质贴图', desc: '재질·텍스처 이미지 소재 만들기', kind: 'material', bz: 'materiallib', lib: 39, link: '/pub/saas/brandgoods/material/uploader?tooltype=materiallib' }),
-    unverified(4, '혼합 재질', '混合材质', '몰딩/벽판의 혼합 재질 — 혼합형 재질 업로드', '/vc/commodity/upload/hybridmaterial'),
+    P({ id: 2, title: '재질 텍스처', origin: '材质贴图', desc: '재질·텍스처 이미지 컨텐츠 제작', kind: 'material', bz: 'materiallib', lib: 39, link: '/pub/saas/brandgoods/material/uploader?tooltype=materiallib' }),
+    P({ id: 4, title: '혼합 재질', origin: '混合材质', desc: '몰딩/벽판의 혼합 재질 — 혼합형 재질 업로드', kind: 'hybrid', lib: 39, link: '/vc/commodity/upload/hybridmaterial' }),
   ],
   paving: [
     P({ id: 5, title: '천장판 모델', origin: '扣板模型', desc: '천장판·전기 모듈 등 시공 상품', kind: 'model3d', bz: 'ceiling', lib: 4, link: '/pub/saas/brandgoods/model/uploader?bztype=ceiling' }),
     P({ id: 6, title: '천장판 텍스처', origin: '扣板贴图', desc: '이미지형 천장판', kind: 'material', bz: 'ceiling', lib: 4, link: '/pub/saas/brandgoods/material/uploader?tooltype=ceiling' }),
-    unverified(7, '타일 상품', '铺贴产品', '타일·대리석·마루 등 시공 상품', '/vc/commodity/upload/tile'),
-    unverified(8, '보더 패턴', '波打线样式', '타일·대리석 보더(波打线) 패턴', '/vc/commodity/upload/tileboundrystyle'),
-    unverified(9, '타일 배열 패턴', '拼砖样式', '타일·대리석 배열(拼砖) 패턴', '/vc/commodity/upload/tilepattern'),
-    unverified(10, '워터젯 패턴', '水刀拼花', '워터젯 인레이 상품', '/pub/saas/decoration-cms/upload/medallion'),
-    unverified(11, '비정형 상품', '异型产品', '직사각형이 아닌 타일·마루', '/vc/commodity/upload/shapedtile'),
+    P({ id: 7, title: '타일 상품', origin: '铺贴产品', desc: '타일·대리석·마루 등 시공 상품', kind: 'tile', lib: 4, link: '/vc/commodity/upload/tile' }),
+    P({ id: 8, title: '보더 패턴', origin: '波打线样式', desc: '타일·대리석 보더(波打线) 패턴', kind: 'border', lib: 4, link: '/vc/commodity/upload/tileboundrystyle' }),
+    P({ id: 9, title: '타일 배열 패턴', origin: '拼砖样式', desc: '타일·대리석 배열(拼砖) 패턴', kind: 'tilePattern', lib: 4, link: '/vc/commodity/upload/tilepattern' }),
+    P({ id: 10, title: '워터젯 패턴', origin: '水刀拼花', desc: '워터젯 인레이 상품', kind: 'waterjet', lib: 4, link: '/pub/saas/decoration-cms/upload/medallion' }),
+    P({ id: 11, title: '비정형 상품', origin: '异型产品', desc: '직사각형이 아닌 타일·마루', kind: 'shaped', lib: 4, link: '/vc/commodity/upload/shapedtile' }),
     unverified(12, '파라메트릭 편집기', '参数化编辑器', '다중 타일 조합·띠 조합·보더·아트월 방안 업로드', '/cloud/tool/h5/decoration-param-editor'),
   ],
   linewallboard: [
@@ -86,7 +92,7 @@ export const CREATE_PORTALS: Record<string, CreatePortal[]> = {
   })(),
   zhuduowei: [
     P({ id: 43, title: '3D 모델', origin: '3D模型', desc: '3DsMax·SketchUp 파일 업로드', kind: 'model3d', bz: 'quark_arch', lib: 81, link: '/pub/saas/brandgoods/model/uploader?bztype=quark_arch' }),
-    P({ id: 44, title: '재질 텍스처', origin: '材质贴图', desc: '재질·텍스처 이미지 소재 만들기', kind: 'material', bz: 'quark_arch', lib: 82, link: '/pub/saas/brandgoods/material/uploader?tooltype=quark_arch' }),
+    P({ id: 44, title: '재질 텍스처', origin: '材质贴图', desc: '재질·텍스처 이미지 컨텐츠 제작', kind: 'material', bz: 'quark_arch', lib: 82, link: '/pub/saas/brandgoods/material/uploader?tooltype=quark_arch' }),
     unverified(45, '몰딩 프로파일', '线条轮廓', '처마·징두리·허리 몰딩 등 단면 프로파일', '/pub/bim/arch/cms-update-molding'),
     P({ id: 46, title: '파라메트릭 모델', origin: '参数化模型', desc: '로마 기둥·문틀 몰딩 등 파라메트릭 모델', kind: 'paramModel', tooltype: 'arch', link: '/vc/modeleditor/new?tooltype=arch' }),
   ],
@@ -95,9 +101,17 @@ export const CREATE_PORTALS: Record<string, CreatePortal[]> = {
   ],
   kudashi: [
     unverified(75, '모델', '3D模型', '쿠다스 모델 목록의 모델 가져오기', '/pub/tool/geom-modeling/kds-model-uploader'),
-    P({ id: 76, title: '재질 텍스처', origin: '材质贴图', desc: '재질·텍스처 이미지 소재 만들기', kind: 'material', bz: 'kudashi', lib: 92, link: '/pub/saas/brandgoods/material/uploader?tooltype=kudashi' }),
+    P({ id: 76, title: '재질 텍스처', origin: '材质贴图', desc: '재질·텍스처 이미지 컨텐츠 제작', kind: 'material', bz: 'kudashi', lib: 92, link: '/pub/saas/brandgoods/material/uploader?tooltype=kudashi' }),
   ],
 };
 
 /** 재질 일괄 만들기의 렌더 분류 — 맞춤(定制) 탭은 ‘全屋定制材质’ 고정(주방·욕실 화면에서 확인), 나머지는 미확인 */
 export const MATERIAL_RENDER_CAT: Record<string, string> = { cupboard: '맞춤가구 재질', wardrobe: '맞춤가구 재질', doorwindow: '맞춤가구 재질' };
+
+/** 혼합 재질의 렌더 분류 (쿠지알러 渲染分类 4종, 화면 순서) */
+export const HYBRID_RENDER_CATS: { value: string; zh: string }[] = [
+  { value: '천장 몰딩 재질', zh: '角线材质' },
+  { value: '걸레받이 재질', zh: '踢脚线材质' },
+  { value: '장식 몰딩 재질', zh: '装饰线材质' },
+  { value: '일체형 벽판 재질', zh: '集成墙板材质' },
+];

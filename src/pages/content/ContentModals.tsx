@@ -276,12 +276,13 @@ export function AddToModal({ kind, options, count, onClose, onApply }: { kind: '
   );
 }
 
-/* ───────────────────────── 소재 만들기 ───────────────────────── */
+/* ───────────────────────── 컨텐츠 제작 ───────────────────────── */
 
-const CARD_ICON: Record<CreateKind, string> = { paramModel: '⬢', material: '▣', model3d: '◈', profile: '⌇', modelCutting: '✂', virtualModel: '⚙', pattern: '▦', unverified: '▢' };
+const SHAPED_NAME = { hexagon: '육각형', star: '네 꼭지 별', radius: '둥근 모서리 사각', custom: '사용자 정의' } as const;
+const CARD_ICON: Record<CreateKind, string> = { paramModel: '⬢', material: '▣', model3d: '◈', profile: '⌇', modelCutting: '✂', virtualModel: '⚙', pattern: '▦', hybrid: '◐', tile: '▤', border: '⌜', tilePattern: '▩', waterjet: '✺', shaped: '⬡', unverified: '▢' };
 
 /**
- * 소재 만들기(创建素材) — 업무 탭별 카드. 카드를 누르면 쿠지알러처럼 그 카드의 생성 화면이 열린다
+ * 컨텐츠 제작(쿠지알러 创建素材) — 업무 탭별 카드. 카드를 누르면 쿠지알러처럼 그 카드의 생성 화면이 열린다
  * (파라메트릭 모델 = 에디터 + 모델 유형 선택, 나머지 = 업로드 화면 — CreatePages.tsx).
  */
 export function CreateMaterialModal({ tabKey, onClose, onPick }: { tabKey: string; onClose: () => void; onPick: (tab: BizTab, portal: CreatePortal) => void }) {
@@ -289,7 +290,7 @@ export function CreateMaterialModal({ tabKey, onClose, onPick }: { tabKey: strin
   // 에디터를 뺀 배포(main)에서는 파라메트릭 모델 카드를 숨긴다
   const cards = (CREATE_PORTALS[tab.key] ?? []).filter((c) => MODELING_EDITOR_ENABLED || c.kind !== 'paramModel');
   return (
-    <Modal title="소재 만들기" onClose={onClose} size="xl">
+    <Modal title="컨텐츠 제작" onClose={onClose} size="xl">
       <div className="seg cl-tabs-scroll" role="tablist">
         {BIZ_TABS.map((t) => <button key={t.key} role="tab" aria-selected={t.key === tab.key} className={`seg-item${t.key === tab.key ? ' active' : ''}`} onClick={() => setTab(t)}>{t.label}</button>)}
       </div>
@@ -640,6 +641,13 @@ export function DetailModal({ item, path, related, history, customFields, onClos
           {item.model3d?.kind === 'param' && <p className="cl-model-tag">⬢ 파라메트릭 모델 · {item.renderCat || '분류 없음'}</p>}
           {item.model3d?.kind === 'glb' && <p className="cl-model-tag">◈ 3D 모델 업로드 · {item.model3d.file}</p>}
           {item.profile && <p className="cl-model-tag">⌇ 몰딩 프로파일 단면 {item.profile.w} × {item.profile.h} mm · 점 {item.profile.points.length}개</p>}
+          {item.mix && <p className="cl-model-tag">◐ 혼합 재질 · 검은 영역 {item.mix.black.name} · 흰 영역 {item.mix.white.name}</p>}
+          {item.border && <p className="cl-model-tag">⌜ 보더 패턴 · 보더 타일 {item.border.edge.name}{item.border.cornerTile ? ` · 코너 타일 ${item.border.cornerTile.name}` : ' · 코너 없음'}</p>}
+          {item.shaped && <p className="cl-model-tag">⬡ 비정형 상품 · {SHAPED_NAME[item.shaped.kind]}{item.shaped.params ? ` · 직선 변 ${item.shaped.params.straight}mm · 호 높이 ${item.shaped.params.arc}mm` : ''}{item.shaped.kind === 'radius' && item.shaped.params ? ` · 짝 맞는 작은 타일 ${item.shaped.params.side}mm` : ''}{item.shaped.cad ? ` · CAD ${item.shaped.cad.name}` : ''} · 면 {item.shaped.faces.length}장 · 줄눈 {item.shaped.gapWidth}mm</p>}
+          {item.medallion && <p className="cl-model-tag">✺ 워터젯 패턴 · 영역 {item.medallion.regions}개 · 구멍 {item.medallion.fills.filter((f) => f === 'hollow').length}개 · {item.medallion.w}×{item.medallion.h} mm</p>}
+          {item.tilePattern && <p className="cl-model-tag">▩ 타일 배열 패턴 · {item.tilePattern.template} · 타일 {Object.keys(item.tilePattern.tiles).length}종</p>}
+          {(item.tile?.pbr ?? item.shaped?.pbr) && <p className="cl-model-tag">◍ 실시간 재질 세부 조정 · 바꾼 값 {Object.keys((item.tile?.pbr ?? item.shaped?.pbr)!.values).length}개</p>}
+          {item.tile && <p className="cl-model-tag">▤ 타일 상품 · 줄눈 {item.tile.gapWidth}mm {item.tile.gapColor}{item.tile.faces ? ` · 면 ${item.tile.faces.length}장` : ''}{item.tile.order ? ` · 맞춤 배열 ${item.tile.order.rows}×${item.tile.order.cols}` : ''}</p>}
           <div className="cl-detail-ops">
             <div className="cl-dd">
               <button className="btn-ghost" onClick={() => setMenu((m) => !m)}>소재 관리 ▾</button>

@@ -1,17 +1,12 @@
 /** 내장 페이지 키. 커스텀 메뉴는 'custom-*' 형태의 자유 키를 사용한다. */
 export type BuiltinMenuKey =
   | 'dashboard'
-  | 'drawings'
-  | 'floorplans'
   | 'users'
   | 'content-users'
   | 'content'
+  | 'library'
   | 'brands'
   | 'products'
-  | 'editor'
-  | 'parts'
-  | 'assembly'
-  | 'design'
   | 'settings';
 
 export type MenuKey = BuiltinMenuKey | (string & {});
@@ -63,14 +58,14 @@ export type AdminConfig = {
 
 /** admin 등급이 가질 수 있는 전체 메뉴 키(대시보드+주메뉴+시스템) */
 export const ALL_ADMIN_MENU_KEYS: MenuKey[] = [
-  'dashboard', 'users', 'content-users', 'content', 'brands', 'drawings', 'floorplans', 'products', 'design', 'settings',
+  'dashboard', 'users', 'content-users', 'content', 'library', 'brands', 'products', 'settings',
 ];
 
 /** 기본 등급 세트 (설정에서 추가·수정·삭제 가능) */
 export const DEFAULT_ROLES: Role[] = [
   { id: 'role-super', name: '최고관리자', scope: 'admin', menus: [...ALL_ADMIN_MENU_KEYS], builtin: true },
-  { id: 'role-operator', name: '운영자', scope: 'admin', menus: ['dashboard', 'drawings', 'floorplans', 'content', 'products', 'design'], builtin: true },
-  { id: 'role-viewer', name: '뷰어', scope: 'admin', menus: ['dashboard', 'drawings', 'floorplans'], builtin: true },
+  { id: 'role-operator', name: '운영자', scope: 'admin', menus: ['dashboard', 'content', 'library', 'products'], builtin: true },
+  { id: 'role-viewer', name: '뷰어', scope: 'admin', menus: ['dashboard'], builtin: true },
   { id: 'role-user', name: '일반', scope: 'service', menus: [], builtin: true },
   { id: 'role-b2b', name: 'B2B', scope: 'service', menus: [], builtin: true },
   { id: 'role-vip', name: 'VIP', scope: 'service', menus: [], builtin: true },
@@ -95,23 +90,14 @@ export const DEFAULT_SUBMENUS: Record<string, MenuConfig[]> = {
     { key: 'brands', label: '브랜드 관리', visible: true },
     { key: 'users/roles', label: '어드민 권한 관리', visible: true },
   ],
-  content: [
-    { key: 'content/library', label: '컨텐츠 라이브러리', visible: true },
-    { key: 'products', label: '상품 관리', visible: true },
-    ...DEFAULT_PRODUCT_SUBMENUS,
-  ],
-  drawings: [
-    { key: 'floorplans', label: '사용자 도면 관리', visible: true },
-    { key: 'drawings/apt', label: 'APT 도면 관리', visible: true },
-  ],
+  content: [...DEFAULT_PRODUCT_SUBMENUS],
 };
 
 export const DEFAULT_CONFIG: AdminConfig = {
   mainMenu: [
     { key: 'users', label: '사용자 관리', visible: true },
-    { key: 'content', label: '컨텐츠 관리', visible: true },
-    { key: 'drawings', label: '도면 관리', visible: true },
-    { key: 'design', label: '설계 미리보기', visible: true },
+    { key: 'content', label: '컨텐츠 관리', visible: true },
+    { key: 'library', label: '컨텐츠 라이브러리', visible: true },
   ],
   removedMenus: [],
   productSubMenus: DEFAULT_PRODUCT_SUBMENUS,
@@ -129,6 +115,21 @@ export const DEFAULT_CONFIG: AdminConfig = {
 };
 
 const CONFIG_KEY = 'hp3-admin-config';
+
+/** 새로 생긴 기본 메뉴를 저장된 순서에 끼운다 — 기본 순서상 바로 앞 메뉴 뒤 (앞 메뉴가 없으면 맨 뒤) */
+function insertMissing(menu: MenuConfig[], missing: MenuConfig[]): MenuConfig[] {
+  const out = [...menu];
+  for (const m of missing) {
+    const order = DEFAULT_CONFIG.mainMenu.map((d) => d.key);
+    const prev = order.slice(0, order.indexOf(m.key)).reverse().find((k) => out.some((o) => o.key === k));
+    const at = prev ? out.findIndex((o) => o.key === prev) + 1 : out.length;
+    out.splice(at, 0, m);
+  }
+  return out;
+}
+
+/** 컨텐츠 라이브러리는 2026-10-07 컨텐츠 관리 하위에서 최상위 메뉴로 — 컨텐츠 관리 권한이 있던 등급에 자동 부여 */
+const withLibrary = (r: Role): Role => (r.menus.includes('content') && !r.menus.includes('library') ? { ...r, menus: [...r.menus, 'library'] } : r);
 
 export function loadConfig(): AdminConfig {
   try {
@@ -154,7 +155,7 @@ export function loadConfig(): AdminConfig {
     // 메뉴별 하위메뉴 — 저장본 순서/표시 유지, 라벨은 최신 기본값. 누락 항목·부모 병합.
     // 구버전(subMenus 없음)은 productSubMenus를 content 하위로 마이그레이션.
     const savedSubMenus: Record<string, MenuConfig[]> = saved.subMenus
-      ?? { ...DEFAULT_SUBMENUS, content: [{ key: 'products', label: '상품 관리', visible: true }, ...savedSubs, ...missingSubs] };
+      ?? { ...DEFAULT_SUBMENUS, content: [...savedSubs, ...missingSubs] };
     const mergedSubMenus: Record<string, MenuConfig[]> = {};
     for (const parent of Object.keys(DEFAULT_SUBMENUS)) {
       const defs = DEFAULT_SUBMENUS[parent];
@@ -176,15 +177,15 @@ export function loadConfig(): AdminConfig {
         if (!s) return d;
         // 최고관리자(superuser)는 항상 모든 어드민 메뉴 접근 — 새 메뉴 추가 시에도 자동 포함
         if (d.id === 'role-super') return { ...s, menus: [...ALL_ADMIN_MENU_KEYS] };
-        return s;
+        return withLibrary(s);
       }),
-      ...savedRoles.filter((s) => !DEFAULT_ROLES.some((d) => d.id === s.id)),
+      ...savedRoles.filter((s) => !DEFAULT_ROLES.some((d) => d.id === s.id)).map(withLibrary),
     ];
     const currentRoleId = mergedRoles.some((r) => r.id === saved.currentRoleId)
       ? saved.currentRoleId
       : 'role-super';
     return {
-      mainMenu: [...validMenu, ...missing],
+      mainMenu: insertMissing(validMenu, missing),
       removedMenus: removed,
       productSubMenus: [...savedSubs, ...missingSubs],
       subMenus: mergedSubMenus,
