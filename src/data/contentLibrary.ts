@@ -70,7 +70,69 @@ export type Item = {
   photos?: string[];
   /** 상세 소개 문구 */
   detailText?: string;
+  /** 혼합 재질(쿠지알러 混合材质 · MixMaterial) — 흑백 마스크(IndexedDB 에셋)의 검은 영역·흰 영역에 재질 하나씩 */
+  mix?: { mask: string; black: MixPart; white: MixPart };
+  /** 타일 상품(쿠지알러 铺贴产品) — 줄눈·붙임 방식·재질 분류·여러 면 이미지·맞춤 배열 */
+  tile?: TileInfo;
+  /** 보더 패턴(쿠지알러 波打线样式) — 보더 타일·코너 타일(타일 상품) */
+  border?: { corner: boolean; flat: boolean; edge: MixPart; cornerTile?: MixPart };
+  /** 타일 배열 패턴(쿠지알러 拼砖样式) — 붙임 방식 템플릿·크기 항목·칸별 타일 상품 */
+  tilePattern?: { templateId: number; template: string; sizes: Record<string, number>; tiles: Record<string, MixPart> };
+  /** 워터젯 패턴(쿠지알러 水刀拼花) — DXF 닫힌 영역(형상은 IndexedDB 에셋)과 영역별 채움 */
+  medallion?: { asset: string; w: number; h: number; regions: number; fills: (MedallionFill | null)[] };
+  /** 비정형 상품(쿠지알러 异型产品) — 형상·매개변수(mm)·형상대로 자른 면 이미지(IndexedDB 에셋)·줄눈·재질 분류 */
+  shaped?: ShapedInfo;
 };
+
+/** 비정형 상품 정보 (쿠지알러 shape_create 의 입력과 같은 항목) */
+export type ShapedInfo = {
+  kind: 'hexagon' | 'star' | 'radius' | 'custom';
+  /** 별·둥근 사각 — 직선 변·호 높이·짝 맞는 작은 타일 변 길이 (mm) */
+  params?: { straight: number; arc: number; side: number };
+  /** 사용자 정의 — CAD 윤곽(0–1, 위 원점)·원래 크기(mm)·원래 크기 유지 */
+  cad?: { name: string; w: number; h: number; points: [number, number][]; keep: boolean };
+  faces: string[];
+  gapColor: string;
+  gapWidth: number;
+  mat: [string, string] | null;
+  /** 실시간 재질 세부 조정 */
+  pbr?: PbrConfig;
+};
+
+/**
+ * 실시간 재질 세부 조정 (쿠지알러 实时材质制作工具 ⚙) — 재질 템플릿 id(= 실시간 재질 분류 재질 id)·템플릿 기본값과 다른 값·표시 모델.
+ * 맵 값은 주소 또는 'asset:<IndexedDB id>', __normal = 바꾼 노멀 맵
+ */
+export type PbrConfig = { template: string; values: Record<string, number | boolean | string | [number, number, number]>; model?: number };
+
+/** 워터젯 영역 채움 — 타일 상품(실제 크기·회전) 또는 구멍 */
+export type MedallionFill = { id: string; name: string; img: string; L: number; W: number; rot: number } | 'hollow';
+
+/** 타일 상품 정보 (쿠지알러 tile/create 의 입력과 같은 항목) */
+export type TileInfo = {
+  gapColor: string;
+  gapWidth: number;
+  /** 붙임 방식 id (pavingData PAVING) — 보더 타일은 0 */
+  paving: number;
+  angle?: 45 | 60;
+  /** 렌더 분류 경로 id */
+  cat: number[];
+  /** 실시간 재질 분류 [대분류 원문, 재질 id] — 재질 인용이면 null */
+  mat: [string, string] | null;
+  /** 가변 범위 (카펫) mm */
+  range?: { minL: number; maxL: number; minW: number; maxW: number };
+  /** 여러 면 이미지 (IndexedDB 에셋 id) — 다면 타일 상품 */
+  faces?: string[];
+  /** 맞춤 배열 — 행×열 칸마다 면 번호 */
+  order?: { rows: number; cols: number; L: number; W: number; cells: (number | null)[] };
+  /** 인용한 재질 상품 id */
+  refId?: string;
+  /** 실시간 재질 세부 조정 */
+  pbr?: PbrConfig;
+};
+
+/** 혼합 재질에 쓴 재질 — 재질 라이브러리 상품 */
+export type MixPart = { id: string; name: string; img: string };
 
 export type ItemModel =
   /** 파라메트릭 모델 에디터에서 만든 모델 — id = hp3-param-models 의 모델, asset = 내보낸 GLB */
@@ -79,7 +141,11 @@ export type ItemModel =
   | { kind: 'glb'; asset: string; file: string };
 
 /** 몰딩 프로파일 단면 — 좌하단 (0,0) 기준 mm 좌표 */
-export type ProfileShape = { w: number; h: number; points: [number, number][] };
+export type ProfileShape = {
+  w: number; h: number; points: [number, number][];
+  /** 단면 그리기로 만든 단면의 원래 경로(윤곽 편집기 형식) — 다시 열어 고칠 때 */
+  path?: string;
+};
 
 /** 모델 크기(w=폭, d=깊이, h=높이) → 쿠지알러식 ‘W X D X H mm’ */
 export const modelSizeText = (b: { w: number; h: number; d: number }) => `${b.w} X ${b.d} X ${b.h} mm`;
@@ -449,7 +515,7 @@ export function resetContentState() {
   localStorage.removeItem(KEY);
 }
 
-/* ───────────────────────── 소재 만들기 · 저장 후 입고 ───────────────────────── */
+/* ───────────────────────── 컨텐츠 제작 · 저장 후 입고 ───────────────────────── */
 
 /** 지금 보고 있는 라이브러리(기업 / 추가)의 상품 목록 */
 export const itemsOf = (s: ContentState) => (s.activeLibrary === 'main' ? s.items : s.extraItems[s.activeLibrary] ?? []);

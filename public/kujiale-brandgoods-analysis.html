@@ -293,7 +293,7 @@ footer{margin-top:80px;color:var(--ink-faint);font-size:12px;border-top:1px soli
     <p><b>HP3</b>: 같은 카드(쿠지알러 <code>uploadPortals</code> 번호·순서·설명)를 보여 주고, 카드를 누르면 쿠지알러처럼 그 카드의 생성 화면이 열립니다 — 카드별 화면과 생성 조건은 <a href="#create">3-2 절</a>.</p>
     <div class="pair">
       <figure class="shot"><img src="captures/kujiale-brandgoods/09-create.jpg" alt="쿠지알러 소재 만들기"><figcaption>쿠지알러 소재 만들기</figcaption></figure>
-      <figure class="shot"><img src="captures/kujiale-brandgoods/hp3-create.jpg" alt="HP3 소재 만들기"><figcaption>HP3 소재 만들기 (주방·욕실 맞춤)</figcaption></figure>
+      <figure class="shot"><img src="captures/kujiale-brandgoods/hp3-create.jpg" alt="HP3 컨텐츠 제작"><figcaption>HP3 컨텐츠 제작 (주방·욕실 맞춤 — 쿠지알러 ‘소재 만들기’)</figcaption></figure>
     </div>
   </div>
 
@@ -499,7 +499,7 @@ footer{margin-top:80px;color:var(--ink-faint);font-size:12px;border-top:1px soli
     <tr><td>일괄 편집</td><td>18개 항목</td><td>15개 동작, 3개(분할 전처리·설비 분류·모델 설정)는 에디터 연동 안내</td></tr>
     <tr><td>필터·정렬·검색</td><td>시스템 필터 5개 + 태그 123그룹</td><td>동일 + 태그 검색·그룹 미지정</td></tr>
     <tr><td>빠른 편집 / 상세</td><td>모달 / 새 탭</td><td>모달 / 모달, 작업 이력 자동 기록</td></tr>
-    <tr><td>소재 만들기</td><td>탭별 카드 → 카드별 생성 화면</td><td>같은 카드 → 같은 생성 화면·조건 (3-2 절), 미확인 카드는 안내만</td></tr>
+    <tr><td>소재 만들기 (HP3 ‘컨텐츠 제작’)</td><td>탭별 카드 → 카드별 생성 화면</td><td>같은 카드 → 같은 생성 화면·조건 (3-2 절), 미확인 카드는 안내만</td></tr>
     <tr><td>가져오기/내보내기</td><td>엑셀, 3단계 내보내기, 이력</td><td>CSV, 3단계 내보내기, 이력, 양식 다운로드</td></tr>
     <tr><td>라이브러리 관리 / 설정 / 휴지통</td><td>별도 페이지 / 모달 / 트리 하단</td><td>모달 / 모달 / 트리 하단 (+ 영구 삭제)</td></tr>
   </table></div>
@@ -507,7 +507,7 @@ footer{margin-top:80px;color:var(--ink-faint);font-size:12px;border-top:1px soli
   <h3 id="hp3-gap">미구현 · 후속 과제</h3>
   <ul>
     <li><b>백엔드 저장</b> — 지금은 브라우저 저장(localStorage). 운영 전 API·DB(상품·폴더·이력 테이블)로 옮겨야 다른 운영자와 공유됩니다.</li>
-    <li><b>파라메트릭 모델 에디터 연결 (반영됨)</b> — ‘소재 만들기’의 파라메트릭 모델 카드만 에디터를 엽니다(모델 유형 선택부터). 다른 카드는 쿠지알러처럼 각자의 업로드 화면으로 갑니다. 목록·상세의 ‘모델 편집’으로 다시 열고, ‘저장 후 입고’로 갱신합니다.</li>
+    <li><b>파라메트릭 모델 에디터 연결 (반영됨)</b> — ‘컨텐츠 제작’의 파라메트릭 모델 카드만 에디터를 엽니다(모델 유형 선택부터). 다른 카드는 쿠지알러처럼 각자의 업로드 화면으로 갑니다. 목록·상세의 ‘모델 편집’으로 다시 열고, ‘저장 후 입고’로 갱신합니다.</li>
     <li><b>남은 모델 데이터 작업</b> — 3D 모델 분할(분할면·저장), 3D 재질 교체·범례 태그·분할 전처리·설비 분류, 에디터의 빠른 모델링·변수 계열·외부 값·플러그인은 쿠지알러 동작을 확인한 뒤 진행.</li>
     <li><b>화면 미확인 카드</b> — 3-2 절 목록. 쿠지알러 화면 확인(보기만) 후 이식.</li>
     <li><b>업로드 변환</b> — .fbx·.glb 는 브라우저에서 변환(<code>src/data/fbxConvert.ts</code>). .skp·.max·.3dm·압축 파일은 변환 서버가 있어야 합니다.</li>

@@ -1,0 +1,3151 @@
+[
+ {
+  "id": 1010,
+  "name": "별 타일-둥근 모서리",
+  "zh": "星形砖-圆角砖",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4W1FVWV.jpg",
+  "cat": 3065,
+  "sizes": [
+   {
+    "key": "bigSize",
+    "label": "큰 타일 변",
+    "value": 600
+   },
+   {
+    "key": "smallSize",
+    "label": "작은 타일 변",
+    "value": 100
+   },
+   {
+    "key": "straightEdge",
+    "label": "직선 변",
+    "value": 10
+   },
+   {
+    "key": "arcHigh",
+    "label": "호 높이",
+    "value": 30
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": true
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": true
+   }
+  ]
+ },
+ {
+  "id": 108,
+  "name": "평행 어긋남 2.3",
+  "zh": "平行错位2.3",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY2EJW.jpg",
+  "cat": 3070,
+  "sizes": [
+   {
+    "key": "longSize",
+    "label": "긴 변",
+    "value": 400
+   },
+   {
+    "key": "shortSize1",
+    "label": "짧은 변 1",
+    "value": 200
+   },
+   {
+    "key": "shortSize2",
+    "label": "짧은 변 2",
+    "value": 100
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 107,
+  "name": "평행 어긋남 2.2",
+  "zh": "平行错位2.2",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY2OL0.jpg",
+  "cat": 3069,
+  "sizes": [
+   {
+    "key": "longSize",
+    "label": "긴 변",
+    "value": 600
+   },
+   {
+    "key": "shortSize1",
+    "label": "짧은 변 1",
+    "value": 300
+   },
+   {
+    "key": "shortSize2",
+    "label": "짧은 변 2",
+    "value": 150
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 106,
+  "name": "큐브-6-1-1-1-1-1-1-1",
+  "zh": "魔方-6-1-1-1-1-1-1-1",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY2L8Y.jpg",
+  "cat": 3068,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 480
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   },
+   {
+    "key": "fourthTile",
+    "label": "4번 타일",
+    "shaped": false
+   },
+   {
+    "key": "fifthTile",
+    "label": "5번 타일",
+    "shaped": false
+   },
+   {
+    "key": "sixthTile",
+    "label": "6번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 96,
+  "name": "큐브-직사각형-2",
+  "zh": "魔方-矩形-2",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY216S.jpg",
+  "cat": 3023,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 330
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 95,
+  "name": "큐브-직사각형-1",
+  "zh": "魔方-矩形-1",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY3TPC.jpg",
+  "cat": 3022,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 600
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   },
+   {
+    "key": "fourthTile",
+    "label": "4번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 94,
+  "name": "맞붙임 5",
+  "zh": "紧紧相依5",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY3QDB.jpg",
+  "cat": 941,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 100
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 600
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   },
+   {
+    "key": "fourthTile",
+    "label": "4번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 93,
+  "name": "맞붙임 4",
+  "zh": "紧紧相依4",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY41EE.jpg",
+  "cat": 3062,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 100
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 600
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   },
+   {
+    "key": "fourthTile",
+    "label": "4번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 92,
+  "name": "엇갈림 붙임-2",
+  "zh": "交错铺-2",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY3X2D.jpg",
+  "cat": 3001,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 150
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 300
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 91,
+  "name": "가로세로 맞춤 4",
+  "zh": "横竖拼4",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY483G.jpg",
+  "cat": 952,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 400
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 90,
+  "name": "가로세로 맞춤 3",
+  "zh": "横竖拼3",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY44QF.jpg",
+  "cat": 951,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 400
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   },
+   {
+    "key": "fourthTile",
+    "label": "4번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 89,
+  "name": "바람개비 붙임 8",
+  "zh": "风车铺8",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY4ERI.jpg",
+  "cat": 950,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 100
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 400
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   },
+   {
+    "key": "fourthTile",
+    "label": "4번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 88,
+  "name": "2장 엇갈림 붙임 2",
+  "zh": "双拼工字铺2",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY4BFH.jpg",
+  "cat": 949,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 100
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 400
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 87,
+  "name": "2장 엇갈림 붙임 1",
+  "zh": "双拼工字铺1",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY32Y4.jpg",
+  "cat": 948,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 100
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 400
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 86,
+  "name": "가로세로 맞춤 2",
+  "zh": "横竖拼2",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY2YM3.jpg",
+  "cat": 947,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 300
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   },
+   {
+    "key": "fourthTile",
+    "label": "4번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 85,
+  "name": "가로세로 맞춤 1",
+  "zh": "横竖拼1",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY39N6.jpg",
+  "cat": 946,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 300
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 84,
+  "name": "헤링본 4",
+  "zh": "人字拼4",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY36B5.jpg",
+  "cat": 945,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 200
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 83,
+  "name": "헤링본 3",
+  "zh": "人字拼3",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY3GC8.jpg",
+  "cat": 944,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 100
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 400
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   },
+   {
+    "key": "fourthTile",
+    "label": "4번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 82,
+  "name": "헤링본 2",
+  "zh": "人字拼2",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY3D07.jpg",
+  "cat": 943,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 100
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 400
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 81,
+  "name": "헤링본 1",
+  "zh": "人字拼1",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY3N1A.jpg",
+  "cat": 942,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 100
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 400
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 80,
+  "name": "맞붙임 3",
+  "zh": "紧紧相依3",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY3JO9.jpg",
+  "cat": 941,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 100
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 800
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "fourthTile",
+    "label": "4번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   },
+   {
+    "key": "fifthTile",
+    "label": "5번 타일",
+    "shaped": false
+   },
+   {
+    "key": "sixthTile",
+    "label": "6번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 79,
+  "name": "DYRS 맞춤 붙임 2",
+  "zh": "东易日盛定制铺2",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY5D7S.jpg",
+  "cat": 569,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 100
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 800
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 78,
+  "name": "DYRS 맞춤 붙임",
+  "zh": "东易日盛定制铺",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY59UR.jpg",
+  "cat": 527,
+  "sizes": [
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 1600
+   },
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 100
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 77,
+  "name": "바람개비 붙임 7",
+  "zh": "风车铺7",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY5JVU.jpg",
+  "cat": 3061,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 100
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 400
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 75,
+  "name": "사다리 붙임 10",
+  "zh": "梯子铺10",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY5QKW.jpg",
+  "cat": 3060,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 100
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 200
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 74,
+  "name": "큐브-2-1-1",
+  "zh": "魔方-2-1-1",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY5N8V.jpg",
+  "cat": 3059,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 300
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 73,
+  "name": "별빛 2",
+  "zh": "星光璀璨2",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY5X9Y.jpg",
+  "cat": 3058,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 100
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 400
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 72,
+  "name": "큐브-3-8-12-2",
+  "zh": "魔方-3-8-12-2",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY5TWX.jpg",
+  "cat": 3057,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 100
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 71,
+  "name": "큐브-3-9-8-4",
+  "zh": "魔方-3-9-8-4",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY4LGK.jpg",
+  "cat": 3056,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 100
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 70,
+  "name": "큐브-3-1-8-4",
+  "zh": "魔方-3-1-8-4",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY4I4J.jpg",
+  "cat": 3055,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 400
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 69,
+  "name": "사다리 붙임 9",
+  "zh": "梯子铺9",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY4S5M.jpg",
+  "cat": 3054,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 300
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   },
+   {
+    "key": "fourthTile",
+    "label": "4번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 68,
+  "name": "사다리 붙임 8",
+  "zh": "梯子铺8",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY4OSL.jpg",
+  "cat": 3053,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 300
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   },
+   {
+    "key": "fourthTile",
+    "label": "4번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 67,
+  "name": "평행 붙임-4-1-1-1-1",
+  "zh": "平行铺-4-1-1-1-1",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY4YTO.jpg",
+  "cat": 3052,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 100
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 800
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   },
+   {
+    "key": "fourthTile",
+    "label": "4번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 66,
+  "name": "큐브-2-4-6",
+  "zh": "魔方-2-4-6",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY4VHN.jpg",
+  "cat": 3051,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 300
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 65,
+  "name": "삼각형+작은 타일-3-4-4-2",
+  "zh": "三角形嵌小砖-3-4-4-2",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY56IQ.jpg",
+  "cat": 3050,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 300
+   },
+   {
+    "key": "smallSize",
+    "label": "작은 타일 변",
+    "value": 60
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 64,
+  "name": "바람개비+작은 타일-3-4-4-8",
+  "zh": "风车铺嵌小砖-3-4-4-8",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY536P.jpg",
+  "cat": 3049,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 300
+   },
+   {
+    "key": "smallSize",
+    "label": "작은 타일 변",
+    "value": 100
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 63,
+  "name": "삼각형+작은 타일-3-1-2-2",
+  "zh": "三角形嵌小砖-3-1-2-2",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY6VP9.jpg",
+  "cat": 3048,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 300
+   },
+   {
+    "key": "smallSize",
+    "label": "작은 타일 변",
+    "value": 60
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 62,
+  "name": "삼각형+작은 타일-3-2-2-1",
+  "zh": "三角形嵌小砖-3-2-2-1",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY6SD8.jpg",
+  "cat": 3047,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 300
+   },
+   {
+    "key": "smallSize",
+    "label": "작은 타일 변",
+    "value": 60
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 61,
+  "name": "엇갈림 붙임-2-8-1",
+  "zh": "交错铺-2-8-1",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY73EB.jpg",
+  "cat": 3046,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 300
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 60,
+  "name": "큐브-2-5-3",
+  "zh": "魔方-2-5-3",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY702A.jpg",
+  "cat": 3045,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 100
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 300
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 59,
+  "name": "큐브-2-4-1",
+  "zh": "魔方-2-4-1",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY7A3D.jpg",
+  "cat": 3044,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 100
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 300
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 58,
+  "name": "큐브-3-4-1-1",
+  "zh": "魔方-3-4-1-1",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY76QC.jpg",
+  "cat": 3043,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 100
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 200
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 57,
+  "name": "큐브-3-2-2-1",
+  "zh": "魔方-3-2-2-1",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY7GRF.jpg",
+  "cat": 3042,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 100
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 200
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 56,
+  "name": "사다리 붙임 7",
+  "zh": "梯子铺7",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY7DFE.jpg",
+  "cat": 3041,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 100
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 200
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 55,
+  "name": "평행 붙임-3-5-1-1",
+  "zh": "平行铺-3-5-1-1",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY64Y1.jpg",
+  "cat": 3040,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 300
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 54,
+  "name": "평행 붙임-2-2-1",
+  "zh": "平行铺-2-2-1",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY61M0.jpg",
+  "cat": 3039,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 300
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 53,
+  "name": "삼각형 붙임 3",
+  "zh": "三角形铺法3",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY6BN3.jpg",
+  "cat": 3038,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 300
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 52,
+  "name": "사다리 붙임 6",
+  "zh": "梯子铺6",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY68B2.jpg",
+  "cat": 3037,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 100
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 200
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 51,
+  "name": "사다리 붙임 5",
+  "zh": "梯子铺5",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY6IC5.jpg",
+  "cat": 3036,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 100
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 200
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 50,
+  "name": "엇갈림 붙임-2-4-2",
+  "zh": "交错铺-2-4-2",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY6F04.jpg",
+  "cat": 3035,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 300
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 49,
+  "name": "사다리 붙임 4",
+  "zh": "梯子铺4",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY6P17.jpg",
+  "cat": 3034,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 300
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 48,
+  "name": "엇갈림 붙임-2-8-2",
+  "zh": "交错铺-2-8-2",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY6LO6.jpg",
+  "cat": 3033,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 100
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 300
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 47,
+  "name": "엇갈림 붙임-2-2-2",
+  "zh": "交错铺-2-2-2",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY8F7P.jpg",
+  "cat": 3032,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 50
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 400
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 46,
+  "name": "평행 붙임-2-2-3",
+  "zh": "平行铺-2-2-3",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY8BUO.jpg",
+  "cat": 3031,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 400
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 600
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 45,
+  "name": "엇갈림 붙임 3-2-2-2",
+  "zh": "交错铺3-2-2-2",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY8LVR.jpg",
+  "cat": 3030,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 600
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 800
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 44,
+  "name": "바람개비 붙임 6",
+  "zh": "风车铺6",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY8IJQ.jpg",
+  "cat": 585,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 700
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   },
+   {
+    "key": "fourthTile",
+    "label": "4번 타일",
+    "shaped": false
+   },
+   {
+    "key": "fifthTile",
+    "label": "5번 타일",
+    "shaped": false
+   },
+   {
+    "key": "sixthTile",
+    "label": "6번 타일",
+    "shaped": false
+   },
+   {
+    "key": "seventhTile",
+    "label": "7번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 43,
+  "name": "바람개비 붙임 5",
+  "zh": "风车铺5",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY8SKT.jpg",
+  "cat": 584,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 600
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   },
+   {
+    "key": "fourthTile",
+    "label": "4번 타일",
+    "shaped": false
+   },
+   {
+    "key": "fifthTile",
+    "label": "5번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 42,
+  "name": "큐브-2-2-1",
+  "zh": "魔方-2-2-1",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY8P8S.jpg",
+  "cat": 1045,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 100
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 600
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 41,
+  "name": "바람개비 붙임 4",
+  "zh": "风车铺4",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY909V.jpg",
+  "cat": 3029,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 300
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 40,
+  "name": "큐브-3-1-1-1",
+  "zh": "魔方-3-1-1-1",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY8VWU.jpg",
+  "cat": 3028,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 600
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 39,
+  "name": "바람개비 붙임 3",
+  "zh": "风车铺3",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY7NGH.jpg",
+  "cat": 3027,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 200
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 38,
+  "name": "엇갈림 붙임-2-1-1",
+  "zh": "交错铺-2-1-1",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY7K4G.jpg",
+  "cat": 3026,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 200
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 600
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 37,
+  "name": "큐브-4-1-1-1-1",
+  "zh": "魔方-4-1-1-1-1",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY7U5J.jpg",
+  "cat": 3025,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 300
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   },
+   {
+    "key": "fourthTile",
+    "label": "4번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 36,
+  "name": "삼위일체 2",
+  "zh": "三位一体2",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY7QSI.jpg",
+  "cat": 3024,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 300
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 35,
+  "name": "평행 어긋남-2-1-1",
+  "zh": "平行错位-2-1-1",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY81TL.jpg",
+  "cat": 672,
+  "sizes": [
+   {
+    "key": "longSize",
+    "label": "긴 변",
+    "value": 300
+   },
+   {
+    "key": "shortSize",
+    "label": "짧은 변",
+    "value": 150
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 34,
+  "name": "사다리 붙임 3",
+  "zh": "梯子铺3",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY7XHK.jpg",
+  "cat": 673,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 100
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 33,
+  "name": "#자 격자 붙임-2-5-1",
+  "zh": "井字铺-2-5-1",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY88IN.jpg",
+  "cat": 674,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 100
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 32,
+  "name": "#자 격자 붙임-3-1-4-1",
+  "zh": "井字铺-3-1-4-1",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY856M.jpg",
+  "cat": 675,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 100
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 400
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 31,
+  "name": "사다리 붙임 2",
+  "zh": "梯子铺2",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY9XP6.jpg",
+  "cat": 676,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 100
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 400
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "fourthTile",
+    "label": "4번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 30,
+  "name": "평행 붙임-7-1-1-1-1-1-1-1",
+  "zh": "平行铺-7-1-1-1-1-1-1-1",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY9UD5.jpg",
+  "cat": 677,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 50
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 400
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   },
+   {
+    "key": "fourthTile",
+    "label": "4번 타일",
+    "shaped": false
+   },
+   {
+    "key": "fifthTile",
+    "label": "5번 타일",
+    "shaped": false
+   },
+   {
+    "key": "sixthTile",
+    "label": "6번 타일",
+    "shaped": false
+   },
+   {
+    "key": "seventhTile",
+    "label": "7번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 29,
+  "name": "평행 붙임-2-1-1",
+  "zh": "平行铺-2-1-1",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VYA5E8.jpg",
+  "cat": 671,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 100
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 600
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 28,
+  "name": "큰 타일+작은 타일-2-1-1",
+  "zh": "大砖嵌小砖-2-1-1",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VYA227.jpg",
+  "cat": 670,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 50
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 400
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 27,
+  "name": "맞붙임 2",
+  "zh": "紧紧相依2",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VYAC3A.jpg",
+  "cat": 678,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 100
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 800
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "fourthTile",
+    "label": "4번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 26,
+  "name": "사다리 붙임",
+  "zh": "梯子铺",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VYA8Q9.jpg",
+  "cat": 669,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 100
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 600
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 25,
+  "name": "피시본",
+  "zh": "鱼骨拼",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VYAIRC.jpg",
+  "cat": 582,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 300
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   },
+   {
+    "key": "fourthTile",
+    "label": "4번 타일",
+    "shaped": false
+   },
+   {
+    "key": "fifthTile",
+    "label": "5번 타일",
+    "shaped": false
+   },
+   {
+    "key": "sixthTile",
+    "label": "6번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 24,
+  "name": "삼위일체",
+  "zh": "三位一体",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VYAFFB.jpg",
+  "cat": 583,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 600
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 18,
+  "name": "맞붙임",
+  "zh": "紧紧相依",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY9H01.jpg",
+  "cat": 570,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 100
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 800
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 17,
+  "name": "별빛",
+  "zh": "星光璀璨",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY9R14.jpg",
+  "cat": 569,
+  "sizes": [
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 50
+   },
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 400
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 16,
+  "name": "입체 타일",
+  "zh": "立体砖",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VY9NO3.jpg",
+  "cat": 545,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 300
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   },
+   {
+    "key": "thirdTile",
+    "label": "3번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 15,
+  "name": "큰 타일+작은 삼각 타일",
+  "zh": "大砖嵌小三角砖",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VYBH7M.jpg",
+  "cat": 544,
+  "sizes": [
+   {
+    "key": "largeTileSize",
+    "label": "큰 타일",
+    "value": 300
+   },
+   {
+    "key": "smallTileSize",
+    "label": "작은 타일",
+    "value": 50
+   }
+  ],
+  "slots": [
+   {
+    "key": "largeTile1",
+    "label": "largeTile1",
+    "shaped": false
+   },
+   {
+    "key": "smallTile",
+    "label": "smallTile",
+    "shaped": false
+   },
+   {
+    "key": "largeTile2",
+    "label": "largeTile2",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 14,
+  "name": "큰 타일+작은 타일-3-1-1-1",
+  "zh": "大砖嵌小砖-3-1-1-1",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VYBDUL.jpg",
+  "cat": 543,
+  "sizes": [
+   {
+    "key": "largeTileSize",
+    "label": "큰 타일",
+    "value": 300
+   },
+   {
+    "key": "smallTileSize",
+    "label": "작은 타일",
+    "value": 50
+   }
+  ],
+  "slots": [
+   {
+    "key": "largeTile1",
+    "label": "largeTile1",
+    "shaped": false
+   },
+   {
+    "key": "smallTile",
+    "label": "smallTile",
+    "shaped": false
+   },
+   {
+    "key": "largeTile2",
+    "label": "largeTile2",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 13,
+  "name": "큰 타일+작은 타일-3-2-2-1",
+  "zh": "大砖嵌小砖-3-2-2-1",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VYBNVO.jpg",
+  "cat": 542,
+  "sizes": [
+   {
+    "key": "largeTileSize",
+    "label": "큰 타일",
+    "value": 300
+   },
+   {
+    "key": "smallTileSize",
+    "label": "작은 타일",
+    "value": 50
+   }
+  ],
+  "slots": [
+   {
+    "key": "largeTile1",
+    "label": "largeTile1",
+    "shaped": false
+   },
+   {
+    "key": "smallTile",
+    "label": "smallTile",
+    "shaped": false
+   },
+   {
+    "key": "largeTile2",
+    "label": "largeTile2",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 12,
+  "name": "큰 타일+작은 타일-3-2-2-4",
+  "zh": "大砖嵌小砖-3-2-2-4",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VYBKJN.jpg",
+  "cat": 541,
+  "sizes": [
+   {
+    "key": "largeTileSize",
+    "label": "큰 타일",
+    "value": 300
+   },
+   {
+    "key": "smallTileSize",
+    "label": "작은 타일",
+    "value": 50
+   }
+  ],
+  "slots": [
+   {
+    "key": "largeTile1",
+    "label": "largeTile1",
+    "shaped": false
+   },
+   {
+    "key": "smallTile",
+    "label": "smallTile",
+    "shaped": false
+   },
+   {
+    "key": "largeTile2",
+    "label": "largeTile2",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 11,
+  "name": "큰 타일+작은 타일-3-1-1-2",
+  "zh": "大砖嵌小砖-3-1-1-2",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VYBUKQ.jpg",
+  "cat": 540,
+  "sizes": [
+   {
+    "key": "largeTileSize",
+    "label": "큰 타일",
+    "value": 300
+   },
+   {
+    "key": "smallTileSize",
+    "label": "작은 타일",
+    "value": 50
+   }
+  ],
+  "slots": [
+   {
+    "key": "largeTile1",
+    "label": "largeTile1",
+    "shaped": false
+   },
+   {
+    "key": "smallTile",
+    "label": "smallTile",
+    "shaped": false
+   },
+   {
+    "key": "largeTile2",
+    "label": "largeTile2",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 10,
+  "name": "큰 타일+작은 타일-2-4-2",
+  "zh": "大砖嵌小砖-2-4-2",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VYBR8P.jpg",
+  "cat": 539,
+  "sizes": [
+   {
+    "key": "largeTileSize",
+    "label": "큰 타일",
+    "value": 300
+   },
+   {
+    "key": "smallTileSize",
+    "label": "작은 타일",
+    "value": 50
+   }
+  ],
+  "slots": [
+   {
+    "key": "largeTile",
+    "label": "largeTile",
+    "shaped": false
+   },
+   {
+    "key": "smallTile",
+    "label": "smallTile",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 9,
+  "name": "삼각형 붙임 2",
+  "zh": "三角形铺法2",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VYC29S.jpg",
+  "cat": 537,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 300
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 8,
+  "name": "삼각형 붙임",
+  "zh": "三角形铺法",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VYBXWR.jpg",
+  "cat": 533,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 300
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 7,
+  "name": "간격 붙임",
+  "zh": "间隔铺",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VYAPGE.jpg",
+  "cat": 534,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 100
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 6,
+  "name": "엇갈림 붙임",
+  "zh": "交错铺",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VYAM4D.jpg",
+  "cat": 535,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 300
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 5,
+  "name": "어긋남 붙임",
+  "zh": "错位铺",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VYAW5G.jpg",
+  "cat": 536,
+  "sizes": [
+   {
+    "key": "unitSize",
+    "label": "단위 크기",
+    "value": 300
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 4,
+  "name": "바람개비 붙임 2",
+  "zh": "风车铺2",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VYASSF.jpg",
+  "cat": 538,
+  "sizes": [
+   {
+    "key": "firstTileSize",
+    "label": "1번 타일 크기",
+    "value": 200
+   },
+   {
+    "key": "secondTileSize",
+    "label": "2번 타일 크기",
+    "value": 50
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 3,
+  "name": "바구니 짜임 붙임",
+  "zh": "编织铺",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VYB3TI.jpg",
+  "cat": 527,
+  "sizes": [
+   {
+    "key": "longSideSize",
+    "label": "긴 변",
+    "value": 300
+   },
+   {
+    "key": "shortSideSize",
+    "label": "짧은 변",
+    "value": 100
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 2,
+  "name": "큰 타일+작은 타일",
+  "zh": "大砖嵌小砖",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VYB0HH.jpg",
+  "cat": 526,
+  "sizes": [
+   {
+    "key": "largeTileSize",
+    "label": "큰 타일",
+    "value": 300
+   },
+   {
+    "key": "smallTileSize",
+    "label": "작은 타일",
+    "value": 50
+   }
+  ],
+  "slots": [
+   {
+    "key": "largeTile",
+    "label": "largeTile",
+    "shaped": false
+   },
+   {
+    "key": "smallTile",
+    "label": "smallTile",
+    "shaped": false
+   }
+  ]
+ },
+ {
+  "id": 1,
+  "name": "바람개비 붙임",
+  "zh": "风车铺",
+  "img": "https://spriteoss.kujiale.com/tilepattern/template/dev/3FO4K4VYBAIK.jpg",
+  "cat": 525,
+  "sizes": [
+   {
+    "key": "tileSize",
+    "label": "타일 크기",
+    "value": 300
+   }
+  ],
+  "slots": [
+   {
+    "key": "firstTile",
+    "label": "1번 타일",
+    "shaped": false
+   },
+   {
+    "key": "secondTile",
+    "label": "2번 타일",
+    "shaped": false
+   }
+  ]
+ }
+]

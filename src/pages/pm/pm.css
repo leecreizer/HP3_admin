@@ -359,3 +359,10 @@ kbd { font: 10.5px var(--num); color: var(--sub); background: #f1f3f6; border-ra
 .pm-pe-multi { display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px solid #b9cff8; background: #f3f7fe; border-radius: 8px; }
 .pm-pe-multi .pm-row2 { grid-template-columns: 70px minmax(0, 1fr); align-items: center; }
 .pm-pe-multi small { color: var(--sub); }
+
+/* 단면 그리기 — 이름 정하기 */
+.pm-sec-done { display: flex; gap: 14px; align-items: center; }
+.pm-sec-done img { width: 120px; height: 120px; flex: none; border: 1px solid #e3e6ea; border-radius: 6px; background: #f5f6f8; }
+.pm-sec-done .pm-field { flex: 1; }
+.pm-shape-pick { display: flex; gap: 4px; }
+.pm-shape-pick > .pm-btn:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

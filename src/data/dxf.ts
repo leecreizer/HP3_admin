@@ -1,10 +1,11 @@
 import type { ProfileShape } from './contentLibrary';
 
 /**
- * DXF → 몰딩 프로파일 단면 (쿠지알러 ‘线条轮廓’ 업로드: DXF 파일, 5MB 이하).
- * ENTITIES 의 LWPOLYLINE·POLYLINE(VERTEX)·LINE·ARC·CIRCLE 을 읽어 닫힌 윤곽을 만들고,
- * 그중 면적이 가장 큰 윤곽을 단면으로 쓴다. 원호(bulge·ARC)는 10° 간격으로 나눈다.
- * 결과는 좌하단 (0,0) 기준 mm, 반시계 방향.
+ * DXF 읽기.
+ *  parseDxfProfile — 몰딩 프로파일 단면 (쿠지알러 ‘线条轮廓’ 업로드: DXF 파일, 5MB 이하): 닫힌 윤곽 중 면적이 가장 큰 것.
+ *                    결과는 좌하단 (0,0) 기준 mm, 반시계 방향.
+ *  parseDxfLoops   — 닫힌 윤곽 전부 (쿠지알러 ‘水刀拼花’ 워터젯: 직선·원호·타원호·스플라인, 끊긴 끝은 ‘틈 허용치’ 안이면 잇는다).
+ * ENTITIES 의 LWPOLYLINE·POLYLINE(VERTEX)·LINE·ARC·CIRCLE·ELLIPSE·SPLINE 을 읽는다. 원호(bulge·ARC)는 10° 간격으로 나눈다.
  */
 
 type Pt = [number, number];
@@ -55,6 +56,36 @@ function arcPoints(cx: number, cy: number, r: number, startDeg: number, endDeg: 
   return Array.from({ length: n + 1 }, (_, k) => [cx + r * Math.cos(a0 + ((a1 - a0) * k) / n), cy + r * Math.sin(a0 + ((a1 - a0) * k) / n)] as Pt);
 }
 
+/** 타원호 — 긴 축 끝점(mx,my, 중심 기준)·짧은/긴 비율·매개변수 t0→t1 */
+function ellipsePoints(cx: number, cy: number, mx: number, my: number, ratio: number, t0: number, t1: number): Pt[] {
+  let a1 = t1;
+  while (a1 <= t0) a1 += Math.PI * 2;
+  const nx = -my * ratio, ny = mx * ratio; // 짧은 축 = 긴 축을 90° 돌려 비율만큼
+  const n = Math.max(4, Math.ceil((a1 - t0) / STEP) * 2);
+  return Array.from({ length: n + 1 }, (_, k) => { const t = t0 + ((a1 - t0) * k) / n; return [cx + mx * Math.cos(t) + nx * Math.sin(t), cy + my * Math.cos(t) + ny * Math.sin(t)] as Pt; });
+}
+
+/** B-스플라인(de Boor) — 매듭·가중치가 맞으면 쓰고, 아니면 맞춤점(없으면 조정점)을 잇는다 */
+function splinePoints(deg: number, knots: number[], ctrl: Pt[], weights: number[], fit: Pt[]): Pt[] {
+  if (ctrl.length < 2 || knots.length !== ctrl.length + deg + 1) return fit.length > 1 ? fit : ctrl;
+  const w = weights.length === ctrl.length ? weights : ctrl.map(() => 1);
+  const at = (u: number): Pt => {
+    let k = deg;
+    while (k < ctrl.length - 1 && knots[k + 1] <= u) k++;
+    const d = Array.from({ length: deg + 1 }, (_, j) => { const c = ctrl[j + k - deg]; const ww = w[j + k - deg]; return [c[0] * ww, c[1] * ww, ww]; });
+    for (let r = 1; r <= deg; r++) for (let j = deg; j >= r; j--) {
+      const i = j + k - deg;
+      const den = knots[i + deg - r + 1] - knots[i];
+      const a = den ? (u - knots[i]) / den : 0;
+      d[j] = [0, 1, 2].map((q) => (1 - a) * d[j - 1][q] + a * d[j][q]);
+    }
+    return [d[deg][0] / d[deg][2], d[deg][1] / d[deg][2]];
+  };
+  const u0 = knots[deg], u1 = knots[ctrl.length];
+  const n = Math.max(8, (ctrl.length - deg) * 12);
+  return Array.from({ length: n + 1 }, (_, k) => at(k === n ? u1 - 1e-9 : u0 + ((u1 - u0) * k) / n));
+}
+
 function polyline(vs: { p: Pt; bulge: number }[], closed: boolean): Pt[] {
   if (!vs.length) return [];
   const out: Pt[] = [vs[0].p];
@@ -92,7 +123,8 @@ function chain(segs: Pt[][], tol: number): Pt[][] {
   return loops;
 }
 
-export function parseDxfProfile(text: string): ProfileShape {
+/** ENTITIES 를 읽어 닫힌 고리들 (mm, 원래 좌표) — tol: 끝점을 이어 붙일 틈 허용치(mm) */
+function readLoops(text: string, tol?: number): Pt[][] {
   const ps = pairs(text);
   let scale = 1;
   const unit = ps.findIndex(([c, v]) => c === 9 && v === '$INSUNITS');
@@ -140,9 +172,32 @@ export function parseDxfProfile(text: string): ProfileShape {
       segs.push(arcPoints(num(get(10) ?? '0'), num(get(20) ?? '0'), num(get(40) ?? '0'), Number(get(50) ?? 0), Number(get(51) ?? 0)));
     } else if (type === 'CIRCLE') {
       loops.push(arcPoints(num(get(10) ?? '0'), num(get(20) ?? '0'), num(get(40) ?? '0'), 0, 360).slice(0, -1));
+    } else if (type === 'ELLIPSE') {
+      const t0 = Number(get(41) ?? 0), t1 = Number(get(42) ?? Math.PI * 2);
+      const pts = ellipsePoints(num(get(10) ?? '0'), num(get(20) ?? '0'), num(get(11) ?? '0'), num(get(21) ?? '0'), Number(get(40) ?? 1), t0, t1);
+      if (Math.abs(t1 - t0 - Math.PI * 2) < 1e-6) loops.push(pts.slice(0, -1)); else segs.push(pts);
+    } else if (type === 'SPLINE') {
+      const closed = (Number(get(70) ?? 0) & 1) === 1;
+      const deg = Number(get(71) ?? 3);
+      const knots: number[] = [], weights: number[] = [], ctrl: Pt[] = [], fit: Pt[] = [];
+      for (const [c, v] of body) {
+        if (c === 40) knots.push(Number(v));
+        else if (c === 41) weights.push(Number(v));
+        else if (c === 10) ctrl.push([num(v), 0]);
+        else if (c === 20 && ctrl.length) ctrl[ctrl.length - 1][1] = num(v);
+        else if (c === 11) fit.push([num(v), 0]);
+        else if (c === 21 && fit.length) fit[fit.length - 1][1] = num(v);
+      }
+      const pts = splinePoints(deg, knots, ctrl, weights, fit);
+      const shut = pts.length > 2 && near(pts[0], pts[pts.length - 1], 1e-6);
+      if (closed || shut) loops.push(shut ? pts.slice(0, -1) : pts); else segs.push(pts);
     }
   }
-  const all = [...loops, ...chain(segs, 0.01 * Math.max(1, scale))].filter((l) => l.length >= 3 && Math.abs(area(l)) > 1e-6);
+  return [...loops, ...chain(segs, tol ?? 0.01 * Math.max(1, scale))].filter((l) => l.length >= 3 && Math.abs(area(l)) > 1e-6);
+}
+
+export function parseDxfProfile(text: string): ProfileShape {
+  const all = readLoops(text);
   if (!all.length) throw new Error('닫힌 윤곽을 찾지 못했습니다 — 단면을 닫힌 폴리선(또는 이어진 선·호)으로 그려 주세요');
   let best = all.reduce((a, b) => (Math.abs(area(b)) > Math.abs(area(a)) ? b : a));
   if (area(best) < 0) best = best.slice().reverse();
@@ -150,6 +205,24 @@ export function parseDxfProfile(text: string): ProfileShape {
   const r2 = (v: number) => Math.round(v * 100) / 100;
   const points = best.map(([x, y]) => [r2(x - minX), r2(y - minY)] as Pt);
   return { w: r2(Math.max(...points.map((p) => p[0]))), h: r2(Math.max(...points.map((p) => p[1]))), points };
+}
+
+/**
+ * 워터젯 패턴용 — 닫힌 고리 전부 (왼쪽 아래 (0,0) 기준 mm).
+ * gapTol(틈 허용치): 그보다 가까운 끝점은 이어 붙인다 / minGap(최소 간격): 폭이 그보다 좁은 고리는 버린다(점·선으로 뭉개짐).
+ */
+export function parseDxfLoops(text: string, opt: { gapTol: number; minGap: number }): { w: number; h: number; loops: Pt[][] } {
+  const keep = readLoops(text, opt.gapTol).filter((l) => {
+    const xs = l.map((p) => p[0]), ys = l.map((p) => p[1]);
+    return Math.min(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) >= opt.minGap;
+  });
+  if (!keep.length) throw new Error('닫힌 영역을 찾지 못했습니다 — 선이 끊겼다면 틈 허용치를 키워 보세요');
+  const flat = keep.flat();
+  const minX = Math.min(...flat.map((p) => p[0])), minY = Math.min(...flat.map((p) => p[1]));
+  const r2 = (v: number) => Math.round(v * 100) / 100;
+  const out = keep.map((l) => l.map(([x, y]) => [r2(x - minX), r2(y - minY)] as Pt));
+  const of = out.flat();
+  return { w: r2(Math.max(...of.map((p) => p[0]))), h: r2(Math.max(...of.map((p) => p[1]))), loops: out };
 }
 
 /** 단면 미리보기 이미지 (PNG dataURL) */

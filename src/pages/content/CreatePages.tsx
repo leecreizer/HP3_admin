@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { MATERIAL_RENDER_CAT, type CreatePortal } from '../../data/contentCreate';
-import { fileToThumb, newId, walkFolders, type BizTab, type ContentState, type Folder, type Item } from '../../data/contentLibrary';
+import { MATERIAL_RENDER_CAT } from '../../data/contentCreate';
+import { fileToThumb, newId, walkFolders, type Folder, type Item } from '../../data/contentLibrary';
 import materialCategories from '../../data/materialCategories.json';
 import { parseDxfProfile, profileThumb } from '../../data/dxf';
 import { putAsset } from '../../data/assetStore';
@@ -8,17 +8,23 @@ import { convertFbxToGlb, glbToDataUrl } from '../../data/fbxConvert';
 import { glbInfo } from '../../pm/glb';
 import { AssetViewer } from '../../components/AssetViewer';
 import { FolderPickModal } from './ContentModals';
+import { HybridMaterialPage } from './DecoPages';
+import { TilePage } from './TilePage';
+import { BorderPage } from './BorderPage';
+import { TilePatternPage } from './TilePatternPage';
+import { WaterjetPage } from './WaterjetPage';
+import { SectionDraw } from '../pm/SectionDraw';
+import { ShapedTilePage } from './ShapedTilePage';
+import type { NewItemDraft, PageProps } from './createTypes';
 
 /**
- * 소재 만들기 카드별 생성 화면 — 쿠지알러에서 각 카드가 여는 화면을 그대로 옮겼다.
+ * 컨텐츠 제작 카드별 생성 화면 — 쿠지알러에서 각 카드가 여는 화면을 그대로 옮겼다.
  * (화면 구성·업로드 조건은 2026-10-06 쿠지알러 HANSSEM 계정 화면을 보기만 하고 확인한 것. 업로드·만들기는 누르지 않음)
  *
  * 쿠지알러는 업로드 뒤 서버에서 모델 변환·정보 입력 단계로 넘어가지만, 그 단계는 실제로 올려 보지 않아 확인하지 못했다.
  * HP3 는 올린 파일로 바로 상품을 만들고(상품명 = 파일 이름) 상세·빠른 편집에서 정보를 채운다.
  */
 
-export type NewItemDraft = Pick<Item, 'name' | 'lib'> & Partial<Item>;
-type PageProps = { tab: BizTab; portal: CreatePortal; st: ContentState; onClose: () => void; onCreate: (drafts: NewItemDraft[], msg: string) => void };
 
 type MatGroup = { name: string; zh: string; items: { id: string; name: string; zh: string }[] };
 const MATERIAL_GROUPS = materialCategories as MatGroup[];
@@ -238,6 +244,7 @@ function Model3dPage({ tab, portal, onClose, onCreate }: PageProps) {
 function ProfilePage({ tab, portal, onClose, onCreate }: PageProps) {
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState('');
+  const [draw, setDraw] = useState(false);
   const upload = async ([f]: File[]) => {
     setErr('');
     if (extOf(f) !== 'dxf') { setErr(`${f.name}: DXF 파일만 올릴 수 있습니다`); return; }
@@ -256,6 +263,16 @@ function ProfilePage({ tab, portal, onClose, onCreate }: PageProps) {
         </DropZone>
         <Err msg={err} />
       </Sec>
+      <Sec title="단면 직접 그리기">
+        <div className="cl-sec-draw">
+          <p>CAD 도면 없이 단면을 바로 그려 몰딩 프로파일을 만듭니다 — 사각형·걸레받이·모따기 판·L자·계단형·사분원·코브 템플릿에서 시작하거나 점을 찍어 그리고, 둥근 모서리·모따기·원호로 다듬습니다.</p>
+          <button className="btn-primary" onClick={() => setDraw(true)}>✎ 단면 그리기</button>
+        </div>
+      </Sec>
+      {draw && <SectionDraw onClose={() => setDraw(false)} onDone={(name, shape) => {
+        setDraw(false);
+        onCreate([{ name, lib: portal.lib!, img: profileThumb(shape), profile: shape, size: `${shape.w} X ${shape.h} mm` }], `‘${name}’ 단면을 그려 몰딩 프로파일을 만들었습니다 — 단면 ${shape.w} × ${shape.h} mm`);
+      }} />}
     </Shell>
   );
 }
@@ -405,6 +422,12 @@ export function CreatePage(props: PageProps) {
     case 'virtualModel': return <VirtualModelPage {...props} />;
     case 'pattern': return <PatternPage {...props} />;
     case 'modelCutting': return <ModelCuttingPage {...props} />;
+    case 'hybrid': return <HybridMaterialPage {...props} />;
+    case 'tile': return <TilePage {...props} />;
+    case 'border': return <BorderPage {...props} />;
+    case 'tilePattern': return <TilePatternPage {...props} />;
+    case 'waterjet': return <WaterjetPage {...props} />;
+    case 'shaped': return <ShapedTilePage {...props} />;
     default: return <UnverifiedPage {...props} />;
   }
 }

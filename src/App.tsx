@@ -3,13 +3,9 @@ import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
 import { loadConfig, saveConfig, type AdminConfig, type MenuKey } from './config';
 import { INITIAL_BRANDS, INITIAL_GROUPS, type Brand, type Group } from './data/org';
-import { AptPlans } from './pages/AptPlans';
 import { Brands } from './pages/Brands';
 import { Dashboard } from './pages/Dashboard';
-import { Floorplans } from './pages/Floorplans';
 import { Products } from './pages/Products';
-import { PmStudio } from './pages/PmStudio';
-import { Design } from './pages/Design';
 import { RoleManager } from './pages/RoleManager';
 import { ModelingLibrary } from './pages/ModelingLibrary';
 import { StyleLibrary } from './pages/StyleLibrary';
@@ -19,6 +15,7 @@ import { Users, loadUsers, userKind } from './pages/Users';
 
 const FIXED_TITLE: Partial<Record<MenuKey, string>> = {
   dashboard: '대시보드',
+  library: '컨텐츠 라이브러리',
   settings: '설정',
 };
 
@@ -45,7 +42,6 @@ export default function App() {
   const adminGrades = config.roles.filter((r) => r.scope === 'admin').map((r) => r.name);
   const everyUser = loadUsers();
   const operators = everyUser.filter((u) => userKind(u, adminGrades) === 'operator');
-  const contentUsers = everyUser.filter((u) => userKind(u, adminGrades) === 'content');
   // 로그인 사용자는 고정 — 기본 계정(topbar) 매칭 운영자, 없으면 첫 운영자
   const loginUserId = (() => {
     try { const s = localStorage.getItem('hp3-login-user'); if (s && operators.some((u) => u.id === s)) return s; } catch { /* ignore */ }
@@ -53,9 +49,6 @@ export default function App() {
   })();
   const currentUser = operators.find((u) => u.id === loginUserId) ?? null;
   const currentUserName = currentUser?.name ?? config.topbar.userName;
-  // 운영자는 콘텐츠를 전체 열람(미리보기 '전체') — 콘텐츠 그룹 소속 개념 없음
-  const myGroupIds: string[] = [];
-  const isAdminUser = true;
   // 브랜드/그룹은 사용자 관리에서 생성·관리되고 상품의 컨텐츠 권한 등에서 공유된다
   const loadOrg = <T,>(key: string, fallback: T): T => {
     try {
@@ -124,11 +117,8 @@ export default function App() {
   const SUB_TITLE: Record<string, string> = {
     'users/operators': '어드민 사용자 관리',
     'content-users': '홈플래너 사용자 관리',
-    'content/library': '컨텐츠 라이브러리',
     'products': '상품 관리',
     'brands': '브랜드 관리',
-    'floorplans': '사용자 도면 관리',
-    'drawings/apt': 'APT 도면 관리',
     'users/roles': '어드민 권한 관리',
     'products/modeling': '컨텐츠 그룹 관리',
     'products/styles': '스타일 그룹 관리',
@@ -159,14 +149,6 @@ export default function App() {
     case 'dashboard':
       content = <Dashboard />;
       break;
-    case 'floorplans':
-      content = <Floorplans />;
-      break;
-    case 'drawings':
-      content = active === 'drawings/apt'
-        ? <AptPlans />
-        : <PagePlaceholder title="도면 관리" />;
-      break;
     case 'users':
       if (active === 'users/roles') {
         content = <RoleManager config={config} onChange={setConfig} dirty={configDirty} onSave={() => saveConfigNow()} />;
@@ -182,10 +164,11 @@ export default function App() {
     case 'brands':
       content = <Brands brands={brands} setBrands={setBrands} groups={groups} setGroups={setGroups} dirty={orgDirty} onSave={saveOrg} />;
       break;
-    case 'content':
-      // 컨텐츠 관리 대메뉴·하위 ‘컨텐츠 라이브러리’ — 쿠지알러 기업 상품 라이브러리 구조
+    case 'library':
+      // 컨텐츠 라이브러리 (최상위 메뉴) — 쿠지알러 기업 상품 라이브러리 구조 참고. 파라메트릭 모델 에디터도 여기서 연다
       content = <ContentLibrary userName={currentUserName} />;
       break;
+    case 'content':
     case 'products':
       if (active === 'products/modeling') { content = <ModelingLibrary />; break; }
       if (active === 'products/styles') { content = <StyleLibrary />; break; }
@@ -193,19 +176,10 @@ export default function App() {
         <Products
           groups={groups}
           panel={productsPanel}
-          onClosePanel={() => setActive('products')}
+          onClosePanel={() => setActive(allowedMenus.has('library') ? 'library' : 'dashboard')}
           currentUser={currentUserName}
         />
       );
-      break;
-    case 'editor':
-    case 'parts':
-    case 'assembly':
-      // 파라메트릭 모델 에디터 — 쿠지알러 参数化模型编辑器를 참고해 새로 만든 에디터 (src/pm · src/pages/pm)
-      content = <PmStudio userName={currentUserName} />;
-      break;
-    case 'design':
-      content = <Design users={contentUsers} currentUserId={null} myGroupIds={myGroupIds} isAdmin={isAdminUser} userName={currentUserName} />;
       break;
     case 'settings':
       content = <Settings config={config} onChange={setConfig} dirty={configDirty} onSave={() => saveConfigNow()} />;
@@ -221,7 +195,7 @@ export default function App() {
         collapsed={collapsed}
         config={config}
         allowedMenus={allowedMenus}
-        onSelect={setActive}
+        onSelect={(k) => setActive(k === 'content' ? (config.subMenus.content?.find((m) => m.visible)?.key ?? 'products') : k)}
         onToggleCollapse={() => setCollapsed((c) => !c)}
         onReorder={reorderMenu}
       />
