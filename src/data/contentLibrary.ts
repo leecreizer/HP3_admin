@@ -86,6 +86,26 @@ export type Item = {
   shaped?: ShapedInfo;
   /** 파라메트릭 방안(쿠지알러 参数化编辑器) — 타일·포설 방식·매개변수·표기 미리보기 */
   paving?: PvScheme;
+  /** 몰딩/벽판(쿠지알러 线条/墙板) — 제품 유형·단면 구간·크기·바탕 재질·덧붙임 재질 */
+  lineWall?: LineWallInfo;
+};
+
+/**
+ * 몰딩/벽판 정보 (쿠지알러 molding/create · wallboard/create 의 입력과 같은 항목).
+ * 단면은 선분·원호 ‘구간’ 그대로(덧붙임 재질을 구간 번호 범위로 붙임), 좌하단 (0,0) mm 반시계.
+ */
+export type LineWallInfo = {
+  /** 제품 유형 — 260 걸레받이 · 401 코너 몰딩 · 615 장식 몰딩 · 613 일체형 벽판 · 3196 외부 모서리 몰딩 */
+  type: number;
+  shape: { points: [number, number][]; segs: { a: number; b: number; bulge?: number }[]; w: number; h: number };
+  file?: string;
+  /** 몰딩 — 고정 길이 또는 맞춤(조형 변 길이대로) */
+  molding?: { customized: boolean; length?: number };
+  /** 벽판 — 고정 규격 길이(최대 10개)·맞춤 최대 길이 */
+  wallboard?: { specifications: number[]; customized: boolean; customizedSize?: number };
+  base: MixPart;
+  /** 덧붙임 재질 — 구간 번호 범위 [start, end]·재질·붙임 방식(맞춤 fit / 평붙임 tile) */
+  attach: { start: number; end: number; mat: MixPart; mode: 'fit' | 'tile' }[];
 };
 
 /** 비정형 상품 정보 (쿠지알러 shape_create 의 입력과 같은 항목) */

@@ -19,9 +19,10 @@ import type { ToolType } from '../pm/modelTypes';
  *  waterjet     워터젯 패턴 업로드 (decoration-cms/upload/medallion) — DXF 영역 + 영역별 재질
  *  shaped       비정형 상품 업로드 (vc/commodity/upload/shapedtile) — 이미지 + 형상(육각형·별·둥근 사각·CAD)으로 자르기
  *  paving       파라메트릭 편집기 (/cloud/tool/h5/decoration-param-editor) — 타일·포설 방식·매개변수로 방안 만들기
+ *  lineWall     몰딩/벽판 업로드 (vc/commodity/upload/fdprofile) — CAD 단면 + 제품 유형·크기·바탕 재질·구간별 덧붙임 재질
  *  unverified   쿠지알러 화면을 아직 열어 보지 않은 카드 — 생성 조건을 지어내지 않고 안내만 한다
  */
-export type CreateKind = 'paramModel' | 'material' | 'model3d' | 'profile' | 'modelCutting' | 'virtualModel' | 'pattern' | 'hybrid' | 'tile' | 'border' | 'tilePattern' | 'waterjet' | 'shaped' | 'paving' | 'unverified';
+export type CreateKind = 'paramModel' | 'material' | 'model3d' | 'profile' | 'modelCutting' | 'virtualModel' | 'pattern' | 'hybrid' | 'tile' | 'border' | 'tilePattern' | 'waterjet' | 'shaped' | 'paving' | 'lineWall' | 'unverified';
 
 export type CreatePortal = {
   /** 쿠지알러 uploadPortals id */
@@ -77,7 +78,7 @@ export const CREATE_PORTALS: Record<string, CreatePortal[]> = {
     P({ id: 12, title: '파라메트릭 편집기', origin: '参数化编辑器', desc: '다중 타일 조합·띠 조합·보더·아트월 방안 업로드', kind: 'paving', lib: 5, link: '/cloud/tool/h5/decoration-param-editor' }),
   ],
   linewallboard: [
-    unverified(13, '몰딩/벽판', '线条/墙板', '몰딩·일체형 벽판 업로드', '/vc/commodity/upload/fdprofile'),
+    P({ id: 13, title: '몰딩/벽판', origin: '线条/墙板', desc: '몰딩·일체형 벽판 업로드', kind: 'lineWall', lib: 7, link: '/vc/commodity/upload/fdprofile' }),
   ],
   diatommud: [
     unverified(14, '컬러칩', '色卡', '도료 조색용 컬러칩', '/vc/commodity/upload/colorCard'),

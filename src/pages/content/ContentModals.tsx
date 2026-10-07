@@ -9,6 +9,7 @@ import { CREATE_PORTALS, type CreateKind, type CreatePortal } from '../../data/c
 import { AssetViewer } from '../../components/AssetViewer';
 import { MODELING_EDITOR_ENABLED } from '../../pm/editorFlag';
 import { PV_TYPES } from '../../data/paving';
+import { LW_TYPES } from './lineWall';
 
 /* ───────────────────────── 공통 셸 ───────────────────────── */
 
@@ -280,7 +281,7 @@ export function AddToModal({ kind, options, count, onClose, onApply }: { kind: '
 /* ───────────────────────── 컨텐츠 제작 ───────────────────────── */
 
 const SHAPED_NAME = { hexagon: '육각형', star: '네 꼭지 별', radius: '둥근 모서리 사각', custom: '사용자 정의' } as const;
-const CARD_ICON: Record<CreateKind, string> = { paramModel: '⬢', material: '▣', model3d: '◈', profile: '⌇', modelCutting: '✂', virtualModel: '⚙', pattern: '▦', hybrid: '◐', tile: '▤', border: '⌜', tilePattern: '▩', waterjet: '✺', shaped: '⬡', paving: '⊞', unverified: '▢' };
+const CARD_ICON: Record<CreateKind, string> = { paramModel: '⬢', material: '▣', model3d: '◈', profile: '⌇', modelCutting: '✂', virtualModel: '⚙', pattern: '▦', hybrid: '◐', tile: '▤', border: '⌜', tilePattern: '▩', waterjet: '✺', shaped: '⬡', paving: '⊞', lineWall: '⫽', unverified: '▢' };
 
 /**
  * 컨텐츠 제작(쿠지알러 创建素材) — 업무 탭별 카드. 카드를 누르면 쿠지알러처럼 그 카드의 생성 화면이 열린다
@@ -643,11 +644,17 @@ export function DetailModal({ item, path, related, history, customFields, onClos
           </div>
           {item.model3d?.kind === 'param' && <p className="cl-model-tag">⬢ 파라메트릭 모델 · {item.renderCat || '분류 없음'}</p>}
           {item.model3d?.kind === 'glb' && <p className="cl-model-tag">◈ 3D 모델 업로드 · {item.model3d.file}</p>}
-          {item.profile && <p className="cl-model-tag">⌇ 몰딩 프로파일 단면 {item.profile.w} × {item.profile.h} mm · 점 {item.profile.points.length}개</p>}
+          {item.profile && !item.lineWall && <p className="cl-model-tag">⌇ 몰딩 프로파일 단면 {item.profile.w} × {item.profile.h} mm · 점 {item.profile.points.length}개</p>}
           {item.mix && <p className="cl-model-tag">◐ 혼합 재질 · 검은 영역 {item.mix.black.name} · 흰 영역 {item.mix.white.name}</p>}
           {item.border && <p className="cl-model-tag">⌜ 보더 패턴 · 보더 타일 {item.border.edge.name}{item.border.cornerTile ? ` · 코너 타일 ${item.border.cornerTile.name}` : ' · 코너 없음'}</p>}
           {item.shaped && <p className="cl-model-tag">⬡ 비정형 상품 · {SHAPED_NAME[item.shaped.kind]}{item.shaped.params ? ` · 직선 변 ${item.shaped.params.straight}mm · 호 높이 ${item.shaped.params.arc}mm` : ''}{item.shaped.kind === 'radius' && item.shaped.params ? ` · 짝 맞는 작은 타일 ${item.shaped.params.side}mm` : ''}{item.shaped.cad ? ` · CAD ${item.shaped.cad.name}` : ''} · 면 {item.shaped.faces.length}장 · 줄눈 {item.shaped.gapWidth}mm</p>}
           {item.medallion && <p className="cl-model-tag">✺ 워터젯 패턴 · 영역 {item.medallion.regions}개 · 구멍 {item.medallion.fills.filter((f) => f === 'hollow').length}개 · {item.medallion.w}×{item.medallion.h} mm</p>}
+          {item.lineWall && (() => {
+            const lw = item.lineWall, s = lw.shape;
+            const size = lw.wallboard ? `${lw.wallboard.specifications.length ? `규격 ${lw.wallboard.specifications.join('·')}mm` : ''}${lw.wallboard.customized ? `${lw.wallboard.specifications.length ? ' · ' : ''}맞춤 최대 ${lw.wallboard.customizedSize}mm` : ''}` : lw.molding?.customized ? '맞춤 규격' : `길이 ${lw.molding?.length ?? 0}mm`;
+            const att = new Set(lw.attach.filter((a) => a.mat.id !== lw.base.id).map((a) => a.mat.id)).size;
+            return <p className="cl-model-tag">⫽ 몰딩/벽판 · {LW_TYPES.find((t) => t.code === lw.type)?.name ?? lw.type} · 단면 {s.w} × {s.h} mm · 구간 {s.segs.length}개 · {size} · 바탕 {lw.base.name}{att ? ` · 덧붙임 재질 ${att}종` : ''}</p>;
+          })()}
           {item.paving && <p className="cl-model-tag">⊞ 파라메트릭 방안 · {PV_TYPES.find((t) => t.v === item.paving!.type)?.name ?? '방안'} · 캔버스 {item.modelSize} · 포설 방식 {item.paving.nodes.filter((n) => n.kind === 'paving').length}개 · 매개변수 {item.paving.params.length}개{item.paving.label ? ' · 표기 미리보기 있음' : ''}</p>}
           {item.tilePattern && <p className="cl-model-tag">▩ 타일 배열 패턴 · {item.tilePattern.template} · 타일 {Object.keys(item.tilePattern.tiles).length}종</p>}
           {(item.tile?.pbr ?? item.shaped?.pbr) && <p className="cl-model-tag">◍ 실시간 재질 세부 조정 · 바꾼 값 {Object.keys((item.tile?.pbr ?? item.shaped?.pbr)!.values).length}개</p>}

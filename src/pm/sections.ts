@@ -1,5 +1,5 @@
 import type { ProfileShape } from '../data/contentLibrary';
-import { parseLinePath, stringifyLinePath } from './path';
+import { expandNumArcs, parseLinePath, stringifyLinePath } from './path';
 import { polyOf } from './geometry';
 import { PmEval } from './resolve';
 import { newModel } from './store';
@@ -69,4 +69,34 @@ export function sectionShape(path: string): ProfileShape {
   const r2 = (v: number) => Math.round(v * 100) / 100;
   const points = pts.map(([x, y]) => [r2(x - minX), r2(y - minY)] as [number, number]);
   return { w: r2(Math.max(...points.map((q) => q[0]))), h: r2(Math.max(...points.map((q) => q[1]))), points, path };
+}
+
+/**
+ * 그린 경로 → 단면 구간 (점 · 다음 점까지의 휨) — 원호 선·둥근 모서리는 원호 한 구간 그대로(몰딩/벽판 업로드의 면 나누기).
+ * 오프셋이 있으면 꺾은선(모두 직선). 위치·방향은 그대로 — 원점·반시계 맞추기는 받는 쪽에서.
+ */
+export function sectionArcs(path: string): { points: [number, number][]; bulges: number[] } {
+  const { node, ev } = sectionContext(path);
+  const p = parseLinePath(path, true);
+  if (!p.closed) throw new Error('단면은 닫힌 경로여야 합니다');
+  const num = ev.numPath(node, p, '단면');
+  const poly = num.offset ? polyOf(num) : null;
+  const r = poly ? { pts: poly, bulges: poly.map(() => 0) } : expandNumArcs(num.points, num.lines);
+  if (r.pts.length < 3 || r.pts.some(([x, y]) => !Number.isFinite(x) || !Number.isFinite(y)) || r.bulges.some((b) => !Number.isFinite(b))) {
+    throw new Error('단면 점을 계산하지 못했습니다 — 좌표가 숫자인지, 원호·둥근 모서리가 들어갈 길이가 되는지 확인하세요');
+  }
+  return { points: r.pts.map(([x, y]) => [x, y] as [number, number]), bulges: r.bulges };
+}
+
+/** 단면 구간 → 그리기 경로 — 원호 구간은 원호 선(반지름·방향·짧은/긴 호)으로 (CAD 단면 다시 그리기) */
+export function sectionPathFromArcs(points: [number, number][], bulges: number[]): string {
+  const lines = points.map((a, i): PathLine => {
+    const b = bulges[i] ?? 0;
+    if (!b) return straight;
+    const z = points[(i + 1) % points.length];
+    const theta = 4 * Math.atan(Math.abs(b));
+    const r = Math.hypot(z[0] - a[0], z[1] - a[1]) / (2 * Math.sin(theta / 2));
+    return { type: 1, radius: n(r), clockwise: b < 0, minor: theta <= Math.PI + 1e-9 };
+  });
+  return stringifyLinePath(closedPath(points.map(([x, y]) => pt(x, y)), lines));
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { stringifyLinePath } from './path';
-import { SECTION_TEMPLATES, sectionShape, sectionStartPath } from './sections';
+import { SECTION_TEMPLATES, sectionArcs, sectionPathFromArcs, sectionShape, sectionStartPath } from './sections';
 
 const tpl = (key: string) => SECTION_TEMPLATES.find((t) => t.key === key)!;
 const defaults = (key: string) => Object.fromEntries(tpl(key).fields.map((f) => [f.k, f.v]));
@@ -40,6 +40,36 @@ describe('단면 그리기 — 경로 → 몰딩 단면', () => {
     const s = sectionShape(sectionStartPath({ points: [[0, 0], [40, 0], [40, 10], [0, 10]] }));
     expect([s.w, s.h]).toEqual([40, 10]);
     expect(sectionShape(sectionStartPath()).w).toBe(30);
+  });
+
+  it('구간 — 원호 선·둥근 모서리는 원호 한 구간, 넓이는 펼친 단면과 같다', () => {
+    const bulgeArea = (s: { points: [number, number][]; bulges: number[] }) => s.points.reduce((sum, a, i) => {
+      const b = s.points[(i + 1) % s.points.length], k = s.bulges[i];
+      const tri = (a[0] * b[1] - b[0] * a[1]) / 2;
+      if (!k) return sum + tri;
+      const th = 4 * Math.atan(k), c = Math.hypot(b[0] - a[0], b[1] - a[1]), r = c / (2 * Math.sin(Math.abs(th) / 2));
+      return sum + tri + Math.sign(th) * (r * r / 2) * (Math.abs(th) - Math.sin(Math.abs(th))); // 활꼴
+    }, 0);
+    const q = sectionArcs(stringifyLinePath(tpl('quarter').build({ R: 20 })));
+    expect(q.points.length).toBe(3);
+    expect(q.bulges.filter((b) => b !== 0)).toHaveLength(1);
+    expect(q.bulges.find((b) => b !== 0)).toBeCloseTo(Math.tan(Math.PI / 8), 9); // 반시계 90°
+    expect(bulgeArea(q)).toBeCloseTo((Math.PI * 400) / 4, 6);
+    const sk = sectionArcs(stringifyLinePath(tpl('skirt').build(defaults('skirt'))));
+    expect(sk.points.length).toBe(5); // 둥근 모서리 = 점 2개 + 원호 1구간
+    expect(sk.bulges.filter((b) => b !== 0)).toHaveLength(1);
+    expect(bulgeArea(sk)).toBeCloseTo(15 * 80 - 25 + (Math.PI * 25) / 4, 6);
+    const c = sectionArcs(stringifyLinePath(tpl('cove').build(defaults('cove'))));
+    expect(c.points.length).toBe(5);
+    expect(c.bulges.filter((b) => b < 0)).toHaveLength(1); // 오목 = 시계
+  });
+
+  it('구간 → 경로 왕복 — 원호 구간이 같은 원호로 돌아온다', () => {
+    const pts: [number, number][] = [[0, 0], [30, 0], [30, 10], [0, 40]];
+    const bul = [0, 0, -0.3, 0];
+    const back = sectionArcs(sectionPathFromArcs(pts, bul));
+    expect(back.points).toEqual(pts);
+    back.bulges.forEach((b, i) => expect(b).toBeCloseTo(bul[i], 3));
   });
 
   it('닫히지 않았거나 넓이가 없으면 알림', () => {
