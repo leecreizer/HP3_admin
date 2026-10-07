@@ -40,13 +40,17 @@ function withPath(d: Doc, t: Target, p: PmPath): Doc {
 /** 자 눈금 간격 — 화면에서 50px 이상 */
 const tickStep = (scale: number) => [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000].find((s) => s * scale >= 50) ?? 10000;
 
-export function ProfileEditor({ ev, node, param, kind, closedDefault, title, onSave, onClose, section, onValidate }: {
+export function ProfileEditor({ ev, node, param, kind, closedDefault, title, onSave, onClose, section, onValidate, sectionHint, sectionDepth = 300 }: {
   ev: PmEval; node: PmNode; param: string; kind: 'plank' | 'line'; closedDefault: boolean; title: string;
   onSave: (value: string) => void; onClose: () => void;
   /** 단면 그리기 — 몰딩 단면 템플릿 · 닫힌 경로 고정 · 300mm 몰딩 3D 미리보기 (CAD 없이 단면 만들기) */
   section?: boolean;
   /** 저장 전 검사 — 문구를 돌려주면 저장하지 않고 알림 */
   onValidate?: (value: string) => string | null;
+  /** 단면 모드 머리 안내 (기본: 몰딩 단면 안내) */
+  sectionHint?: string;
+  /** 단면 모드 3D 미리보기 길이 mm (기본 300 몰딩) */
+  sectionDepth?: number;
 }) {
   const initial = useMemo<Doc>(() => {
     const raw = node.params[param] ?? '';
@@ -348,7 +352,7 @@ export function ProfileEditor({ ev, node, param, kind, closedDefault, title, onS
   const ticksX: number[] = [], ticksY: number[] = [];
   for (let x = Math.ceil(toMm(0, 0)[0] / step) * step; x <= toMm(box.w, 0)[0]; x += step) ticksX.push(x);
   for (let y = Math.ceil(toMm(0, box.h)[1] / step) * step; y <= toMm(0, 0)[1]; y += step) ticksY.push(y);
-  const thick = kind === 'plank' ? ev.numParam(node, 'thickness', 18) : section ? 300 : 0;
+  const thick = kind === 'plank' ? ev.numParam(node, 'thickness', 18) : section ? sectionDepth : 0;
   const shapeKey = kind === 'plank' || section ? JSON.stringify([outlineNum, nums.holes, thick]) : '';
 
   const selP = selPt != null ? path.points[selPt] : null;
@@ -359,7 +363,7 @@ export function ProfileEditor({ ev, node, param, kind, closedDefault, title, onS
     <div className="pm-modal-bg">
       <div className="pm-modal pm-pe" role="dialog" aria-modal="true" aria-label={title}>
         <header>
-          <div><b>{title}</b><small>{section ? '단면(mm) — 왼쪽 아래가 (0,0). 오른쪽 단면 템플릿에서 시작하거나 ‘그리기’로 점을 찍으세요 · 3D 미리보기는 300mm 몰딩' : `${node.name}${kind === 'plank' ? ` · 두께 ${thick}` : ''} — 좌표는 수식(#W, #D …) 그대로 저장됩니다`}</small></div>
+          <div><b>{title}</b><small>{section ? sectionHint ?? '단면(mm) — 왼쪽 아래가 (0,0). 오른쪽 단면 템플릿에서 시작하거나 ‘그리기’로 점을 찍으세요 · 3D 미리보기는 300mm 몰딩' : `${node.name}${kind === 'plank' ? ` · 두께 ${thick}` : ''} — 좌표는 수식(#W, #D …) 그대로 저장됩니다`}</small></div>
           <button className="pm-icon" title="실행 취소" aria-label="실행 취소" disabled={hist.i === 0} onClick={() => setHist((h) => ({ ...h, i: Math.max(0, h.i - 1) }))}>↶</button>
           <button className="pm-icon" title="다시 실행" aria-label="다시 실행" disabled={hist.i >= hist.list.length - 1} onClick={() => setHist((h) => ({ ...h, i: Math.min(h.list.length - 1, h.i + 1) }))}>↷</button>
           <button className="pm-btn" onClick={() => (dirty ? setConfirmExit(true) : onClose())}>나가기</button>

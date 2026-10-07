@@ -15,6 +15,7 @@ import { TilePatternPage } from './TilePatternPage';
 import { WaterjetPage } from './WaterjetPage';
 import { SectionDraw } from '../pm/SectionDraw';
 import { ShapedTilePage } from './ShapedTilePage';
+import { PavingPage } from './paving/PavingPage';
 import type { NewItemDraft, PageProps } from './createTypes';
 
 /**
@@ -428,6 +429,7 @@ export function CreatePage(props: PageProps) {
     case 'tilePattern': return <TilePatternPage {...props} />;
     case 'waterjet': return <WaterjetPage {...props} />;
     case 'shaped': return <ShapedTilePage {...props} />;
+    case 'paving': return <PavingPage {...props} />;
     default: return <UnverifiedPage {...props} />;
   }
 }

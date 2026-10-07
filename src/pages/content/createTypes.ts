@@ -18,6 +18,8 @@ export type PageProps = {
   st: ContentState;
   onClose: () => void;
   onCreate: (drafts: NewItemDraft[], msg: string, opts?: CreateOpts) => string[];
+  /** 만든 상품 고치기 — 파라메트릭 편집기의 두 번째 저장부터 */
+  onUpdate?: (id: string, patch: Partial<Item>, action: string) => void;
   /** 만든 상품으로 가기 — 화면을 닫고 그 상품의 폴더를 연다 (쿠지알러 ‘상품 목록 보기’) */
   onReveal: (itemId: string) => void;
 };

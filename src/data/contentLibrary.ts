@@ -7,6 +7,8 @@
  * 저장: localStorage — 자동저장 없음, 화면의 '저장' 버튼으로만 영속화 (다른 관리 화면과 동일).
  */
 
+import type { PvScheme } from './paving';
+
 export type Folder = { id: string; name: string; hidden?: boolean; cover?: string; children?: Folder[] };
 
 export type Item = {
@@ -82,6 +84,8 @@ export type Item = {
   medallion?: { asset: string; w: number; h: number; regions: number; fills: (MedallionFill | null)[] };
   /** 비정형 상품(쿠지알러 异型产品) — 형상·매개변수(mm)·형상대로 자른 면 이미지(IndexedDB 에셋)·줄눈·재질 분류 */
   shaped?: ShapedInfo;
+  /** 파라메트릭 방안(쿠지알러 参数化编辑器) — 타일·포설 방식·매개변수·표기 미리보기 */
+  paving?: PvScheme;
 };
 
 /** 비정형 상품 정보 (쿠지알러 shape_create 의 입력과 같은 항목) */
