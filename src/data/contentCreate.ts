@@ -20,9 +20,10 @@ import type { ToolType } from '../pm/modelTypes';
  *  shaped       비정형 상품 업로드 (vc/commodity/upload/shapedtile) — 이미지 + 형상(육각형·별·둥근 사각·CAD)으로 자르기
  *  paving       파라메트릭 편집기 (/cloud/tool/h5/decoration-param-editor) — 타일·포설 방식·매개변수로 방안 만들기
  *  lineWall     몰딩/벽판 업로드 (vc/commodity/upload/fdprofile) — CAD 단면 + 제품 유형·크기·바탕 재질·구간별 덧붙임 재질
+ *  colorCard    컬러칩 업로드 (vc/commodity/upload/colorCard) — R·G·B·이름·분류 표, 글상자·CSV·컬러칩 사진으로 한꺼번에
  *  unverified   쿠지알러 화면을 아직 열어 보지 않은 카드 — 생성 조건을 지어내지 않고 안내만 한다
  */
-export type CreateKind = 'paramModel' | 'material' | 'model3d' | 'profile' | 'modelCutting' | 'virtualModel' | 'pattern' | 'hybrid' | 'tile' | 'border' | 'tilePattern' | 'waterjet' | 'shaped' | 'paving' | 'lineWall' | 'unverified';
+export type CreateKind = 'paramModel' | 'material' | 'model3d' | 'profile' | 'modelCutting' | 'virtualModel' | 'pattern' | 'hybrid' | 'tile' | 'border' | 'tilePattern' | 'waterjet' | 'shaped' | 'paving' | 'lineWall' | 'colorCard' | 'unverified';
 
 export type CreatePortal = {
   /** 쿠지알러 uploadPortals id */
@@ -81,7 +82,7 @@ export const CREATE_PORTALS: Record<string, CreatePortal[]> = {
     P({ id: 13, title: '몰딩/벽판', origin: '线条/墙板', desc: '몰딩·일체형 벽판 업로드', kind: 'lineWall', lib: 7, link: '/vc/commodity/upload/fdprofile' }),
   ],
   diatommud: [
-    unverified(14, '컬러칩', '色卡', '도료 조색용 컬러칩', '/vc/commodity/upload/colorCard'),
+    P({ id: 14, title: '컬러칩', origin: '色卡', desc: '도료 조색용 컬러칩', kind: 'colorCard', lib: 9, link: '/vc/commodity/upload/colorCard' }),
     unverified(15, '벽면 패턴', '墙面图案', '규조토 패턴·벽화 등 벽면 상품', '/pub/saas/decoration-cms/upload/wallPattern'),
     unverified(16, '도료 상품', '涂料商品', '도료·규조토 — 요철 질감 표현 지원', '/pub/saas/decoration-cms/vc/commodity/upload/diatomMud'),
   ],

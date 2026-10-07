@@ -17,6 +17,7 @@ import { SectionDraw } from '../pm/SectionDraw';
 import { ShapedTilePage } from './ShapedTilePage';
 import { PavingPage } from './paving/PavingPage';
 import { LineWallboardPage } from './LineWallboardPage';
+import { ColorCardPage } from './ColorCardPage';
 import type { NewItemDraft, PageProps } from './createTypes';
 
 /**
@@ -432,6 +433,7 @@ export function CreatePage(props: PageProps) {
     case 'shaped': return <ShapedTilePage {...props} />;
     case 'paving': return <PavingPage {...props} />;
     case 'lineWall': return <LineWallboardPage {...props} />;
+    case 'colorCard': return <ColorCardPage {...props} />;
     default: return <UnverifiedPage {...props} />;
   }
 }

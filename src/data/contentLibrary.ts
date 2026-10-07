@@ -88,6 +88,8 @@ export type Item = {
   paving?: PvScheme;
   /** 몰딩/벽판(쿠지알러 线条/墙板) — 제품 유형·단면 구간·크기·바탕 재질·덧붙임 재질 */
   lineWall?: LineWallInfo;
+  /** 컬러칩(쿠지알러 色卡 · colorcard/create 의 color) — #rrggbb */
+  colorCard?: { color: string };
 };
 
 /**
